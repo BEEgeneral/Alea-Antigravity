@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🌌 Aleasignature - Luxury Real Estate Platform
 
-## Getting Started
+Aleasignature is an exclusive, high-end real estate and investment platform designed for high-net-worth individuals and institutional investors. The portal offers a curated selection of off-market properties, dynamic profitability calculators, and a secure operational pipeline for agents.
 
-First, run the development server:
+*Built with Next.js (App Router), Supabase (Auth, Postgres, Edge Functions), Tailwind CSS, and Framer Motion for a "Quiet Luxury" aesthetic.*
+
+## ✨ Features
+
+- **Exclusive Radar de Inversión:** Off-market property listings with secure data rooms.
+- **Dynamic Profitability Calculator:** Instant ROI and yield estimations for investors.
+- **Agent Dashboard & CRM:** Integrated lead management, interaction logging, and matching system.
+- **Data Security:** Strict Row Level Security (RLS) policies implemented via Supabase to protect sensitive property and investor data.
+- **Premium UI/UX:** High-performance, kinetic typography, glassmorphism, and seamless micro-interactions.
+
+## 🚀 Getting Started
+
+First, set up your local environment variables. Create a `.env.local` file and add your Supabase credentials:
 
 ```bash
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+Then, run the development server:
+
+```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🏗️ Architecture
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Frontend:** Next.js 15, React, Tailwind CSS, Framer Motion, Lucide React.
+- **Backend/Database:** Supabase (PostgreSQL), Edge Functions for complex calculations.
+- **Deployment:** Ready for Vercel.
 
-## Learn More
+## 🛡️ Definition of Done (The House Way)
+This project follows strict guidelines for speed-to-market, visual excellence, and maintainability.
+- **Visuals:** Minimalist, high contrast, avoiding generic defaults.
+- **Interactions:** Fast feedback, clear system states (loading, errors, success).
+- **Codebase:** Typed, linted, and fully architected for scalability.
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+*Created by [Antigravity]*

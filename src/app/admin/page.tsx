@@ -173,6 +173,23 @@ export default function AdminDashboard() {
         }
     };
 
+    const handleDeleteLead = async (id: string) => {
+        if (!confirm("¿Estás seguro de que quieres eliminar esta ficha de Operativa (Lead)? Esta acción es irreversible.")) return;
+        const { error } = await supabase
+            .from('leads')
+            .delete()
+            .eq('id', id);
+
+        if (!error) {
+            setLeads((prev: any[]) => prev.filter((l: any) => l.id !== id));
+            if (selectedLead?.id === id) setSelectedLead(null);
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        } else {
+            console.error("Error deleting lead", error);
+        }
+    };
+
     const handleDeleteProperty = async (id: string) => {
         if (!confirm("¿Estás seguro de que quieres dar de baja esta propiedad?")) return;
         const { error } = await supabase
@@ -853,6 +870,13 @@ export default function AdminDashboard() {
                                     <span className="text-sm font-serif text-primary italic">{lead.matchScore}%</span>
                                 </div>
                             </div>
+                            <button
+                                onClick={() => handleDeleteLead(lead.id)}
+                                className="p-3 hover:bg-red-50 rounded-2xl transition-all border border-transparent hover:border-red-200 group"
+                                title="Eliminar Ficha de Operativa"
+                            >
+                                <Trash2 size={20} className="text-muted-foreground group-hover:text-red-500 transition-colors" />
+                            </button>
                             <button
                                 onClick={() => setSelectedLead(null)}
                                 className="p-3 hover:bg-muted rounded-2xl transition-all border border-transparent hover:border-border"

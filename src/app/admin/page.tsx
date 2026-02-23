@@ -1,0 +1,2011 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+"use client";
+
+import {
+    Users, Building, Activity, ShieldAlert, ArrowUpRight, Search,
+    CheckCircle2, FileText, Download, UserCheck, Mail, GripVertical,
+    Clock, MapPin, LayoutDashboard, Plus, MoreHorizontal, Share2,
+    ChevronLeft, Maximize2, Bed, Bath, Sparkles, TrendingUp, Wind,
+    Trees, ShoppingBag, Umbrella, Tag, Calendar, ShieldCheck, Star,
+    Trash2, Edit2, Upload, Loader2
+} from "lucide-react";
+import Link from "next/link";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
+
+// Defined Pipeline Stages
+const PIPELINE_STAGES = [
+    { id: "prospect", label: "Prospect", color: "bg-blue-500" },
+    { id: "qualified", label: "Qualified", color: "bg-amber-500" },
+    { id: "due-diligence", label: "Due Diligence", color: "bg-purple-500" },
+    { id: "offer", label: "Offer / LOI", color: "bg-emerald-500" },
+    { id: "closing", label: "Closing", color: "bg-primary" },
+];
+
+// Pipeline stage IDs match lead status values directly — no need for mapping objects.
+const VALID_STAGES = new Set(PIPELINE_STAGES.map(s => s.id));
+
+const MOCK_ACTIVITY = [
+    { id: "a1", action: "DOWNLOADED_DOCUMENT", detail: "Alberto Gala downloaded 'Nota Simple - Palacio Gran Vía'", time: "10 mins ago" },
+    { id: "a2", action: "VIEWED_PROPERTY", detail: "Sofia Martinez viewed 'Azure Seafront Villa'", time: "2 hours ago" },
+    { id: "a3", action: "PROFILE_UPDATED", detail: "Eduardo Santacruz completed Voice Onboarding", time: "5 hours ago" },
+];
+
+const MOCK_TEMPLATES = [
+    { id: "t1", name: "NDA - Acuerdo de Confidencialidad", type: "Legal", lastUsed: "1 day ago" },
+    { id: "t2", name: "LoI - Carta de Intención de Compra", type: "Legal", lastUsed: "3 days ago" },
+    { id: "t3", name: "Perfil de Inversión Resumido", type: "Internal", lastUsed: "Today" },
+];
+
+export default function AdminDashboard() {
+    const router = useRouter();
+    const [activeTab, setActiveTab] = useState("crm");
+    const [selectedInvestor, setSelectedInvestor] = useState<any>(null);
+    const [selectedLead, setSelectedLead] = useState<any>(null);
+    const [leads, setLeads] = useState<any[]>([]);
+    const [interactions, setInteractions] = useState<any[]>([]);
+    const [investors, setInvestors] = useState<any[]>([]);
+    const [properties, setProperties] = useState<any[]>([]);
+    const [draggingId, setDraggingId] = useState<string | null>(null);
+    const [showToast, setShowToast] = useState(false);
+    const [currentUser, setCurrentUser] = useState<any>(null);
+    const [allAgents, setAllAgents] = useState<any[]>([]);
+    const [selectedProperty, setSelectedProperty] = useState<any>(null);
+    const [_loading, setLoading] = useState(true);
+    const [selectedAgentToEdit, setSelectedAgentToEdit] = useState<any>(null);
+    const [selectedInvestorToEdit, setSelectedInvestorToEdit] = useState<any>(null);
+    const [isAddingAgent, setIsAddingAgent] = useState(false);
+    const [isAddingInvestor, setIsAddingInvestor] = useState(false);
+    const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+    const [agentForm, setAgentForm] = useState({ full_name: "", email: "", role: "agent" });
+    const [investorForm, setInvestorForm] = useState<any>({
+        full_name: "",
+        company_name: "",
+        email: "",
+        phone: "",
+        investor_type: "",
+        min_ticket_eur: 0,
+        max_ticket_eur: 0
+    });
+
+    const fetchData = async () => {
+        try {
+            // Fetch Leads with Investor and Property details
+            const { data: leadsData } = await supabase
+                .from('leads')
+                .select(`
+                    *,
+                    investors (*),
+                    properties (*)
+                `)
+                .order('created_at', { ascending: false });
+
+            // Fetch Properties
+            const { data: propertiesData } = await supabase.from('properties').select('*');
+
+            // Fetch Investors
+            const { data: investorsData } = await supabase.from('investors').select('*');
+
+            if (leadsData) setLeads(leadsData);
+            if (propertiesData) setProperties(propertiesData);
+            if (investorsData) setInvestors(investorsData);
+        } catch (error) {
+            console.error("Error fetching data:", error);
+        }
+    };
+
+    useEffect(() => {
+        const checkAuth = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                router.push("/login");
+                return;
+            }
+
+            const { data: agent } = await supabase
+                .from('agents')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
+
+            if (!agent || !agent.is_approved) {
+                router.push("/login");
+                return;
+            }
+
+            setCurrentUser(agent);
+            await fetchData();
+            setLoading(false);
+        };
+        checkAuth();
+    }, [router]);
+
+    useEffect(() => {
+        if (activeTab === "agents" && currentUser?.role === "admin") {
+            const fetchAgents = async () => {
+                const { data } = await supabase.from('agents').select('*').order('created_at', { ascending: false });
+                if (data) setAllAgents(data);
+            };
+            fetchAgents();
+        }
+    }, [activeTab, currentUser]);
+
+    const handleApproveAgent = async (id: string) => {
+        const { error } = await supabase
+            .from('agents')
+            .update({ is_approved: true })
+            .eq('id', id);
+
+        if (!error) {
+            setAllAgents(prev => prev.map(a => a.id === id ? { ...a, is_approved: true } : a));
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        }
+    };
+
+    const handleRejectAgent = async (id: string) => {
+        const { error } = await supabase
+            .from('agents')
+            .delete()
+            .eq('id', id);
+
+        if (!error) {
+            setAllAgents(prev => prev.filter(a => a.id !== id));
+        }
+    };
+
+    const handleDeleteInvestor = async (id: string) => {
+        if (!confirm("¿Estás seguro de que quieres eliminar a este inversor? Esta acción es irreversible.")) return;
+        const { error } = await supabase
+            .from('investors')
+            .delete()
+            .eq('id', id);
+
+        if (!error) {
+            setInvestors((prev: any[]) => prev.filter((i: any) => i.id !== id));
+            if (selectedInvestor?.id === id) setSelectedInvestor(null);
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        } else {
+            console.error("Error deleting investor", error);
+        }
+    };
+
+    const handleDeleteProperty = async (id: string) => {
+        if (!confirm("¿Estás seguro de que quieres dar de baja esta propiedad?")) return;
+        const { error } = await supabase
+            .from('properties')
+            .delete()
+            .eq('id', id);
+
+        if (!error) {
+            setProperties((prev: any[]) => prev.filter((p: any) => p.id !== id));
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        } else {
+            console.error("Error deleting property", error);
+        }
+    };
+
+    const handleUploadPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsUploadingPdf(true);
+        try {
+            // 1. Upload original PDF to Supabase Storage (bucket 'properties')
+            let pdfUrl = null;
+            const fileExt = file.name.split('.').pop();
+            const fileName = `dossiers/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('properties')
+                .upload(fileName, file);
+
+            if (uploadData && !uploadError) {
+                const { data: { publicUrl } } = supabase.storage.from('properties').getPublicUrl(fileName);
+                pdfUrl = publicUrl;
+            } else {
+                console.warn("Could not upload PDF to Storage:", uploadError);
+            }
+
+            // 2. Parse PDF dynamically
+            const rawPdfjs = await import('pdfjs-dist');
+            const pdfjsLib: any = rawPdfjs.default ? rawPdfjs.default : rawPdfjs;
+
+            if (pdfjsLib.GlobalWorkerOptions) {
+                const version = pdfjsLib.version || '3.11.174';
+                pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.js`;
+            }
+
+            const arrayBuffer = await file.arrayBuffer();
+            const typedArray = new Uint8Array(arrayBuffer);
+            const pdf = await pdfjsLib.getDocument({ data: typedArray }).promise;
+
+            let fullText = "";
+            const extractedImages: string[] = [];
+
+            // Extract text from all pages
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map((item: any) => item.str).join(" ");
+                fullText += pageText + "\n";
+            }
+
+            // Extract images from first 3 pages by rendering them via Canvas
+            for (let i = 1; i <= Math.min(pdf.numPages, 3); i++) {
+                const page = await pdf.getPage(i);
+                const viewport = page.getViewport({ scale: 1.5 });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                if (context) {
+                    await page.render({ canvasContext: context, viewport }).promise;
+                    extractedImages.push(canvas.toDataURL('image/jpeg', 0.8));
+                }
+            }
+
+            // Fallback heuristics
+            const priceMatch = fullText.match(/(?:precio|price|valor)[\s:=]*([0-9.,]+)[\s]*(?:€|euros|m|k)/i);
+            const parsedPrice = priceMatch ? parseFloat(priceMatch[1].replace(/[^0-9]/g, '')) : 0;
+
+            // Look for meters
+            const metersMatch = fullText.match(/([0-9.,]+)[\s]*(?:m2|m²|metros)/i);
+            const parsedMeters = metersMatch ? parseFloat(metersMatch[1].replace(/[^0-9]/g, '')) : 0;
+
+            const newProperty = {
+                title: file.name.replace('.pdf', ''),
+                description: fullText.substring(0, 800) + (fullText.length > 800 ? "..." : ""),
+                price: parsedPrice || 1000000, // mock fallback
+                meters: parsedMeters || 150,
+                thumbnail_url: extractedImages[0] || null,
+                images: extractedImages,
+                status: 'Off-Market',
+                asset_type: 'Activo Extraído',
+                is_off_market: true,
+                dossier_url: pdfUrl
+            };
+
+            const { data: insertedData, error: insertError } = await supabase
+                .from('properties')
+                .insert([newProperty])
+                .select();
+
+            if (insertError) throw insertError;
+
+            if (insertedData) {
+                setProperties(prev => [insertedData[0], ...prev]);
+                setShowToast(true);
+            }
+
+        } catch (err: any) {
+            console.error("Error processing PDF:", err?.message || err, err?.stack || "");
+            alert(`Error al procesar el PDF: ${err?.message || 'Error desconocido'}`);
+        } finally {
+            setIsUploadingPdf(false);
+            e.target.value = '';
+        }
+    };
+
+    const handleUpdateAgent = async (agent: any) => {
+        const { error } = await supabase
+            .from('agents')
+            .update({
+                full_name: agent.full_name,
+                role: agent.role,
+                is_approved: agent.is_approved
+            })
+            .eq('id', agent.id);
+
+        if (!error) {
+            setAllAgents(prev => prev.map(a => a.id === agent.id ? { ...a, ...agent } : a));
+            setSelectedAgentToEdit(null);
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        }
+    };
+
+    const handleUpdateInvestor = async (investor: any) => {
+        const { error } = await supabase
+            .from('investors')
+            .update({
+                full_name: investor.full_name,
+                company_name: investor.company_name,
+                phone: investor.phone,
+                investor_type: investor.investor_type,
+                min_ticket_eur: investor.min_ticket_eur,
+                max_ticket_eur: investor.max_ticket_eur
+            })
+            .eq('id', investor.id);
+
+        if (!error) {
+            setInvestors(prev => prev.map(i => i.id === investor.id ? { ...i, ...investor } : i));
+            setSelectedInvestorToEdit(null);
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        } else {
+            console.error("Error updating investor:", error);
+        }
+    };
+
+    const handleCreateAgent = async () => {
+        // Note: Creating a user via admin typically requires Service Role or specific Auth logic.
+        // For simplicity in this UI, we assume we insert into 'agents' and the user will register later,
+        // or we use this just for administrative tracking.
+        const { error } = await supabase
+            .from('agents')
+            .insert([{
+                ...agentForm,
+                is_approved: true,
+                created_at: new Date().toISOString()
+            }]);
+
+        if (!error) {
+            const { data } = await supabase.from('agents').select('*').order('created_at', { ascending: false });
+            if (data) setAllAgents(data);
+            setIsAddingAgent(false);
+            setAgentForm({ full_name: "", email: "", role: "agent" });
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        } else {
+            console.error("Error creating agent:", error);
+        }
+    };
+
+    const handleCreateInvestor = async () => {
+        try {
+            const { error } = await supabase
+                .from('investors')
+                .insert([{
+                    ...investorForm,
+                    status: 'nuevo',
+                    kyc_status: 'pending',
+                    created_at: new Date().toISOString()
+                }]);
+
+            if (!error) {
+                await fetchData(); // Refresh list
+                setIsAddingInvestor(false);
+                setInvestorForm({
+                    full_name: "",
+                    company_name: "",
+                    email: "",
+                    phone: "",
+                    investor_type: "",
+                    min_ticket_eur: 0,
+                    max_ticket_eur: 0
+                });
+                setShowToast(true);
+                setTimeout(() => setShowToast(false), 3000);
+            } else {
+                console.error("Error creating investor:", error);
+            }
+        } catch (error) {
+            console.error("Catch error creating investor:", error);
+        }
+    };
+
+    // Refs for columns to detect drop zones
+    const columnRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+    const handleDragStart = (id: string) => {
+        setDraggingId(id);
+    };
+
+    const handleDragEnd = async (event: any, info: any, leadId: string) => {
+        setDraggingId(null);
+
+        // Find which column the pointer is over
+        const point = info.point;
+        let targetStageId = null;
+
+        for (const stage of PIPELINE_STAGES) {
+            const el = columnRefs.current[stage.id];
+            if (el) {
+                const rect = el.getBoundingClientRect();
+                if (point.x >= rect.left && point.x <= rect.right) {
+                    targetStageId = stage.id;
+                    break;
+                }
+            }
+        }
+
+        if (targetStageId) {
+            const lead = leads.find(l => l.id === leadId);
+
+            if (lead && lead.status !== targetStageId) {
+                // Update local state for optimistic UI
+                setLeads(prev => prev.map(l =>
+                    l.id === leadId ? { ...l, status: targetStageId } : l
+                ));
+
+                // Persist to Supabase
+                const { error } = await supabase
+                    .from('leads')
+                    .update({ status: targetStageId, updated_at: new Date().toISOString() })
+                    .eq('id', leadId);
+
+                if (error) {
+                    console.error("Error updating lead status:", error);
+                    // Revert local state if needed
+                    await fetchData();
+                } else {
+                    setShowToast(true);
+                    setTimeout(() => setShowToast(false), 3000);
+                }
+            }
+        }
+    };
+
+    const _handleAddInteraction = (leadId: string) => {
+        const content = prompt("Añadir nota de seguimiento:");
+        if (content) {
+            const newInteraction = {
+                id: `i${Date.now()}`,
+                leadId,
+                type: "note",
+                content,
+                date: "Just now"
+            };
+            setInteractions([newInteraction, ...interactions]);
+        }
+    };
+
+    const renderInvestorProfile = (investor: any) => {
+        return (
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="max-w-6xl mx-auto w-full p-8"
+            >
+                <div className="flex items-center justify-between mb-12">
+                    <button
+                        onClick={() => setSelectedInvestor(null)}
+                        className="flex items-center space-x-2 text-xs font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                        <span>← Volver al Pipeline</span>
+                    </button>
+                    <div className="flex items-center space-x-4">
+                        <button
+                            onClick={() => setSelectedInvestorToEdit(investor)}
+                            className="px-6 py-2 bg-primary/10 text-primary rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-white transition-all"
+                        >
+                            Editar Perfil
+                        </button>
+                        <button className="px-6 py-2 bg-foreground text-background rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-foreground/90 transition-all">Generar Reporte KYC</button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Sidebar Info */}
+                    <div className="lg:col-span-1 space-y-8">
+                        <div className="bg-card border border-border rounded-[2.5rem] p-8 shadow-sm">
+                            <div className="w-24 h-24 bg-primary/5 rounded-3xl flex items-center justify-center text-4xl font-serif text-primary mb-6 border border-primary/10">
+                                {investor.investor?.charAt(0) || 'I'}
+                            </div>
+                            <h2 className="text-2xl font-serif font-medium mb-1">{investor.investor}</h2>
+                            <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-6">{investor.type}</p>
+
+                            <div className="space-y-4 pt-6 border-t border-border">
+                                <div className="flex items-center space-x-3 text-sm">
+                                    <Mail size={16} className="text-primary/40" />
+                                    <span>{investor.email}</span>
+                                </div>
+                                <div className="flex items-center space-x-3 text-sm">
+                                    <Activity size={16} className="text-primary/40" />
+                                    <span className="text-green-500 font-bold uppercase text-[10px] tracking-widest">Inversor Verificado</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-card border border-border rounded-[2.5rem] p-8 shadow-sm">
+                            <h3 className="text-[10px] uppercase tracking-[0.2em] text-primary font-bold mb-6">Tesis de Inversión</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Ticket Preferido</p>
+                                    <p className="text-lg font-serif">{investor.ticket}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Sectores de Interés</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {investor.interests?.map((interest: string) => (
+                                            <span key={interest} className="px-3 py-1 bg-muted rounded-full text-[10px] font-bold uppercase tracking-wider">{interest}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Main Profiling */}
+                    <div className="lg:col-span-2 space-y-8">
+                        <div className="bg-card border border-border rounded-[2.5rem] p-10 shadow-sm">
+                            <h3 className="text-[10px] uppercase tracking-[0.2em] text-primary font-bold mb-8">Historial de Operaciones</h3>
+                            <div className="space-y-6">
+                                <div className="p-6 bg-muted/30 rounded-3xl border border-border/50 flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-bold">{investor.property}</p>
+                                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-1">{investor.status}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-lg font-serif text-primary">{investor.matchScore}% Match</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-card border border-border rounded-[2.5rem] p-10 shadow-sm">
+                            <h3 className="text-[10px] uppercase tracking-[0.2em] text-primary font-bold mb-8">Documentación KYC</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="p-4 border border-border rounded-2xl flex items-center justify-between group hover:bg-muted/50 transition-all">
+                                    <div className="flex items-center space-x-3">
+                                        <FileText size={18} className="text-primary/60" />
+                                        <span className="text-xs font-bold uppercase tracking-wider">NDA Firmado</span>
+                                    </div>
+                                    <Download size={14} className="text-muted-foreground group-hover:text-primary transition-colors cursor-pointer" />
+                                </div>
+                                <div className="p-4 border border-border rounded-2xl flex items-center justify-between group hover:bg-muted/50 transition-all">
+                                    <div className="flex items-center space-x-3">
+                                        <ShieldAlert size={18} className="text-primary/60" />
+                                        <span className="text-xs font-bold uppercase tracking-wider">Origen de Fondos</span>
+                                    </div>
+                                    <Download size={14} className="text-muted-foreground group-hover:text-primary transition-colors cursor-pointer" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </motion.div>
+        );
+    };
+
+    const renderPropertyDetail = (property: any) => {
+        return (
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="max-w-[1400px] mx-auto w-full p-8"
+            >
+                {/* Header Section */}
+                <div className="flex flex-col md:flex-row md:items-start justify-between mb-8 gap-4">
+                    <div className="flex-1">
+                        <button
+                            onClick={() => setSelectedProperty(null)}
+                            className="flex items-center space-x-2 text-xs font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors mb-4"
+                        >
+                            <ChevronLeft size={16} />
+                            <span>Volver a Inventario</span>
+                        </button>
+                        <h1 className="text-3xl md:text-4xl font-serif font-medium leading-tight mb-2 uppercase tracking-tight">
+                            {property.title}
+                        </h1>
+                        <div className="flex items-center text-sm text-muted-foreground font-medium">
+                            <MapPin size={16} className="text-primary mr-2" />
+                            <span className="uppercase tracking-wider">{property.address}</span>
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                        {property.dossier_url && (
+                            <a
+                                href={property.dossier_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center space-x-2 px-6 py-3 bg-primary text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
+                            >
+                                <FileText size={16} />
+                                <span>Ver Dossier Original</span>
+                            </a>
+                        )}
+                        <button className="flex items-center space-x-2 px-6 py-3 bg-red-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 hidden md:flex">
+                            <FileText size={16} />
+                            <span>Generar PDF</span>
+                        </button>
+                        <button className="flex items-center space-x-2 px-6 py-3 bg-white border border-border rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-muted transition-all text-foreground">
+                            <Share2 size={16} />
+                            <span>Compartir</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    {/* Main Content (Left Column) */}
+                    <div className="lg:col-span-8 space-y-8">
+                        {/* Gallery Section */}
+                        <div className="relative group">
+                            <div className="aspect-[16/10] bg-muted rounded-[2.5rem] overflow-hidden border border-border/50 relative">
+                                <img
+                                    src={property.images?.[0] || "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80"}
+                                    alt={property.title}
+                                    className="w-full h-full object-cover"
+                                />
+                                {/* Gallery Overlay */}
+                                <div className="absolute top-6 left-6 flex space-x-2">
+                                    <span className="px-4 py-1.5 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-lg flex items-center shadow-lg">
+                                        <Star size={12} className="mr-2 fill-white" />
+                                        Exclusiva
+                                    </span>
+                                    <span className="px-4 py-1.5 bg-white/90 backdrop-blur-md text-foreground text-[10px] font-black uppercase tracking-widest rounded-lg border border-white/20 shadow-lg">
+                                        Excelente
+                                    </span>
+                                </div>
+                                <div className="absolute bottom-6 right-6 px-4 py-2 bg-black/50 backdrop-blur-md text-white text-[10px] font-bold rounded-xl border border-white/10">
+                                    1 / {property.images?.length || 54}
+                                </div>
+                            </div>
+                            {/* Thumbnails */}
+                            <div className="flex space-x-4 mt-6 overflow-x-auto pb-2 no-scrollbar">
+                                {(property.images || Array(5).fill("")).slice(0, 5).map((img: string, i: number) => (
+                                    <div key={i} className={`w-24 h-16 rounded-xl overflow-hidden border-2 cursor-pointer transition-all shrink-0 ${i === 0 ? 'border-primary' : 'border-transparent opacity-70 hover:opacity-100'}`}>
+                                        <img src={img || "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80"} alt={`Vista ${i + 1}`} className="w-full h-full object-cover" />
+                                    </div>
+                                ))}
+                                <div className="w-24 h-16 rounded-xl bg-muted flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-muted-foreground border border-border cursor-pointer hover:bg-primary/10 hover:text-primary transition-all shrink-0">
+                                    +46
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Description Section */}
+                        <div className="bg-card border border-border/60 rounded-[2.5rem] p-10 shadow-sm text-white">
+                            <h3 className="flex items-center space-x-3 text-lg font-serif font-medium mb-8">
+                                <FileText className="text-primary" size={24} />
+                                <span className="text-foreground">Descripción</span>
+                            </h3>
+                            <div className="text-muted-foreground leading-relaxed font-light text-lg">
+                                {property.description || "Sin descripción disponible."}
+                            </div>
+                        </div>
+
+
+
+                        {/* Detailed Characteristics */}
+                        <div className="bg-card border border-border/60 rounded-[2.5rem] p-10 shadow-sm text-white">
+                            <h3 className="flex items-center space-x-3 text-lg font-serif font-medium mb-10">
+                                <Building className="text-primary" size={24} />
+                                <span className="text-foreground">Características Detalladas</span>
+                            </h3>
+
+                            {/* Icon Grid */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+                                {[
+                                    { icon: Maximize2, label: "M² Útiles", value: `${property.meters || 0}` },
+                                    { icon: Building, label: "Parcela", value: `${property.parcela_meters || 279} m²` },
+                                    { icon: Sparkles, label: "Estado", value: property.status || "Excelente" },
+                                    { icon: Building, label: "Tipo", value: property.type || "Local" }
+                                ].map((item, i) => (
+                                    <div key={i} className="bg-muted/30 p-6 rounded-3xl border border-border/40 text-center flex flex-col items-center group hover:bg-primary/5 hover:border-primary/20 transition-all">
+                                        <item.icon className="text-primary/40 group-hover:text-primary transition-colors mb-4" size={24} />
+                                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black mb-1">{item.label}</p>
+                                        <p className="text-base font-bold font-serif text-foreground">{item.value}</p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Info List */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-6 text-sm">
+                                {[
+                                    { label: "Tipo:", value: property.type || "Local" },
+                                    { label: "Referencia:", value: property.reference || "3250313UF7635S0001WO", valueClass: "font-mono font-bold" },
+                                    { label: "Estado:", value: property.status || "Excelente" },
+                                    { label: "Orientación:", value: property.orientacion || "Norte" },
+                                    { label: "Cocina:", value: property.cocina || "Equipada" },
+                                    { label: "Piscina:", value: property.piscina ? "Sí" : "Sí" },
+                                    { label: "Jardín:", value: property.jardin ? "Sí" : "Sí" },
+                                    { label: "Amueblado:", value: property.amueblado ? "Sí" : "Sí" },
+                                    { label: "Agente responsable:", value: property.agent_responsible || "Alberto BeeNoCode", valueClass: "font-serif italic" }
+                                ].map((row, i) => (
+                                    <div key={i} className="flex justify-between items-center py-3 border-b border-border/30 last:border-0">
+                                        <span className="text-muted-foreground uppercase tracking-widest text-[10px] font-bold">{row.label}</span>
+                                        <span className={`text-right text-foreground ${row.valueClass || 'font-bold'}`}>{row.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Tags Sections */}
+                            <div className="mt-12 space-y-8">
+                                {[
+                                    { label: "Características", tags: property.features || ["Patio"], icon: Star },
+                                    { label: "Climatización", tags: property.climatization || ["Aire Acondicionado"], icon: Wind },
+                                    { label: "Entorno", tags: property.entorno || ["Cerca de Tiendas", "Cerca del Mar", "Cerca de Colegios"], icon: MapPin },
+                                    { label: "Categoría", tags: property.category || ["Lujo", "Reventa", "Casas de vacaciones", "Oportunidad"], icon: Tag }
+                                ].map((section, i) => (
+                                    <div key={i}>
+                                        <p className="text-[10px] uppercase tracking-widest text-primary font-black mb-4 flex items-center">
+                                            <section.icon size={12} className="mr-2" />
+                                            {section.label}
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {section.tags?.map((tag: string) => (
+                                                <span key={tag} className="px-4 py-1.5 bg-muted rounded-xl text-[10px] font-bold uppercase tracking-wider border border-border/40 text-muted-foreground hover:bg-primary hover:text-white hover:border-primary transition-all cursor-default">{tag}</span>
+                                            ))}
+                                            {(!section.tags || section.tags.length === 0) && <span className="text-[10px] text-muted-foreground/40 uppercase tracking-widest font-bold">No especificado</span>}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Sidebar (Right Column) */}
+                    <div className="lg:col-span-4 space-y-8">
+                        {/* Pricing Card */}
+                        <div className="bg-card border border-border/60 rounded-[2.5rem] p-10 shadow-xl relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
+                            <h3 className="flex items-center space-x-3 text-[10px] uppercase tracking-[0.2em] text-primary font-black mb-10">
+                                <Tag size={16} />
+                                <span>Información de Precio</span>
+                            </h3>
+
+                            <div className="mb-10">
+                                <div className="text-4xl md:text-5xl font-serif font-medium text-foreground mb-1 uppercase tracking-tighter">
+                                    €{Number(property.price).toLocaleString()}
+                                </div>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Precio base</p>
+                            </div>
+
+                            <div className="space-y-6 pt-8 border-t border-border/50">
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mb-4">Desglose de Comisiones</p>
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center text-sm font-medium">
+                                        <span className="text-muted-foreground">Precio base:</span>
+                                        <span className="text-foreground">€{Number(property.price).toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm font-medium">
+                                        <span className="text-muted-foreground">Comisión tercero (2%):</span>
+                                        <span className="text-foreground">€{(Number(property.price) * 0.02).toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm font-medium">
+                                        <span className="text-muted-foreground">Comisión interna (1%):</span>
+                                        <span className="text-foreground">€{(Number(property.price) * 0.01).toLocaleString()}</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-between items-center pt-8 border-t border-border mt-8">
+                                    <p className="text-[10px] uppercase tracking-widest text-primary font-black">Precio final:</p>
+                                    <p className="text-2xl font-serif font-bold text-emerald-600">€{(Number(property.price) * 1.03).toLocaleString()}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Quick Characteristics Card */}
+                        <div className="bg-card border border-border/60 rounded-[2.5rem] p-10 shadow-xl relative overflow-hidden">
+                            <h3 className="flex items-center space-x-3 text-[10px] uppercase tracking-[0.2em] text-primary font-black mb-10">
+                                <LayoutDashboard size={16} />
+                                <span>Características</span>
+                            </h3>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                {[
+                                    { icon: Building, label: "Superficie", value: `${property.meters || 0} m²` },
+                                    { icon: Bed, label: "Habitaciones", value: property.rooms || 10 },
+                                    { icon: Bath, label: "Baños", value: property.bathrooms || 12 },
+                                    { icon: Sparkles, label: "Estado", value: property.status || "Excelente", tag: true }
+                                ].map((item, i) => (
+                                    <div key={i} className="p-6 bg-muted/20 border border-border/30 rounded-3xl flex flex-col items-center text-center group hover:bg-primary/5 transition-all">
+                                        <item.icon className="text-primary/40 group-hover:text-primary transition-colors mb-4" size={24} />
+                                        <p className="text-base font-bold font-serif mb-1 text-foreground">{item.value}</p>
+                                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black">{item.label}</p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="mt-10 space-y-4 pt-10 border-t border-border/50">
+                                {[
+                                    { label: "Tipo:", value: property.type || "Local" },
+                                    { label: "Condición:", value: "Excelente" },
+                                    { label: "Piscina:", value: property.piscina ? "Sí" : "Sí" },
+                                    { label: "Jardín:", value: property.jardin ? "Sí" : "Sí" },
+                                    { label: "Amueblado:", value: property.amueblado ? "Sí" : "Sí" },
+                                    { label: "Agente responsable:", value: property.agent_responsible || "Alberto BeeNoCode" }
+                                ].map((row, i) => (
+                                    <div key={i} className="flex justify-between text-xs font-medium">
+                                        <span className="text-muted-foreground uppercase tracking-widest text-[9px] font-black">{row.label}</span>
+                                        <span className="text-right font-black text-foreground">{row.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </motion.div>
+        );
+    };
+
+    const renderLeadWorkplace = (lead: any) => {
+        const leadInteractions = interactions.filter(i => i.leadId === lead.id);
+
+        return (
+            <motion.div
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                className="fixed inset-0 top-[110px] left-[256px] bg-background z-40 flex overflow-hidden"
+            >
+                {/* Left Area: The "Sala" (Interaction Hub) - Expansive */}
+                <div className="flex-1 flex flex-col border-r border-border/50 bg-muted/5">
+                    {/* Header of the Sala */}
+                    <div className="p-8 border-b border-border/50 flex justify-between items-center bg-card/30 backdrop-blur-md">
+                        <div>
+                            <div className="flex items-center space-x-3 mb-1">
+                                <h2 className="text-2xl font-serif font-medium">{lead.investor}</h2>
+                                <span className="px-3 py-1 bg-primary/10 text-primary text-[9px] font-black uppercase tracking-[0.2em] rounded-full leading-none">
+                                    Dealing Room
+                                </span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Activo: {lead.property}</p>
+                        </div>
+                        <div className="flex items-center space-x-6">
+                            <div className="text-right">
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black mb-1">Score de Match IAI</p>
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-24 bg-muted-foreground/10 h-1.5 rounded-full overflow-hidden">
+                                        <motion.div
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${lead.matchScore}%` }}
+                                            className="h-full bg-primary shadow-[0_0_10px_rgba(255,255,255,0.3)]"
+                                        />
+                                    </div>
+                                    <span className="text-sm font-serif text-primary italic">{lead.matchScore}%</span>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setSelectedLead(null)}
+                                className="p-3 hover:bg-muted rounded-2xl transition-all border border-transparent hover:border-border"
+                            >
+                                <Plus size={20} className="rotate-45 text-muted-foreground" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Content of the Sala */}
+                    <div className="flex-1 overflow-y-auto p-8 space-y-12">
+                        {/* 1. IAI Predictions & Insights (Future) */}
+                        <section className="space-y-4">
+                            <h3 className="text-[10px] uppercase tracking-[0.3em] text-primary font-black flex items-center">
+                                <Activity size={14} className="mr-2" />
+                                IAI Sentinel — Predicciones Estratégicas
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="p-6 bg-gradient-to-br from-primary/[0.05] to-transparent border border-primary/10 rounded-[2rem] relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                        <ArrowUpRight size={40} />
+                                    </div>
+                                    <p className="text-[9px] text-primary/60 uppercase tracking-widest font-black mb-2">Probabilidad de Cierre</p>
+                                    <p className="text-2xl font-serif font-medium">Alta (82%)</p>
+                                    <p className="text-[10px] text-muted-foreground mt-2 font-medium">Basado en interacciones previas y perfil de ticket.</p>
+                                </div>
+                                <div className="p-6 bg-card border border-border/50 rounded-[2rem]">
+                                    <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-black mb-2">Siguiente Acción IAI</p>
+                                    <p className="text-sm font-bold">Enviar Dossier Técnico Actualizado</p>
+                                    <p className="text-[10px] text-primary mt-2 font-black uppercase tracking-widest decoration-dotted underline underline-offset-4 cursor-pointer">Sugerir Email →</p>
+                                </div>
+                                <div className="p-6 bg-card border border-border/50 rounded-[2rem]">
+                                    <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-black mb-2">Riesgos Detectados</p>
+                                    <p className="text-sm font-bold">Dilatación en Due Diligence</p>
+                                    <p className="text-[10px] text-amber-500 mt-2 font-black uppercase tracking-widest">Nivel de Riesgo: Bajo</p>
+                                </div>
+                            </div>
+                        </section>
+
+                        {/* 2. Main Timeline (Emails, Notes, Milestones) */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                            {/* Sala de Interacciones */}
+                            <section className="space-y-6">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground font-black flex items-center">
+                                        <Mail size={14} className="mr-2" />
+                                        Canales de Comunicación
+                                    </h3>
+                                    <div className="flex space-x-2">
+                                        <button className="px-3 py-1 bg-muted rounded-full text-[9px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all">Nota</button>
+                                        <button className="px-3 py-1 bg-muted rounded-full text-[9px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all">Email</button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-6">
+                                    {leadInteractions.map((interaction) => (
+                                        <div key={interaction.id} className="group relative pl-8 border-l border-primary/10">
+                                            <div className="absolute left-[-4px] top-0 w-2 h-2 rounded-full bg-primary/30 group-hover:bg-primary transition-colors" />
+                                            <div className="bg-card border border-border/40 p-6 rounded-3xl group-hover:border-primary/20 transition-all shadow-sm">
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <div>
+                                                        <span className="text-[9px] font-black uppercase tracking-widest text-primary bg-primary/5 px-2 py-0.5 rounded-lg border border-primary/10">
+                                                            {interaction.type}
+                                                        </span>
+                                                        <span className="ml-3 text-[9px] text-muted-foreground font-black uppercase tracking-widest">{interaction.date}</span>
+                                                    </div>
+                                                </div>
+                                                <p className="text-sm leading-relaxed text-foreground/80">{interaction.content}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    {/* Placeholder for Future Email Integration */}
+                                    <div className="p-8 border-2 border-dashed border-border/40 rounded-[2.5rem] flex flex-col items-center justify-center text-center bg-muted/5 opacity-40">
+                                        <Mail size={32} className="text-muted-foreground mb-4" />
+                                        <p className="text-[10px] uppercase tracking-[0.3em] font-black text-muted-foreground">Sincronización de Email</p>
+                                        <p className="text-[9px] text-muted-foreground/60 mt-1">Conecta O365 / Gmail para volcar hilos</p>
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* Avances & Nuevas Situaciones */}
+                            <section className="space-y-6">
+                                <h3 className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground font-black flex items-center">
+                                    <Clock size={14} className="mr-2" />
+                                    Hitos de Maduración
+                                </h3>
+                                <div className="space-y-4">
+                                    <div className="p-6 bg-card border border-border/60 rounded-3xl border-l-4 border-l-emerald-500">
+                                        <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest mb-1">Hito Completado</p>
+                                        <p className="text-sm font-bold">Validación de Fondos Certificada</p>
+                                        <p className="text-[10px] text-muted-foreground mt-2">Documentación KYC procesada correctamente.</p>
+                                    </div>
+                                    <div className="p-6 bg-card border border-border/60 rounded-3xl border-l-4 border-l-amber-500">
+                                        <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mb-1">Situación Pendiente</p>
+                                        <p className="text-sm font-bold">Confirmación de Cita con Arquitecto</p>
+                                        <p className="text-[10px] text-muted-foreground mt-2">Esperando respuesta del equipo de property management.</p>
+                                    </div>
+                                    {/* Feature expansion placeholder */}
+                                    <div className="pt-8 border-t border-border/50">
+                                        <p className="text-[9px] text-muted-foreground/40 italic uppercase tracking-[0.2em] font-bold">Módulo de Seguimiento Dinámico v2.0</p>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right Area: Investor Details & KYC - Compact Sidebar */}
+                <div className="w-[380px] flex flex-col bg-card/50 backdrop-blur-xl shrink-0 overflow-y-auto">
+                    <div className="p-8 space-y-10">
+                        {/* Profile Summary */}
+                        <div className="text-center">
+                            <div className="w-20 h-20 bg-primary/10 rounded-[2rem] flex items-center justify-center text-3xl font-serif text-primary mx-auto mb-6 border border-primary/20">
+                                {lead.investor?.charAt(0) || 'I'}
+                            </div>
+                            <h3 className="text-xl font-serif font-medium leading-none mb-2">{lead.investor}</h3>
+                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">{lead.type}</p>
+                        </div>
+
+                        {/* Essential Info */}
+                        <div className="space-y-6">
+                            <div className="p-5 bg-muted/30 rounded-[2rem] border border-border/50">
+                                <h4 className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-black mb-4">Core Information</h4>
+                                <div className="space-y-4">
+                                    <div className="flex items-center space-x-3 text-sm">
+                                        <Mail size={16} className="text-primary/40 shrink-0" />
+                                        <span className="truncate">{lead.email}</span>
+                                    </div>
+                                    <div className="flex items-center space-x-3 text-sm">
+                                        <Activity size={16} className="text-primary/40 shrink-0" />
+                                        <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-500">KYC Status: Verified</span>
+                                    </div>
+                                    <div className="flex items-center space-x-3 text-sm pt-2 border-t border-border/30">
+                                        <div className="w-5 h-5 bg-primary/10 rounded-full flex items-center justify-center text-[9px] text-primary font-bold">
+                                            {lead.agent?.charAt(0)}
+                                        </div>
+                                        <span className="text-xs font-medium text-muted-foreground">Responsable: {lead.agent}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-5 bg-muted/30 rounded-[2rem] border border-border/50">
+                                <h4 className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-black mb-4">Investment Power</h4>
+                                <div className="space-y-2">
+                                    <p className="text-2xl font-serif text-primary">{lead.ticket}</p>
+                                    <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-medium">Liquidez Nominal Detectada</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Documents */}
+                        <div className="space-y-4">
+                            <h4 className="text-[9px] uppercase tracking-[0.3em] text-primary font-black ml-1">Documentación Crítica</h4>
+                            <div className="space-y-2">
+                                <div className="p-4 bg-muted/20 border border-border/40 rounded-2xl flex items-center justify-between group hover:bg-muted/50 transition-all cursor-pointer">
+                                    <div className="flex items-center space-x-3">
+                                        <FileText size={16} className="text-primary/60" />
+                                        <span className="text-[10px] font-black uppercase tracking-wider">NDA Execution</span>
+                                    </div>
+                                    <Download size={14} className="text-muted-foreground" />
+                                </div>
+                                <div className="p-4 bg-muted/20 border border-border/40 rounded-2xl flex items-center justify-between group hover:bg-muted/50 transition-all cursor-pointer">
+                                    <div className="flex items-center space-x-3">
+                                        <Users size={16} className="text-primary/60" />
+                                        <span className="text-[10px] font-black uppercase tracking-wider">UBO Declaration</span>
+                                    </div>
+                                    <Download size={14} className="text-muted-foreground" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="pt-6">
+                            <button
+                                onClick={() => { setSelectedInvestor(lead); setSelectedLead(null); }}
+                                className="w-full py-4 bg-foreground text-background rounded-[1.5rem] text-[10px] font-black uppercase tracking-[0.2em] hover:scale-[1.02] transition-all"
+                            >
+                                Perfil Completo Maestro
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </motion.div>
+        );
+    };
+
+    const pipelineData = useMemo(() => {
+        const columns: Record<string, any[]> = {};
+        PIPELINE_STAGES.forEach(stage => columns[stage.id] = []);
+        leads.forEach(lead => {
+            const stageId = VALID_STAGES.has(lead.status) ? lead.status : "prospect";
+            if (columns[stageId]) columns[stageId].push(lead);
+        });
+        return columns;
+    }, [leads]);
+
+    return (
+        <div className="flex h-screen bg-muted/10 selection:bg-primary/30">
+
+            {/* Admin Sidebar */}
+            <aside className="w-64 bg-card border-r border-border flex flex-col hidden md:flex shrink-0 z-20 shadow-xl">
+                <div className="p-6 border-b border-border">
+                    <span className="font-serif text-2xl tracking-widest font-medium">Praetorium.</span>
+                    <span className="block text-xs text-muted-foreground uppercase tracking-widest mt-1 font-semibold">Command Center</span>
+                </div>
+
+                <nav className="flex-1 p-4 space-y-2">
+                    <button
+                        onClick={() => { setActiveTab("crm"); setSelectedInvestor(null); }}
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "crm" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                    >
+                        <LayoutDashboard size={18} />
+                        <span>CRM Pipeline</span>
+                    </button>
+
+                    <button
+                        onClick={() => { setActiveTab("investors"); setSelectedInvestor(null); }}
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "investors" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                    >
+                        <Users size={18} />
+                        <span>Investors (KYC)</span>
+                    </button>
+
+                    <button
+                        onClick={() => { setActiveTab("templates"); setSelectedInvestor(null); }}
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "templates" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                    >
+                        <FileText size={18} />
+                        <span>Plantillas</span>
+                    </button>
+
+                    <button
+                        onClick={() => { setActiveTab("assets"); setSelectedInvestor(null); }}
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "assets" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                    >
+                        <Building size={18} />
+                        <span>Asset Management</span>
+                    </button>
+
+                    <button
+                        onClick={() => { setActiveTab("audit"); setSelectedInvestor(null); }}
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "audit" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                    >
+                        <ShieldAlert size={18} />
+                        <span>Activity Logs</span>
+                    </button>
+
+                    {currentUser?.role === 'admin' && (
+                        <button
+                            onClick={() => { setActiveTab("agents"); setSelectedInvestor(null); }}
+                            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "agents" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                        >
+                            <UserCheck size={18} />
+                            <span>Gestión de Agentes</span>
+                        </button>
+                    )}
+                </nav>
+
+                <div className="p-4 border-t border-border bg-muted/5">
+                    <Link href="/" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center uppercase tracking-widest font-bold">
+                        <ArrowUpRight size={12} className="mr-2" /> View Live Site
+                    </Link>
+                </div>
+            </aside>
+
+            {/* Main Content Area */}
+            <main className="flex-1 overflow-hidden flex flex-col relative">
+
+                <header className="p-8 pb-4 flex justify-between items-center bg-background/50 backdrop-blur-sm z-10 border-b border-border/50">
+                    <div>
+                        <h1 className="font-serif text-3xl font-medium tracking-tight">
+                            {activeTab === 'crm' ? 'Operativas Off-Market' :
+                                activeTab === 'investors' ? 'Directorio de Inversores' :
+                                    activeTab === 'templates' ? 'Document Factory' :
+                                        activeTab === 'assets' ? 'Asset Portfolio' :
+                                            activeTab === 'agents' ? 'Control de Agentes' : 'System Logs'}
+                        </h1>
+                        <div className="flex items-center space-x-2 mt-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                                {selectedInvestor ? `Cualificación: ${selectedInvestor.investor}` : 'Estado real de las operaciones activas.'}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center space-x-4">
+                        <div className="bg-card border border-border px-4 py-2 rounded-full flex items-center space-x-2 focus-within:border-primary/50 transition-all shadow-sm">
+                            <Search size={16} className="text-muted-foreground" />
+                            <input type="text" placeholder="Buscar operación..." className="bg-transparent border-none focus:outline-none text-sm w-48" />
+                        </div>
+                        <button className="p-2 bg-primary/10 text-primary rounded-full hover:bg-primary hover:text-white transition-all">
+                            <Plus size={20} />
+                        </button>
+                    </div>
+                </header>
+
+                <div className="flex-1 overflow-x-auto p-8 pt-6 relative">
+                    <AnimatePresence>
+                        {showToast && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 50 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.9 }}
+                                className="fixed bottom-8 right-8 bg-foreground text-background px-6 py-3 rounded-2xl shadow-2xl z-50 flex items-center space-x-3 font-medium border border-white/10"
+                            >
+                                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                                <span>Estado de operación actualizado en Supabase</span>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {selectedInvestor ? (
+                        renderInvestorProfile(selectedInvestor)
+                    ) : (
+                        <div className="h-full flex relative px-8 pt-6">
+                            <div className={`flex-1 overflow-x-auto pb-8 transition-all duration-500 ${selectedLead ? 'mr-96' : ''}`}>
+                                {activeTab === "crm" && (
+                                    <div className="flex h-full space-x-6 min-w-max pb-8 relative">
+                                        {PIPELINE_STAGES.map((stage) => (
+                                            <div
+                                                key={stage.id}
+                                                ref={(el) => (columnRefs.current[stage.id] = el as any)}
+                                                className="w-80 flex flex-col group/column"
+                                            >
+                                                <div className="flex items-center justify-between mb-4 px-3">
+                                                    <div className="flex items-center space-x-2">
+                                                        <div className={`w-2.5 h-2.5 rounded-full ${stage.color} shadow-[0_0_10px_rgba(0,0,0,0.1)]`} />
+                                                        <h3 className="font-serif text-sm font-bold tracking-tight uppercase text-xs tracking-[0.2em]">{stage.label}</h3>
+                                                        <span className="text-[10px] bg-muted/60 px-2 py-0.5 rounded-full text-muted-foreground font-bold border border-border/50">
+                                                            {pipelineData[stage.id]?.length || 0}
+                                                        </span>
+                                                    </div>
+                                                    <button className="text-muted-foreground/40 hover:text-foreground transition-colors">
+                                                        <Plus size={14} />
+                                                    </button>
+                                                </div>
+
+                                                <div className={`flex-1 bg-muted/20 rounded-[2rem] border border-dashed transition-all duration-300 ${draggingId ? 'border-primary/20 bg-primary/5' : 'border-border/40'} p-4 space-y-4 overflow-y-auto`}>
+                                                    <AnimatePresence>
+                                                        {pipelineData[stage.id]?.map((lead) => (
+                                                            <motion.div
+                                                                key={lead.id}
+                                                                layoutId={lead.id}
+                                                                drag
+                                                                dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+                                                                dragElastic={0.05}
+                                                                onDragStart={() => handleDragStart(lead.id)}
+                                                                onDragEnd={(e, info) => handleDragEnd(e, info, lead.id)}
+                                                                onClick={() => { if (!draggingId) setSelectedLead(lead); }}
+                                                                whileDrag={{ scale: 1.05, rotate: 2, zIndex: 100, boxShadow: "0 20px 40px rgba(0,0,0,0.15)" }}
+                                                                initial={{ opacity: 0, scale: 0.9 }}
+                                                                animate={{ opacity: 1, scale: 1 }}
+                                                                className={`bg-card border rounded-3xl p-5 shadow-sm hover:shadow-md transition-all group relative cursor-grab active:cursor-grabbing ${selectedLead?.id === lead.id ? 'border-primary ring-1 ring-primary/20 bg-primary/[0.02]' : 'border-border hover:border-primary/40'}`}
+                                                            >
+                                                                <div className="flex justify-between items-start mb-4">
+                                                                    <div className="flex items-center space-x-3">
+                                                                        <div className="w-10 h-10 bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl flex items-center justify-center text-xs font-serif border border-primary/10 text-primary">
+                                                                            {lead.investors?.full_name?.charAt(0) || lead.investor?.charAt(0)}
+                                                                        </div>
+                                                                        <div>
+                                                                            <h4 className="text-sm font-semibold leading-tight mb-0.5">{lead.investors?.full_name || lead.investor}</h4>
+                                                                            <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{lead.investors?.investor_type || lead.type}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="space-y-2.5 mb-5 px-1">
+                                                                    <div className="flex items-center text-[11px] text-muted-foreground/80 font-medium">
+                                                                        <MapPin size={12} className="mr-2 text-primary/40" />
+                                                                        <span className="truncate">{lead.properties?.title || lead.property}</span>
+                                                                    </div>
+                                                                    <div className="flex items-center text-[10px] text-muted-foreground/60 font-bold uppercase tracking-wider">
+                                                                        <Clock size={12} className="mr-2 text-primary/40" />
+                                                                        <span>ID: {lead.id.slice(0, 8)}...</span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="flex items-center justify-between border-t border-border/30 pt-4">
+                                                                    <div className="flex items-center space-x-2">
+                                                                        <div className="w-20 bg-muted/50 rounded-full h-1.5 overflow-hidden">
+                                                                            <motion.div
+                                                                                initial={{ width: 0 }}
+                                                                                animate={{ width: `${lead.match_score || lead.matchScore}%` }}
+                                                                                className="bg-primary h-full"
+                                                                            />
+                                                                        </div>
+                                                                        <span className="text-[10px] font-black text-primary">{lead.match_score || lead.matchScore}%</span>
+                                                                    </div>
+                                                                    <div className="flex items-center space-x-2">
+                                                                        <span className="text-[9px] font-black bg-primary/5 text-primary/80 px-2 py-1 rounded-lg border border-primary/10">
+                                                                            {lead.investors?.ticket_size || lead.ticket}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </motion.div>
+                                                        ))}
+                                                    </AnimatePresence>
+                                                    {pipelineData[stage.id]?.length === 0 && (
+                                                        <div className="h-40 flex flex-col items-center justify-center text-[10px] text-muted-foreground/30 uppercase tracking-[0.3em] font-bold border-2 border-dashed border-border/20 rounded-[2rem]">
+                                                            <span>Zona Vacía</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <div className="max-w-5xl mx-auto w-full">
+                                    {activeTab === "investors" && (
+                                        <div className="bg-card border border-border rounded-[3rem] shadow-xl p-10 mt-10 max-w-5xl mx-auto overflow-hidden">
+                                            <div className="flex justify-between items-center mb-10 px-6">
+                                                <div>
+                                                    <h2 className="text-2xl font-serif font-medium">Directorio de Inversores</h2>
+                                                    <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold mt-1">Sincronizado con Supabase</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => setIsAddingInvestor(true)}
+                                                    className="px-6 py-2 bg-primary text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-primary/20"
+                                                >
+                                                    Añadir Inversor
+                                                </button>
+                                            </div>
+                                            <div className="space-y-4">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    {investors.map((investor: any) => (
+                                                        <motion.div
+                                                            key={investor.id}
+                                                            whileHover={{ y: -5 }}
+                                                            className="bg-card/50 backdrop-blur-sm border border-border/60 rounded-[2rem] p-6 flex flex-col justify-between hover:shadow-xl hover:border-primary/30 transition-all group relative overflow-hidden"
+                                                        >
+                                                            <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:bg-primary/10 transition-all" />
+
+                                                            <div className="flex items-start justify-between mb-6 relative">
+                                                                <div className="flex items-center space-x-4">
+                                                                    <div className="w-14 h-14 bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl flex items-center justify-center text-xl font-serif text-primary border border-primary/10 shadow-inner">
+                                                                        {investor.full_name?.charAt(0) || 'I'}
+                                                                    </div>
+                                                                    <div>
+                                                                        <h3 className="text-base font-bold text-foreground leading-tight group-hover:text-primary transition-colors">{investor.full_name}</h3>
+                                                                        <div className="flex items-center mt-1">
+                                                                            <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${investor.is_verified ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'}`}>
+                                                                                {investor.is_verified ? 'Verificado' : 'Pendiente'}
+                                                                            </span>
+                                                                            <span className="text-[9px] text-muted-foreground ml-2 font-medium uppercase tracking-wider">{investor.investor_type || 'Private Investor'}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex space-x-1">
+                                                                    <button
+                                                                        onClick={() => setSelectedInvestorToEdit(investor)}
+                                                                        className="p-2.5 bg-muted/50 rounded-xl hover:bg-primary/10 hover:text-primary transition-all text-muted-foreground"
+                                                                    >
+                                                                        <Edit2 size={14} />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleDeleteInvestor(investor.id)}
+                                                                        className="p-2.5 bg-muted/50 rounded-xl hover:bg-red-500/10 hover:text-red-500 transition-all text-muted-foreground"
+                                                                    >
+                                                                        <Trash2 size={14} />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => setSelectedInvestor(investor)}
+                                                                        className="p-2.5 bg-muted/50 rounded-xl hover:bg-foreground hover:text-white transition-all text-muted-foreground"
+                                                                    >
+                                                                        <ArrowUpRight size={14} />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="space-y-3 mb-6">
+                                                                <div className="flex items-center text-[11px] text-muted-foreground/80 font-medium">
+                                                                    <Mail size={12} className="mr-2 text-primary/40" />
+                                                                    <span className="truncate">{investor.email || 'N/A'}</span>
+                                                                </div>
+                                                                <div className="flex items-center text-[11px] text-muted-foreground/80 font-medium">
+                                                                    <Building size={12} className="mr-2 text-primary/40" />
+                                                                    <span className="truncate">{investor.company_name || 'Individual'}</span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="pt-4 border-t border-border/30 flex items-end justify-between">
+                                                                <div>
+                                                                    <p className="text-[8px] text-muted-foreground uppercase tracking-[0.2em] font-black mb-1">Capacidad Estimada</p>
+                                                                    <p className="text-lg font-serif font-bold text-primary">
+                                                                        {investor.ticket_size || (investor.max_ticket_eur ? `€${Number(investor.max_ticket_eur).toLocaleString()}` : '€5M+')}
+                                                                    </p>
+                                                                </div>
+                                                                <div className="flex -space-x-2">
+                                                                    {[1, 2].map((i) => (
+                                                                        <div key={i} className="w-6 h-6 rounded-full border-2 border-card bg-muted flex items-center justify-center overflow-hidden">
+                                                                            <div className="w-full h-full bg-primary/20" />
+                                                                        </div>
+                                                                    ))}
+                                                                    <div className="w-6 h-6 rounded-full border-2 border-card bg-primary/10 flex items-center justify-center text-[8px] font-black text-primary">
+                                                                        +3
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </motion.div>
+                                                    ))}
+                                                    {investors.length === 0 && (
+                                                        <div className="col-span-full text-center py-20 opacity-40 uppercase tracking-widest text-xs font-black border-2 border-dashed border-border/40 rounded-[3rem]">
+                                                            No hay inversores en la base de datos
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "templates" && (
+                                        <div className="bg-card border border-border rounded-[2.5rem] shadow-xl overflow-hidden max-w-4xl mx-auto w-full mt-10">
+                                            <div className="p-10 border-b border-border bg-muted/10 flex justify-between items-center">
+                                                <div>
+                                                    <h2 className="font-serif text-xl font-medium">Gestión de Plantillas Maestras</h2>
+                                                    <p className="text-xs text-muted-foreground mt-1">Automatización de documentos legales y técnicos.</p>
+                                                </div>
+                                                <button className="p-3 bg-primary/10 text-primary rounded-2xl hover:bg-primary hover:text-white transition-all">
+                                                    <Plus size={20} />
+                                                </button>
+                                            </div>
+                                            <div className="p-10 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                                {MOCK_TEMPLATES.map((template: any) => (
+                                                    <div key={template.id} className="p-6 border border-border rounded-3xl flex items-center justify-between hover:bg-muted/30 transition-all group">
+                                                        <div className="flex items-center space-x-4">
+                                                            <div className="p-3 bg-primary/5 rounded-2xl group-hover:bg-primary/10 transition-colors">
+                                                                <FileText size={24} className="text-primary" />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-sm font-bold leading-tight">{template.name}</p>
+                                                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mt-1">Status: Ready</p>
+                                                            </div>
+                                                        </div>
+                                                        <button className="text-[10px] font-black px-4 py-2 bg-muted rounded-xl hover:bg-foreground hover:text-white transition-all uppercase tracking-widest">EDITAR</button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "assets" && (
+                                        <div className="bg-card border border-border rounded-[3rem] shadow-xl p-10 mt-10 max-w-5xl mx-auto overflow-hidden">
+                                            <div className="flex justify-between items-center mb-10 px-6">
+                                                <div>
+                                                    <h2 className="text-2xl font-serif font-medium">Asset Portfolio</h2>
+                                                    <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold mt-1">Propiedades Off-Market</p>
+                                                </div>
+                                                <div className="flex items-center space-x-4">
+                                                    <div className="relative">
+                                                        <input
+                                                            type="file"
+                                                            accept="application/pdf"
+                                                            onChange={handleUploadPdf}
+                                                            disabled={isUploadingPdf}
+                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                                                            title="Subir Dossier (PDF)"
+                                                        />
+                                                        <button
+                                                            disabled={isUploadingPdf}
+                                                            className="px-6 py-2 bg-muted/60 text-foreground border border-border/60 hover:border-foreground/20 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center shadow-sm disabled:opacity-50"
+                                                        >
+                                                            {isUploadingPdf ? (
+                                                                <Loader2 size={16} className="mr-2 animate-spin" />
+                                                            ) : (
+                                                                <Upload size={16} className="mr-2" />
+                                                            )}
+                                                            Procesar PDF
+                                                        </button>
+                                                    </div>
+                                                    <button className="px-6 py-2 bg-primary text-white rounded-xl text-xs font-bold uppercase tracking-widest hidden md:block">Publicar Activo</button>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                                {properties.map((asset: any) => (
+                                                    <div
+                                                        key={asset.id}
+                                                        onClick={() => setSelectedProperty(asset)}
+                                                        className="bg-card border border-border/60 rounded-[2.5rem] overflow-hidden hover:shadow-2xl transition-all group flex flex-col h-full shadow-sm cursor-pointer"
+                                                    >
+                                                        <div className="relative aspect-[16/10] overflow-hidden">
+                                                            <img
+                                                                src={asset.images?.[0] || asset.image || "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80"}
+                                                                alt={asset.title}
+                                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                                            />
+                                                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                                                            <div className="absolute top-4 left-4 flex flex-wrap gap-2">
+                                                                <span className="px-3 py-1 bg-primary text-white text-[8px] font-black uppercase tracking-widest rounded-lg flex items-center shadow-lg border border-primary/20">
+                                                                    <Star size={10} className="mr-1 fill-white" />
+                                                                    Exclusiva
+                                                                </span>
+                                                                <span className="px-3 py-1 bg-white/90 backdrop-blur-md text-foreground text-[8px] font-black uppercase tracking-widest rounded-lg border border-white/20 shadow-lg">
+                                                                    {asset.status || 'Disponible'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="absolute top-4 right-4">
+                                                                <span className="px-3 py-1 bg-primary/20 backdrop-blur-md text-primary text-[8px] font-black uppercase tracking-widest rounded-lg border border-primary/20">
+                                                                    {asset.type || 'Piso'}
+                                                                </span>
+                                                            </div>
+
+                                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20 group-hover:opacity-40 transition-opacity">
+                                                                <Building size={80} className="text-white drop-shadow-2xl" />
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="p-8 flex-1 flex flex-col">
+                                                            <div className="mb-6">
+                                                                <h4 className="text-lg font-serif font-bold text-foreground leading-tight mb-2 group-hover:text-primary transition-colors line-clamp-2 uppercase">
+                                                                    {asset.title}
+                                                                </h4>
+                                                                <div className="flex items-center text-[10px] text-muted-foreground uppercase tracking-widest font-black">
+                                                                    <MapPin size={12} className="mr-2 text-primary/40" />
+                                                                    {asset.address}
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="space-y-4 mb-8 flex-1">
+                                                                <div className="flex items-baseline space-x-2">
+                                                                    <span className="text-2xl font-serif font-bold text-primary">
+                                                                        €{Number(asset.price).toLocaleString()}
+                                                                    </span>
+                                                                    <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Base</span>
+                                                                </div>
+
+                                                                <div className="grid grid-cols-3 gap-2 py-4 border-y border-border/30">
+                                                                    <div className="flex flex-col items-center text-center">
+                                                                        <Maximize2 size={14} className="text-primary/40 mb-1" />
+                                                                        <span className="text-[10px] font-bold text-foreground">{asset.meters || 0}m²</span>
+                                                                        <span className="text-[7px] text-muted-foreground uppercase tracking-widest font-black">Sup</span>
+                                                                    </div>
+                                                                    <div className="flex flex-col items-center text-center">
+                                                                        <Bed size={14} className="text-primary/40 mb-1" />
+                                                                        <span className="text-[10px] font-bold text-foreground">{asset.rooms || 0}</span>
+                                                                        <span className="text-[7px] text-muted-foreground uppercase tracking-widest font-black">Hab</span>
+                                                                    </div>
+                                                                    <div className="flex flex-col items-center text-center">
+                                                                        <Bath size={14} className="text-primary/40 mb-1" />
+                                                                        <span className="text-[10px] font-bold text-foreground">{asset.bathrooms || 0}</span>
+                                                                        <span className="text-[7px] text-muted-foreground uppercase tracking-widest font-black">Baños</span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-2 italic font-light">
+                                                                    {asset.description || "Un activo exclusivo con gran potencial de rentabilidad y ubicación estratégica."}
+                                                                </p>
+                                                            </div>
+
+                                                            <div className="flex items-center gap-2 pt-6">
+                                                                <div className="flex-1 bg-muted/40 hover:bg-primary/5 p-3 rounded-xl border border-border/60 hover:border-primary/20 transition-all flex items-center justify-center">
+                                                                    <Search size={16} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                                                                </div>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); /* logic for edit */ }}
+                                                                    className="flex-1 bg-muted/40 hover:bg-foreground/5 p-3 rounded-xl border border-border/60 hover:border-foreground/20 transition-all flex items-center justify-center"
+                                                                >
+                                                                    <Edit2 size={16} className="text-muted-foreground" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleDeleteProperty(asset.id); }}
+                                                                    className="flex-1 bg-muted/40 hover:bg-red-50 p-3 rounded-xl border border-border/60 hover:border-red-200 transition-all flex items-center justify-center"
+                                                                >
+                                                                    <Trash2 size={16} className="text-muted-foreground hover:text-red-500" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "audit" && (
+                                        <div className="max-w-4xl mx-auto w-full space-y-6 mt-10">
+                                            <div className="bg-card border border-border rounded-[2.5rem] shadow-sm p-10">
+                                                <h2 className="font-serif text-xl font-medium mb-8">System Audit Trail</h2>
+                                                <div className="space-y-6">
+                                                    {MOCK_ACTIVITY.map((log: any) => (
+                                                        <div key={log.id} className="flex space-x-6 items-start">
+                                                            <div className="mt-1 p-2 bg-primary/5 rounded-xl text-primary">
+                                                                <CheckCircle2 size={16} />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-sm font-bold leading-tight">{log.detail}</p>
+                                                                <p className="text-xs text-muted-foreground mt-2 font-medium">{log.time} — Operativa Validada</p>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "agents" && (
+                                        <div className="max-w-4xl mx-auto w-full space-y-6 mt-10 pb-20">
+                                            <div className="bg-card border border-border rounded-[2.5rem] shadow-sm p-10">
+                                                <div className="flex justify-between items-center mb-8">
+                                                    <div>
+                                                        <h2 className="font-serif text-xl font-medium">Control de Agentes</h2>
+                                                        <p className="text-xs text-muted-foreground mt-1">Gestión de accesos y roles del equipo.</p>
+                                                    </div>
+                                                    <div className="flex items-center space-x-4">
+                                                        <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-full uppercase tracking-widest">
+                                                            {allAgents.filter(a => !a.is_approved).length} Pendientes
+                                                        </span>
+                                                        <button
+                                                            onClick={() => setIsAddingAgent(true)}
+                                                            className="flex items-center space-x-2 px-4 py-2 bg-primary text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:opacity-90 transition-all"
+                                                        >
+                                                            <Plus size={14} />
+                                                            <span>Dar de Alta</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-4">
+                                                    {allAgents.map(agent => (
+                                                        <div key={agent.id} className="p-6 border border-border rounded-3xl flex items-center justify-between hover:bg-muted/30 transition-all group">
+                                                            <div className="flex items-center space-x-4">
+                                                                <div className="w-12 h-12 bg-primary/5 rounded-2xl flex items-center justify-center text-primary font-serif border border-primary/10">
+                                                                    {agent.full_name?.charAt(0) || 'A'}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="flex items-center space-x-2">
+                                                                        <p className="text-sm font-bold">{agent.full_name}</p>
+                                                                        <span className={`text-[8px] ${agent.role === 'admin' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'} px-2 py-0.5 rounded-md font-bold uppercase tracking-widest`}>
+                                                                            {agent.role}
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{agent.email}</p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center space-x-3">
+                                                                <button
+                                                                    onClick={() => setSelectedAgentToEdit(agent)}
+                                                                    className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+                                                                >
+                                                                    <Edit2 size={16} />
+                                                                </button>
+                                                                {agent.is_approved ? (
+                                                                    <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest px-4">Activo</span>
+                                                                ) : (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={() => handleRejectAgent(agent.id)}
+                                                                            className="px-4 py-2 border border-border rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-500/10 hover:text-red-500 transition-all"
+                                                                        >
+                                                                            Rechazar
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleApproveAgent(agent.id)}
+                                                                            className="px-4 py-2 bg-primary text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-primary/90 transition-all font-bold"
+                                                                        >
+                                                                            Aprobar
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    {allAgents.length === 0 && (
+                                                        <div className="text-center py-12 text-muted-foreground text-xs uppercase tracking-[0.2em]">No hay agentes registrados</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </main>
+
+            <AnimatePresence>
+                {selectedLead && renderLeadWorkplace(selectedLead)}
+                {selectedProperty && (
+                    <div className="fixed inset-0 z-[60] bg-background overscroll-none overflow-y-auto">
+                        {renderPropertyDetail(selectedProperty)}
+                    </div>
+                )}
+
+                {/* Edit Agent Modal */}
+                {selectedAgentToEdit && (
+                    <div className="fixed inset-0 z-[80] flex items-center justify-center p-6">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setSelectedAgentToEdit(null)}
+                            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                            className="relative bg-card border border-border w-full max-w-lg rounded-[2.5rem] shadow-2xl p-10"
+                        >
+                            <h2 className="font-serif text-2xl mb-2">Editar Agente</h2>
+                            <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-8 italic">Modificando perfil de {selectedAgentToEdit.full_name}</p>
+
+                            <div className="space-y-6">
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Nombre Completo</label>
+                                    <input
+                                        type="text"
+                                        value={selectedAgentToEdit.full_name || ""}
+                                        onChange={(e) => setSelectedAgentToEdit({ ...selectedAgentToEdit, full_name: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Rol en el Sistema</label>
+                                    <select
+                                        value={selectedAgentToEdit.role || "agent"}
+                                        onChange={(e) => setSelectedAgentToEdit({ ...selectedAgentToEdit, role: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all appearance-none"
+                                    >
+                                        <option value="agent">Agente</option>
+                                        <option value="admin">Administrador</option>
+                                    </select>
+                                </div>
+                                <div className="flex items-center space-x-3 p-2">
+                                    <input
+                                        type="checkbox"
+                                        id="edit-approved"
+                                        checked={selectedAgentToEdit.is_approved}
+                                        onChange={(e) => setSelectedAgentToEdit({ ...selectedAgentToEdit, is_approved: e.target.checked })}
+                                        className="accent-primary"
+                                    />
+                                    <label htmlFor="edit-approved" className="text-xs font-bold uppercase tracking-wider cursor-pointer">Estado de Acceso: {selectedAgentToEdit.is_approved ? 'Aprobado' : 'Pendiente'}</label>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4 mt-10">
+                                <button
+                                    onClick={() => setSelectedAgentToEdit(null)}
+                                    className="flex-1 px-6 py-3 border border-border rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-muted transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={() => handleUpdateAgent(selectedAgentToEdit)}
+                                    className="flex-1 px-6 py-3 bg-primary text-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:opacity-90 shadow-lg shadow-primary/20 transition-all"
+                                >
+                                    Guardar Cambios
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+
+                {/* Add Agent Modal */}
+                {isAddingAgent && (
+                    <div className="fixed inset-0 z-[80] flex items-center justify-center p-6">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setIsAddingAgent(false)}
+                            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                            className="relative bg-card border border-border w-full max-w-lg rounded-[2.5rem] shadow-2xl p-10"
+                        >
+                            <h2 className="font-serif text-2xl mb-2">Dar de Alta Agente</h2>
+                            <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-8 italic">Registro manual de nuevo miembro del equipo</p>
+
+                            <div className="space-y-6">
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Nombre Completo</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Ej: Alberto Gala"
+                                        value={agentForm.full_name}
+                                        onChange={(e) => setAgentForm({ ...agentForm, full_name: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Email Profesional</label>
+                                    <input
+                                        type="email"
+                                        placeholder="correo@aleasignature.com"
+                                        value={agentForm.email}
+                                        onChange={(e) => setAgentForm({ ...agentForm, email: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Rol Asignado</label>
+                                    <select
+                                        value={agentForm.role}
+                                        onChange={(e) => setAgentForm({ ...agentForm, role: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all appearance-none"
+                                    >
+                                        <option value="agent">Agente</option>
+                                        <option value="admin">Administrador</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4 mt-10">
+                                <button
+                                    onClick={() => setIsAddingAgent(false)}
+                                    className="flex-1 px-6 py-3 border border-border rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-muted transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleCreateAgent}
+                                    className="flex-1 px-6 py-3 bg-primary text-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:opacity-90 shadow-lg shadow-primary/20 transition-all"
+                                >
+                                    Confirmar Alta
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+
+                {/* Edit Investor Modal */}
+                {selectedInvestorToEdit && (
+                    <div className="fixed inset-0 z-[80] flex items-center justify-center p-6">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setSelectedInvestorToEdit(null)}
+                            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                            className="relative bg-card border border-border w-full max-w-2xl rounded-[2.5rem] shadow-2xl p-10 overflow-y-auto max-h-[90vh]"
+                        >
+                            <h2 className="font-serif text-2xl mb-2">Editar Perfil de Inversor</h2>
+                            <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-8 italic">Modificando cualificación de {selectedInvestorToEdit.full_name}</p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Nombre Completo</label>
+                                    <input
+                                        type="text"
+                                        value={selectedInvestorToEdit.full_name || ""}
+                                        onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, full_name: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Compañía / Family Office</label>
+                                    <input
+                                        type="text"
+                                        value={selectedInvestorToEdit.company_name || ""}
+                                        onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, company_name: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Email de Contacto</label>
+                                    <input
+                                        type="email"
+                                        value={selectedInvestorToEdit.email || ""}
+                                        onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, email: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Tipo de Inversor</label>
+                                    <select
+                                        value={selectedInvestorToEdit.investor_type || ""}
+                                        onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, investor_type: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium appearance-none"
+                                    >
+                                        <option value="HNWI">HNWI</option>
+                                        <option value="Family Office">Family Office</option>
+                                        <option value="Institutional">Institutional</option>
+                                        <option value="Private Equity">Private Equity</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Teléfono</label>
+                                    <input
+                                        type="text"
+                                        value={selectedInvestorToEdit.phone || ""}
+                                        onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, phone: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ticket Mínimo (EUR)</label>
+                                    <input
+                                        type="number"
+                                        value={selectedInvestorToEdit.min_ticket_eur || 0}
+                                        onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, min_ticket_eur: Number(e.target.value) })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ticket Máximo (EUR)</label>
+                                    <input
+                                        type="number"
+                                        value={selectedInvestorToEdit.max_ticket_eur || 0}
+                                        onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, max_ticket_eur: Number(e.target.value) })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <div className="flex items-center space-x-3 p-2 bg-primary/5 rounded-2xl border border-primary/10">
+                                        <input
+                                            type="checkbox"
+                                            id="investor-verified"
+                                            checked={selectedInvestorToEdit.is_verified}
+                                            onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, is_verified: e.target.checked })}
+                                            className="accent-primary w-4 h-4"
+                                        />
+                                        <label htmlFor="investor-verified" className="text-xs font-bold uppercase tracking-widest cursor-pointer text-primary">Estado KYC: {selectedInvestorToEdit.is_verified ? 'VERIFICADO' : 'PENDIENTE'}</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4 mt-10">
+                                <button
+                                    onClick={() => setSelectedInvestorToEdit(null)}
+                                    className="flex-1 px-6 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={() => handleUpdateInvestor(selectedInvestorToEdit)}
+                                    className="flex-1 px-6 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 shadow-xl shadow-primary/20 transition-all"
+                                >
+                                    Guardar Cualificación
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+                {/* Add Investor Modal */}
+                {isAddingInvestor && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            onClick={() => setIsAddingInvestor(false)}
+                            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            className="relative bg-background border border-border w-full max-w-2xl rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh]"
+                        >
+                            <h2 className="font-serif text-3xl mb-2">Alta de Nuevo Inversor</h2>
+                            <p className="text-muted-foreground text-sm mb-8 font-light">Complete los datos para añadir al directorio off-market.</p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="md:col-span-2">
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Nombre Completo</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Ej: Eduardo Santacruz"
+                                        value={investorForm.full_name}
+                                        onChange={(e) => setInvestorForm({ ...investorForm, full_name: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Email Profesional</label>
+                                    <input
+                                        type="email"
+                                        placeholder="eduardo@familyoffice.com"
+                                        value={investorForm.email}
+                                        onChange={(e) => setInvestorForm({ ...investorForm, email: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Compañía / Entidad</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Family Office ES"
+                                        value={investorForm.company_name}
+                                        onChange={(e) => setInvestorForm({ ...investorForm, company_name: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Perfil Inversor</label>
+                                    <select
+                                        value={investorForm.investor_type}
+                                        onChange={(e) => setInvestorForm({ ...investorForm, investor_type: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium appearance-none"
+                                    >
+                                        <option value="">Seleccionar Perfil</option>
+                                        <option value="HNWI">HNWI</option>
+                                        <option value="Family Office">Family Office</option>
+                                        <option value="Institutional">Institutional</option>
+                                        <option value="Private Equity">Private Equity</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Teléfono</label>
+                                    <input
+                                        type="text"
+                                        placeholder="+34 600 000 000"
+                                        value={investorForm.phone}
+                                        onChange={(e) => setInvestorForm({ ...investorForm, phone: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ticket Mínimo (€)</label>
+                                    <input
+                                        type="number"
+                                        value={investorForm.min_ticket_eur}
+                                        onChange={(e) => setInvestorForm({ ...investorForm, min_ticket_eur: Number(e.target.value) })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ticket Máximo (€)</label>
+                                    <input
+                                        type="number"
+                                        value={investorForm.max_ticket_eur}
+                                        onChange={(e) => setInvestorForm({ ...investorForm, max_ticket_eur: Number(e.target.value) })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4 mt-10">
+                                <button
+                                    onClick={() => setIsAddingInvestor(false)}
+                                    className="flex-1 px-6 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleCreateInvestor}
+                                    className="flex-1 px-6 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 shadow-xl shadow-primary/20 transition-all"
+                                >
+                                    Dar de Alta
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}

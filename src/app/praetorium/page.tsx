@@ -7,7 +7,7 @@ import {
     Clock, MapPin, LayoutDashboard, Plus, MoreHorizontal, Share2,
     ChevronLeft, Maximize2, Bed, Bath, Sparkles, TrendingUp, Wind,
     Trees, ShoppingBag, Umbrella, Tag, Calendar, ShieldCheck, Star,
-    Trash2, Edit2, Upload, Loader2
+    Trash2, Edit2, Upload, Loader2, User, LogOut, Settings
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -62,6 +62,8 @@ export default function AdminDashboard() {
     const [isAddingAgent, setIsAddingAgent] = useState(false);
     const [isAddingInvestor, setIsAddingInvestor] = useState(false);
     const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+    const [isSelectingInvestorForLead, setIsSelectingInvestorForLead] = useState(false);
+    const [targetPropertyForLead, setTargetPropertyForLead] = useState<any>(null);
     const [agentForm, setAgentForm] = useState({ full_name: "", email: "", role: "agent" });
     const [investorForm, setInvestorForm] = useState<any>({
         full_name: "",
@@ -70,7 +72,8 @@ export default function AdminDashboard() {
         phone: "",
         investor_type: "",
         min_ticket_eur: 0,
-        max_ticket_eur: 0
+        max_ticket_eur: 0,
+        labels: []
     });
 
     const fetchData = async () => {
@@ -134,6 +137,11 @@ export default function AdminDashboard() {
             fetchAgents();
         }
     }, [activeTab, currentUser]);
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        window.location.href = "/";
+    };
 
     const handleApproveAgent = async (id: string) => {
         const { error } = await supabase
@@ -206,6 +214,36 @@ export default function AdminDashboard() {
             setTimeout(() => setShowToast(false), 3000);
         } else {
             console.error("Error deleting property", error);
+        }
+    };
+
+    const handleCreateLead = async (investorId: string, propertyId: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('leads')
+                .insert([{
+                    investor_id: investorId,
+                    property_id: propertyId,
+                    status: 'prospect',
+                    created_at: new Date().toISOString()
+                }])
+                .select();
+
+            if (!error) {
+                await fetchData(); // Refresh leads
+                setIsSelectingInvestorForLead(false);
+                setTargetPropertyForLead(null);
+                setShowToast(true);
+                setTimeout(() => setShowToast(false), 3000);
+
+                // Optionally switch to CRM tab to show it's there
+                setActiveTab("crm");
+                setSelectedProperty(null); // Close property detail
+            } else {
+                console.error("Error creating lead:", error);
+            }
+        } catch (error) {
+            console.error("Catch error creating lead:", error);
         }
     };
 
@@ -364,7 +402,8 @@ export default function AdminDashboard() {
                 phone: investor.phone,
                 investor_type: investor.investor_type,
                 min_ticket_eur: investor.min_ticket_eur,
-                max_ticket_eur: investor.max_ticket_eur
+                max_ticket_eur: investor.max_ticket_eur,
+                labels: investor.labels
             })
             .eq('id', investor.id);
 
@@ -423,7 +462,8 @@ export default function AdminDashboard() {
                     phone: "",
                     investor_type: "",
                     min_ticket_eur: 0,
-                    max_ticket_eur: 0
+                    max_ticket_eur: 0,
+                    labels: []
                 });
                 setShowToast(true);
                 setTimeout(() => setShowToast(false), 3000);
@@ -533,8 +573,18 @@ export default function AdminDashboard() {
                             <div className="w-24 h-24 bg-primary/5 rounded-3xl flex items-center justify-center text-4xl font-serif text-primary mb-6 border border-primary/10">
                                 {investor.investor?.charAt(0) || 'I'}
                             </div>
-                            <h2 className="text-2xl font-serif font-medium mb-1">{investor.investor}</h2>
-                            <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-6">{investor.type}</p>
+                            <h2 className="text-2xl font-serif font-medium mb-1">{investor.investor || investor.full_name}</h2>
+                            <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-4">{investor.type || investor.investor_type}</p>
+
+                            {investor.labels && investor.labels.length > 0 && (
+                                <div className="flex flex-wrap gap-2 mb-6">
+                                    {investor.labels.map((label: string) => (
+                                        <span key={label} className="px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-full text-[9px] font-black uppercase tracking-widest">
+                                            {label}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
 
                             <div className="space-y-4 pt-6 border-t border-border">
                                 <div className="flex items-center space-x-3 text-sm">
@@ -646,6 +696,16 @@ export default function AdminDashboard() {
                                 <span>Ver Dossier Original</span>
                             </a>
                         )}
+                        <button
+                            onClick={() => {
+                                setTargetPropertyForLead(property);
+                                setIsSelectingInvestorForLead(true);
+                            }}
+                            className="flex items-center space-x-2 px-6 py-3 bg-emerald-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20"
+                        >
+                            <ArrowUpRight size={16} />
+                            <span>Generar Oportunidad</span>
+                        </button>
                         <button className="flex items-center space-x-2 px-6 py-3 bg-red-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 hidden md:flex">
                             <FileText size={16} />
                             <span>Generar PDF</span>
@@ -1302,12 +1362,29 @@ export default function AdminDashboard() {
                             <span>Gestión de Agentes</span>
                         </button>
                     )}
+
                 </nav>
 
-                <div className="p-4 border-t border-border bg-muted/5">
+                <div className="p-4 border-t border-border bg-muted/5 space-y-3">
                     <Link href="/" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center uppercase tracking-widest font-bold">
                         <ArrowUpRight size={12} className="mr-2" /> View Live Site
                     </Link>
+                    <div className="flex items-center justify-between">
+                        <button
+                            onClick={() => { setActiveTab("profile"); setSelectedInvestor(null); }}
+                            className={`flex items-center space-x-2 px-3 py-2 rounded-xl transition-all flex-1 mr-2 text-[10px] font-bold uppercase tracking-widest ${activeTab === "profile" ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+                        >
+                            <User size={14} />
+                            <span className="truncate">{currentUser?.full_name?.split(' ')[0] || 'Mi Perfil'}</span>
+                        </button>
+                        <button
+                            onClick={handleLogout}
+                            title="Cerrar Sesión"
+                            className="p-2 rounded-xl text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-all shrink-0"
+                        >
+                            <LogOut size={16} />
+                        </button>
+                    </div>
                 </div>
             </aside>
 
@@ -1321,7 +1398,8 @@ export default function AdminDashboard() {
                                 activeTab === 'investors' ? 'Directorio de Inversores' :
                                     activeTab === 'templates' ? 'Document Factory' :
                                         activeTab === 'assets' ? 'Asset Portfolio' :
-                                            activeTab === 'agents' ? 'Control de Agentes' : 'System Logs'}
+                                            activeTab === 'profile' ? 'Perfil de Usuario' :
+                                                activeTab === 'agents' ? 'Control de Agentes' : 'System Logs'}
                         </h1>
                         <div className="flex items-center space-x-2 mt-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -1492,6 +1570,15 @@ export default function AdminDashboard() {
                                                                             </span>
                                                                             <span className="text-[9px] text-muted-foreground ml-2 font-medium uppercase tracking-wider">{investor.investor_type || 'Private Investor'}</span>
                                                                         </div>
+                                                                        {investor.labels && investor.labels.length > 0 && (
+                                                                            <div className="flex gap-1 mt-2">
+                                                                                {investor.labels.map((label: string) => (
+                                                                                    <span key={label} className="text-[7px] font-black uppercase tracking-[0.1em] px-1.5 py-0.5 bg-primary/5 text-primary rounded border border-primary/10">
+                                                                                        {label}
+                                                                                    </span>
+                                                                                ))}
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex space-x-1">
@@ -1701,6 +1788,16 @@ export default function AdminDashboard() {
                                                                     <Search size={16} className="text-muted-foreground group-hover:text-primary transition-colors" />
                                                                 </div>
                                                                 <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setTargetPropertyForLead(asset);
+                                                                        setIsSelectingInvestorForLead(true);
+                                                                    }}
+                                                                    className="flex-[2] bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all flex items-center justify-center"
+                                                                >
+                                                                    Generar Oportunidad
+                                                                </button>
+                                                                <button
                                                                     onClick={(e) => { e.stopPropagation(); /* logic for edit */ }}
                                                                     className="flex-1 bg-muted/40 hover:bg-foreground/5 p-3 rounded-xl border border-border/60 hover:border-foreground/20 transition-all flex items-center justify-center"
                                                                 >
@@ -1716,6 +1813,69 @@ export default function AdminDashboard() {
                                                         </div>
                                                     </div>
                                                 ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "profile" && (
+                                        <div className="max-w-4xl mx-auto w-full mt-10 pb-20">
+                                            <div className="bg-card border border-border rounded-[3rem] shadow-xl overflow-hidden">
+                                                <div className="relative h-32 bg-gradient-to-r from-primary/20 to-primary/5">
+                                                    <div className="absolute -bottom-12 left-10">
+                                                        <div className="w-24 h-24 rounded-[2rem] bg-card border-4 border-background flex items-center justify-center text-4xl font-serif text-primary shadow-xl">
+                                                            {currentUser?.full_name?.charAt(0) || 'U'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="pt-16 p-10">
+                                                    <div className="flex justify-between items-start mb-10">
+                                                        <div>
+                                                            <h2 className="text-3xl font-serif font-medium">{currentUser?.full_name}</h2>
+                                                            <p className="text-muted-foreground uppercase tracking-[0.2em] text-[10px] font-black mt-2">{currentUser?.role || 'Agent'}</p>
+                                                        </div>
+                                                        <button className="px-6 py-2 bg-muted/50 hover:bg-muted rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Editar Perfil</button>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                        <div className="space-y-6">
+                                                            <div className="p-6 bg-muted/10 border border-border/50 rounded-3xl">
+                                                                <h3 className="text-[10px] font-black uppercase tracking-widest text-primary mb-4 flex items-center">
+                                                                    <Mail size={14} className="mr-2" /> Información de ContactO
+                                                                </h3>
+                                                                <div className="space-y-4">
+                                                                    <div>
+                                                                        <label className="text-[8px] uppercase tracking-widest text-muted-foreground font-bold">Email Corporativo</label>
+                                                                        <p className="text-sm font-medium mt-1">{currentUser?.email}</p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-[8px] uppercase tracking-widest text-muted-foreground font-bold">Fecha de Ingreso</label>
+                                                                        <p className="text-sm font-medium mt-1">{currentUser?.created_at ? new Date(currentUser.created_at).toLocaleDateString() : 'N/A'}</p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="space-y-6">
+                                                            <div className="p-6 bg-muted/10 border border-border/50 rounded-3xl">
+                                                                <h3 className="text-[10px] font-black uppercase tracking-widest text-primary mb-4 flex items-center">
+                                                                    <ShieldCheck size={14} className="mr-2" /> Seguridad y Acceso
+                                                                </h3>
+                                                                <div className="space-y-4">
+                                                                    <div>
+                                                                        <label className="text-[8px] uppercase tracking-widest text-muted-foreground font-bold">Estado de Cuenta</label>
+                                                                        <div className="flex items-center mt-1 text-emerald-500">
+                                                                            <CheckCircle2 size={14} className="mr-2" />
+                                                                            <span className="text-sm font-bold uppercase tracking-widest text-[10px]">Verificado y Activo</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <button className="w-full py-3 border border-border/50 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-muted/50 transition-all flex items-center justify-center">
+                                                                        Cambiar Contraseña
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -2059,6 +2219,30 @@ export default function AdminDashboard() {
                                     />
                                 </div>
                                 <div className="md:col-span-2">
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-3 px-1">Etiquetas de Inversores</label>
+                                    <div className="flex flex-wrap gap-4 p-4 bg-muted/20 border border-border/40 rounded-2xl">
+                                        {["Comprador", "Vendedor"].map((label) => (
+                                            <label key={label} className="flex items-center space-x-3 cursor-pointer group">
+                                                <div className="relative flex items-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={(selectedInvestorToEdit.labels || []).includes(label)}
+                                                        onChange={(e) => {
+                                                            const currentLabels = selectedInvestorToEdit.labels || [];
+                                                            const newLabels = e.target.checked
+                                                                ? [...currentLabels, label]
+                                                                : currentLabels.filter((l: string) => l !== label);
+                                                            setSelectedInvestorToEdit({ ...selectedInvestorToEdit, labels: newLabels });
+                                                        }}
+                                                        className="w-5 h-5 accent-primary rounded-lg border-border"
+                                                    />
+                                                </div>
+                                                <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/70 group-hover:text-primary transition-colors">{label}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="md:col-span-2">
                                     <div className="flex items-center space-x-3 p-2 bg-primary/5 rounded-2xl border border-primary/10">
                                         <input
                                             type="checkbox"
@@ -2179,6 +2363,30 @@ export default function AdminDashboard() {
                                         className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
                                     />
                                 </div>
+                                <div className="md:col-span-2">
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-3 px-1">Etiquetas</label>
+                                    <div className="flex flex-wrap gap-4 p-4 bg-muted/20 border border-border/40 rounded-2xl">
+                                        {["Comprador", "Vendedor"].map((label) => (
+                                            <label key={label} className="flex items-center space-x-3 cursor-pointer group">
+                                                <div className="relative flex items-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={(investorForm.labels || []).includes(label)}
+                                                        onChange={(e) => {
+                                                            const currentLabels = investorForm.labels || [];
+                                                            const newLabels = e.target.checked
+                                                                ? [...currentLabels, label]
+                                                                : currentLabels.filter((l: string) => l !== label);
+                                                            setInvestorForm({ ...investorForm, labels: newLabels });
+                                                        }}
+                                                        className="w-5 h-5 accent-primary rounded-lg border-border"
+                                                    />
+                                                </div>
+                                                <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/70 group-hover:text-primary transition-colors">{label}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="flex gap-4 mt-10">
@@ -2195,6 +2403,52 @@ export default function AdminDashboard() {
                                     Dar de Alta
                                 </button>
                             </div>
+                        </motion.div>
+                    </div>
+                )}
+
+                {/* Select Investor for Opportunity Modal */}
+                {isSelectingInvestorForLead && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            onClick={() => setIsSelectingInvestorForLead(false)}
+                            className="absolute inset-0 bg-black/80 backdrop-blur-md"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            className="relative bg-background border border-border w-full max-w-xl rounded-[2.5rem] p-10 shadow-2xl overflow-hidden"
+                        >
+                            <h2 className="font-serif text-2xl mb-2">Asignar Inversor</h2>
+                            <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold mb-8">Vincular propiedad a un potencial comprador</p>
+
+                            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-4 custom-scrollbar">
+                                {investors.map((inv: any) => (
+                                    <button
+                                        key={inv.id}
+                                        onClick={() => handleCreateLead(inv.id, targetPropertyForLead?.id)}
+                                        className="w-full text-left p-4 rounded-2xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group flex items-center justify-between"
+                                    >
+                                        <div>
+                                            <p className="font-bold text-sm group-hover:text-primary transition-colors">{inv.full_name}</p>
+                                            <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">{inv.company_name || 'Individual'}</p>
+                                        </div>
+                                        <ArrowUpRight size={16} className="text-muted-foreground group-hover:text-primary transition-all" />
+                                    </button>
+                                ))}
+                                {investors.length === 0 && (
+                                    <div className="text-center py-12 text-muted-foreground text-xs uppercase tracking-widest">No hay inversores registrados</div>
+                                )}
+                            </div>
+
+                            <button
+                                onClick={() => setIsSelectingInvestorForLead(false)}
+                                className="w-full mt-8 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
+                            >
+                                Cancelar
+                            </button>
                         </motion.div>
                     </div>
                 )}

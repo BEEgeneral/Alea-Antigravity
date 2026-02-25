@@ -91,7 +91,7 @@ function LoginForm() {
                         await supabase.auth.signOut();
                         throw new Error("Tu cuenta está pendiente de aprobación por un administrador.");
                     }
-                    router.push("/admin");
+                    router.push("/praetorium");
                 } else {
                     // User is an investor or general user → go to radar
                     router.push("/radar");

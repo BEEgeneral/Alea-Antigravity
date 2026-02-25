@@ -41,7 +41,7 @@ export default function InvestmentRadar() {
     });
     const [showContactSuccess, setShowContactSuccess] = useState(false);
 
-    // Auth guard: redirect to login if not authenticated
+    // Auth & Permission guard
     useEffect(() => {
         const checkAuth = async () => {
             const { data: { session } } = await supabase.auth.getSession();
@@ -49,7 +49,36 @@ export default function InvestmentRadar() {
                 router.push("/login");
                 return;
             }
-            setAuthChecked(true);
+
+            const userId = session.user.id;
+
+            // Check agents table
+            const { data: agent } = await supabase
+                .from('agents')
+                .select('role')
+                .eq('id', userId)
+                .single();
+
+            if (agent && (agent.role === 'admin' || agent.role === 'agent')) {
+                setAuthChecked(true);
+                return;
+            }
+
+            // Check investors table
+            const { data: investor } = await supabase
+                .from('investors')
+                .select('investor_type')
+                .eq('id', userId)
+                .single();
+
+            const role = investor?.investor_type?.toLowerCase();
+            if (role === 'inversor' || role === 'colaborador') {
+                setAuthChecked(true);
+                return;
+            }
+
+            // If we reach here, user is logged in but not authorized
+            router.push("/");
         };
         checkAuth();
     }, [router]);

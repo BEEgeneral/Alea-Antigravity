@@ -1,4 +1,4 @@
-"use client";
+003"use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -11,18 +11,52 @@ export default function Navbar() {
     const [isScrolled, setIsScrolled] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [user, setUser] = useState<any>(null);
+    const [userRole, setUserRole] = useState<string | null>(null);
     const pathname = usePathname();
     const isLanding = pathname === "/";
 
     useEffect(() => {
+        const fetchUserProfile = async (userId: string) => {
+            // Check agents first
+            const { data: agent } = await supabase
+                .from('agents')
+                .select('role')
+                .eq('id', userId)
+                .single();
+
+            if (agent) {
+                setUserRole(agent.role); // 'admin' or 'agent'
+                return;
+            }
+
+            // Check investors
+            const { data: investor } = await supabase
+                .from('investors')
+                .select('investor_type')
+                .eq('id', userId)
+                .single();
+
+            if (investor) {
+                setUserRole(investor.investor_type?.toLowerCase()); // 'inversor' or 'colaborador'
+            }
+        };
+
         // Get initial session
         supabase.auth.getSession().then(({ data: { session } }) => {
-            setUser(session?.user ?? null);
+            const currentUser = session?.user ?? null;
+            setUser(currentUser);
+            if (currentUser) fetchUserProfile(currentUser.id);
         });
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setUser(session?.user ?? null);
+            const currentUser = session?.user ?? null;
+            setUser(currentUser);
+            if (currentUser) {
+                fetchUserProfile(currentUser.id);
+            } else {
+                setUserRole(null);
+            }
         });
 
         const handleScroll = () => {
@@ -42,10 +76,11 @@ export default function Navbar() {
             { name: "Praetorium", href: "#praetorium" },
             { name: "Testimonios", href: "#testimonios" },
         ]
-        : [
-            { name: "Radar de Inversión", href: "/radar", active: pathname === "/radar" },
-            { name: "Mi Perfil", href: "/profile", active: pathname === "/profile" },
-        ];
+        : [];
+
+    // ACL Logic
+    const canSeeRadar = userRole === 'admin' || userRole === 'inversor' || userRole === 'colaborador' || userRole === 'agent';
+    const canSeeDashboard = userRole === 'admin' || userRole === 'agent';
 
     return (
         <nav
@@ -89,14 +124,14 @@ export default function Navbar() {
                         {!user ? (
                             <>
                                 <Link
-                                    href="/login"
+                                    href="/radar"
                                     className="text-[9px] font-black tracking-[0.2em] uppercase border border-border/50 px-6 py-2.5 rounded-full hover:bg-foreground hover:text-background transition-all duration-500"
                                 >
-                                    Acceso Radar
+                                    Radar
                                 </Link>
                                 <Link
-                                    href="/onboarding"
-                                    className="group relative text-[9px] font-black tracking-[0.2em] uppercase bg-primary/10 text-primary border border-primary/20 px-6 py-2.5 rounded-full overflow-hidden transition-all duration-500 hover:bg-primary hover:text-white hover:shadow-[0_0_20px_rgba(180,130,60,0.3)]"
+                                    href="/praetorium"
+                                    className="group relative text-[9px] font-black tracking-[0.2em] uppercase bg-primary text-white border border-primary px-6 py-2.5 rounded-full overflow-hidden transition-all duration-500 hover:opacity-90 hover:shadow-lg hover:shadow-primary/20"
                                 >
                                     <span className="relative z-10 flex items-center">
                                         Portal Agentes
@@ -106,21 +141,26 @@ export default function Navbar() {
                             </>
                         ) : (
                             <div className="flex items-center space-x-4">
-                                <Link
-                                    href="/radar"
-                                    className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground hover:text-primary transition-all duration-300"
-                                >
-                                    Radar
-                                </Link>
-                                <Link
-                                    href="/admin"
-                                    className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground hover:text-primary transition-all duration-300"
-                                >
-                                    Dashboard
-                                </Link>
+                                {canSeeRadar && (
+                                    <Link
+                                        href="/radar"
+                                        className="text-[9px] font-black tracking-[0.2em] uppercase border border-border/50 px-6 py-2.5 rounded-full hover:bg-foreground hover:text-background transition-all duration-500"
+                                    >
+                                        Radar
+                                    </Link>
+                                )}
+                                {canSeeDashboard && (
+                                    <Link
+                                        href="/praetorium"
+                                        className="text-[9px] font-black tracking-[0.2em] uppercase bg-primary text-white border border-primary px-6 py-2.5 rounded-full hover:opacity-90 transition-all duration-500 shadow-lg shadow-primary/20"
+                                    >
+                                        Portal Agentes
+                                    </Link>
+                                )}
                                 <Link
                                     href="/profile"
                                     className="flex items-center justify-center w-10 h-10 rounded-full border border-primary/20 bg-primary/5 text-primary hover:bg-primary hover:text-white transition-all duration-500 shadow-sm"
+                                    title="Mi Perfil"
                                 >
                                     <User size={20} />
                                 </Link>
@@ -161,13 +201,17 @@ export default function Navbar() {
                             <div className="flex flex-col space-y-4 pt-4">
                                 {!user ? (
                                     <>
-                                        <Link href="/login" className="w-full text-center py-4 rounded-xl border border-border uppercase text-[10px] font-bold tracking-widest">Acceso Radar</Link>
-                                        <Link href="/onboarding" className="w-full text-center py-4 rounded-xl bg-primary/10 text-primary border border-primary/20 uppercase text-[10px] font-bold tracking-widest">Portal Agentes</Link>
+                                        <Link href="/radar" className="w-full text-center py-4 rounded-xl border border-border uppercase text-[10px] font-bold tracking-widest">Radar</Link>
+                                        <Link href="/praetorium" className="w-full text-center py-4 rounded-xl bg-primary/10 text-primary border border-primary/20 uppercase text-[10px] font-bold tracking-widest">Portal Agentes</Link>
                                     </>
                                 ) : (
                                     <>
-                                        <Link href="/radar" onClick={() => setMobileMenuOpen(false)} className="w-full text-center py-4 rounded-xl border border-border uppercase text-[10px] font-bold tracking-widest">Acceso Radar</Link>
-                                        <Link href="/admin" onClick={() => setMobileMenuOpen(false)} className="w-full text-center py-4 rounded-xl border border-border uppercase text-[10px] font-bold tracking-widest">Portal Agentes</Link>
+                                        {canSeeRadar && (
+                                            <Link href="/radar" onClick={() => setMobileMenuOpen(false)} className="w-full text-center py-4 rounded-xl border border-border uppercase text-[10px] font-bold tracking-widest">Radar</Link>
+                                        )}
+                                        {canSeeDashboard && (
+                                            <Link href="/praetorium" onClick={() => setMobileMenuOpen(false)} className="w-full text-center py-4 rounded-xl border border-border uppercase text-[10px] font-bold tracking-widest">Portal Agentes</Link>
+                                        )}
                                         <Link
                                             href="/profile"
                                             onClick={() => setMobileMenuOpen(false)}

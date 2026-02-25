@@ -4,20 +4,36 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, ArrowRight } from "lucide-react";
+import { Menu, X, ArrowRight, User } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 export default function Navbar() {
     const [isScrolled, setIsScrolled] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [user, setUser] = useState<any>(null);
     const pathname = usePathname();
     const isLanding = pathname === "/";
 
     useEffect(() => {
+        // Get initial session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setUser(session?.user ?? null);
+        });
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setUser(session?.user ?? null);
+        });
+
         const handleScroll = () => {
             setIsScrolled(window.scrollY > 20);
         };
         window.addEventListener("scroll", handleScroll);
-        return () => window.removeEventListener("scroll", handleScroll);
+
+        return () => {
+            window.removeEventListener("scroll", handleScroll);
+            subscription.unsubscribe();
+        };
     }, []);
 
     const navLinks = isLanding
@@ -70,21 +86,46 @@ export default function Navbar() {
 
                     {/* Action Buttons */}
                     <div className="hidden md:flex items-center space-x-4">
-                        <Link
-                            href="/radar"
-                            className="text-[9px] font-black tracking-[0.2em] uppercase border border-border/50 px-6 py-2.5 rounded-full hover:bg-foreground hover:text-background transition-all duration-500"
-                        >
-                            Acceso Radar
-                        </Link>
-                        <Link
-                            href="/admin"
-                            className="group relative text-[9px] font-black tracking-[0.2em] uppercase bg-primary/10 text-primary border border-primary/20 px-6 py-2.5 rounded-full overflow-hidden transition-all duration-500 hover:bg-primary hover:text-white hover:shadow-[0_0_20px_rgba(180,130,60,0.3)]"
-                        >
-                            <span className="relative z-10 flex items-center">
-                                Portal Agentes
-                                <ArrowRight size={12} className="ml-2 group-hover:translate-x-1 transition-transform" />
-                            </span>
-                        </Link>
+                        {!user ? (
+                            <>
+                                <Link
+                                    href="/login"
+                                    className="text-[9px] font-black tracking-[0.2em] uppercase border border-border/50 px-6 py-2.5 rounded-full hover:bg-foreground hover:text-background transition-all duration-500"
+                                >
+                                    Acceso Radar
+                                </Link>
+                                <Link
+                                    href="/onboarding"
+                                    className="group relative text-[9px] font-black tracking-[0.2em] uppercase bg-primary/10 text-primary border border-primary/20 px-6 py-2.5 rounded-full overflow-hidden transition-all duration-500 hover:bg-primary hover:text-white hover:shadow-[0_0_20px_rgba(180,130,60,0.3)]"
+                                >
+                                    <span className="relative z-10 flex items-center">
+                                        Portal Agentes
+                                        <ArrowRight size={12} className="ml-2 group-hover:translate-x-1 transition-transform" />
+                                    </span>
+                                </Link>
+                            </>
+                        ) : (
+                            <div className="flex items-center space-x-4">
+                                <Link
+                                    href="/radar"
+                                    className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground hover:text-primary transition-all duration-300"
+                                >
+                                    Radar
+                                </Link>
+                                <Link
+                                    href="/admin"
+                                    className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground hover:text-primary transition-all duration-300"
+                                >
+                                    Dashboard
+                                </Link>
+                                <Link
+                                    href="/profile"
+                                    className="flex items-center justify-center w-10 h-10 rounded-full border border-primary/20 bg-primary/5 text-primary hover:bg-primary hover:text-white transition-all duration-500 shadow-sm"
+                                >
+                                    <User size={20} />
+                                </Link>
+                            </div>
+                        )}
                     </div>
 
                     {/* Mobile Toggle */}
@@ -118,8 +159,25 @@ export default function Navbar() {
                                 </a>
                             ))}
                             <div className="flex flex-col space-y-4 pt-4">
-                                <Link href="/radar" className="w-full text-center py-4 rounded-xl border border-border uppercase text-[10px] font-bold tracking-widest">Acceso Radar</Link>
-                                <Link href="/admin" className="w-full text-center py-4 rounded-xl bg-primary/10 text-primary border border-primary/20 uppercase text-[10px] font-bold tracking-widest">Portal Agentes</Link>
+                                {!user ? (
+                                    <>
+                                        <Link href="/login" className="w-full text-center py-4 rounded-xl border border-border uppercase text-[10px] font-bold tracking-widest">Acceso Radar</Link>
+                                        <Link href="/onboarding" className="w-full text-center py-4 rounded-xl bg-primary/10 text-primary border border-primary/20 uppercase text-[10px] font-bold tracking-widest">Portal Agentes</Link>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Link href="/radar" onClick={() => setMobileMenuOpen(false)} className="w-full text-center py-4 rounded-xl border border-border uppercase text-[10px] font-bold tracking-widest">Acceso Radar</Link>
+                                        <Link href="/admin" onClick={() => setMobileMenuOpen(false)} className="w-full text-center py-4 rounded-xl border border-border uppercase text-[10px] font-bold tracking-widest">Portal Agentes</Link>
+                                        <Link
+                                            href="/profile"
+                                            onClick={() => setMobileMenuOpen(false)}
+                                            className="w-full flex items-center justify-center space-x-2 py-4 rounded-xl bg-primary/10 text-primary border border-primary/20 uppercase text-[10px] font-bold tracking-widest"
+                                        >
+                                            <User size={16} />
+                                            <span>Mi Perfil</span>
+                                        </Link>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </motion.div>

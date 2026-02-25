@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Mic, ArrowRight, Shield, TrendingUp, Zap, Building2, Scale, Calculator, HardHat, Paintbrush, FileSignature, Star, X, MapPin } from "lucide-react";
+import { Mic, ArrowRight, Shield, TrendingUp, Zap, Building2, Scale, Calculator, HardHat, Paintbrush, FileSignature, Star, X, MapPin, ChevronRight, Gavel, FileCheck } from "lucide-react";
 import Link from "next/link";
 import { motion, Variants, AnimatePresence } from "framer-motion";
+import Navbar from "@/components/Navbar";
 
 const fadeInUp: Variants = {
   hidden: { opacity: 0, y: 40 },
@@ -38,30 +39,8 @@ const CITIES = [
 export default function Home() {
   const [openCity, setOpenCity] = useState<(typeof CITIES)[0] | null>(null);
   return (
-    <main className="min-h-screen bg-background text-foreground selection:bg-primary/30 font-sans">
-
-      {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 p-6 flex justify-between items-center bg-background/80 backdrop-blur-md border-b border-white/5">
-        <div className="flex items-center space-x-3">
-          {/* User's uploaded logos (Black/White variants) */}
-          <img src="/alea-monogram-black.png" alt="Aleasignature Logo" className="h-10 w-auto opacity-90 transition-opacity hover:opacity-100 dark:hidden" />
-          <img src="/alea-monogram-white.png" alt="Aleasignature Logo" className="h-10 w-auto opacity-90 transition-opacity hover:opacity-100 hidden dark:block" />
-          <span className="font-serif text-xl tracking-widest font-medium">Aleasignature.</span>
-        </div>
-        <div className="hidden md:flex items-center space-x-8 text-sm font-medium text-muted-foreground">
-          <a href="#ventajas" className="hover:text-foreground transition-colors">Ventajas</a>
-          <a href="#praetorium" className="hover:text-foreground transition-colors">Praetorium</a>
-          <a href="#testimonios" className="hover:text-foreground transition-colors">Testimonios</a>
-        </div>
-        <div className="flex items-center space-x-4">
-          <Link href="/login" className="text-[10px] font-bold tracking-[0.2em] uppercase border border-border px-5 py-2.5 rounded-full hover:bg-foreground hover:text-background transition-all">
-            Acceso Inversores
-          </Link>
-          <Link href="/login" className="text-[10px] font-bold tracking-[0.2em] uppercase bg-primary/10 text-primary border border-primary/20 px-5 py-2.5 rounded-full hover:bg-primary hover:text-white transition-all shadow-sm shadow-primary/10">
-            Portal Agentes
-          </Link>
-        </div>
-      </nav>
+    <main className="min-h-screen bg-background text-foreground selection:bg-primary/30 font-sans overflow-x-hidden">
+      <Navbar />
 
       {/* Hero Section */}
       <section className="relative h-screen flex items-center justify-center px-6 overflow-hidden pt-20">
@@ -227,20 +206,34 @@ export default function Home() {
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }} className="bg-card p-8 rounded-2xl border border-border shadow-sm">
-              <Shield className="w-10 h-10 text-primary mb-6" />
-              <h3 className="font-serif text-xl font-medium mb-3">Exclusividad Total</h3>
-              <p className="text-muted-foreground leading-relaxed">Propiedades que no aparecen en portales públicos. Acceso privilegiado a las mejores oportunidades antes de que lleguen a tu competencia.</p>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }}
+              className="bg-card/40 backdrop-blur-md p-10 rounded-[2rem] border border-white/10 shadow-sm group hover:border-primary/50 transition-all duration-500 relative overflow-hidden"
+            >
+              <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/10 rounded-full blur-[60px] group-hover:bg-primary/20 transition-all" />
+              <Shield className="w-12 h-12 text-primary mb-8" />
+              <h3 className="font-serif text-2xl font-medium mb-4 tracking-tight">Exclusividad Total</h3>
+              <p className="text-muted-foreground leading-relaxed font-light">Propiedades que no aparecen en portales públicos. Acceso privilegiado a las mejores oportunidades antes de que lleguen a tu competencia.</p>
             </motion.div>
-            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 }} className="bg-card p-8 rounded-2xl border border-border shadow-sm">
-              <TrendingUp className="w-10 h-10 text-primary mb-6" />
-              <h3 className="font-serif text-xl font-medium mb-3">Rentabilidad Superior</h3>
-              <p className="text-muted-foreground leading-relaxed">Precios más competitivos al evitar la especulación del mercado abierto. Márgenes de beneficio superiores garantizados en cada operación.</p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 }}
+              className="bg-card/40 backdrop-blur-md p-10 rounded-[2rem] border border-white/10 shadow-sm group hover:border-primary/50 transition-all duration-500 relative overflow-hidden"
+            >
+              <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/10 rounded-full blur-[60px] group-hover:bg-primary/20 transition-all" />
+              <TrendingUp className="w-12 h-12 text-primary mb-8" />
+              <h3 className="font-serif text-2xl font-medium mb-4 tracking-tight">Rentabilidad Superior</h3>
+              <p className="text-muted-foreground leading-relaxed font-light">Precios más competitivos al evitar la especulación del mercado abierto. Márgenes de beneficio superiores garantizados en cada operación.</p>
             </motion.div>
-            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.3 }} className="bg-card p-8 rounded-2xl border border-border shadow-sm">
-              <Zap className="w-10 h-10 text-primary mb-6" />
-              <h3 className="font-serif text-xl font-medium mb-3">Eficiencia Operativa</h3>
-              <p className="text-muted-foreground leading-relaxed">Sin intermediarios innecesarios. Negociación directa y estructuración ágil para un cierre mucho más rápido y limpio.</p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.3 }}
+              className="bg-card/40 backdrop-blur-md p-10 rounded-[2rem] border border-white/10 shadow-sm group hover:border-primary/50 transition-all duration-500 relative overflow-hidden"
+            >
+              <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/10 rounded-full blur-[60px] group-hover:bg-primary/20 transition-all" />
+              <Zap className="w-12 h-12 text-primary mb-8" />
+              <h3 className="font-serif text-2xl font-medium mb-4 tracking-tight">Eficiencia Operativa</h3>
+              <p className="text-muted-foreground leading-relaxed font-light">Sin intermediarios innecesarios. Negociación directa y estructuración ágil para un cierre mucho más rápido y limpio.</p>
             </motion.div>
           </div>
         </div>

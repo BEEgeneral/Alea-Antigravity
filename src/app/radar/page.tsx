@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Navbar from "@/components/Navbar";
 
 interface RadarProperty {
     id: string;
@@ -103,23 +104,8 @@ export default function InvestmentRadar() {
     }
 
     return (
-        <div className="min-h-screen bg-background text-foreground selection:bg-primary/30 font-sans">
-            {/* Header / Navigation */}
-            <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
-                <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-                    <Link href="/" className="font-serif text-2xl tracking-widest font-medium group transition-all">
-                        ALEA<span className="text-primary group-hover:text-foreground transition-colors">SIGNATURE</span>
-                    </Link>
-
-                    <div className="hidden md:flex items-center space-x-8">
-                        <Link href="/radar" className="text-primary text-xs font-bold uppercase tracking-widest flex items-center">
-                            <div className="w-1.5 h-1.5 rounded-full bg-primary mr-2 animate-pulse" />
-                            Radar de Inversión
-                        </Link>
-                        <Link href="/profile" className="text-muted-foreground hover:text-foreground text-xs font-bold uppercase tracking-widest transition-colors">Mi Perfil</Link>
-                    </div>
-                </div>
-            </header>
+        <div className="min-h-screen bg-background text-foreground selection:bg-primary/30 font-sans overflow-x-hidden">
+            <Navbar />
 
             <main className="pt-32 pb-24 px-6">
                 <div className="max-w-7xl mx-auto">
@@ -180,11 +166,12 @@ export default function InvestmentRadar() {
                                     return (
                                         <motion.div
                                             key={property.id}
-                                            initial={{ opacity: 0, scale: 0.9 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            transition={{ delay: idx * 0.1 }}
-                                            whileHover={{ y: -10 }}
-                                            className="group bg-card border border-border rounded-[2.5rem] overflow-hidden flex flex-col h-full hover:border-primary/30 hover:shadow-xl transition-all duration-500 relative"
+                                            initial={{ opacity: 0, scale: 0.95 }}
+                                            whileInView={{ opacity: 1, scale: 1 }}
+                                            viewport={{ once: true }}
+                                            transition={{ delay: idx * 0.05 }}
+                                            whileHover={{ y: -8 }}
+                                            className="group bg-card/50 backdrop-blur-md border border-white/10 rounded-[2.5rem] overflow-hidden flex flex-col h-full hover:border-primary/40 hover:shadow-[0_20px_50px_rgba(0,0,0,0.2)] transition-all duration-700 relative"
                                         >
                                             {/* Status Badge */}
                                             <div className="absolute top-6 left-6 z-10">

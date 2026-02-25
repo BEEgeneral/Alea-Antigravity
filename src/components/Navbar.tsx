@@ -128,14 +128,8 @@ export default function Navbar() {
                     <div className="hidden md:flex items-center space-x-4">
                         {loadingAuth ? (
                             <div className="w-8 h-8 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
-                        ) : !user ? (
+                        ) : (!user?.id || !userRole) ? (
                             <>
-                                <Link
-                                    href="/radar"
-                                    className="text-[9px] font-black tracking-[0.2em] uppercase border border-border/50 px-6 py-2.5 rounded-full hover:bg-foreground hover:text-background transition-all duration-500"
-                                >
-                                    Radar
-                                </Link>
                                 <Link
                                     href="/praetorium"
                                     className="group relative text-[9px] font-black tracking-[0.2em] uppercase bg-primary text-white border border-primary px-6 py-2.5 rounded-full overflow-hidden transition-all duration-500 hover:opacity-90 hover:shadow-lg hover:shadow-primary/20"
@@ -210,9 +204,8 @@ export default function Navbar() {
                                     <div className="flex justify-center py-4">
                                         <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
                                     </div>
-                                ) : !user ? (
+                                ) : (!user?.id || !userRole) ? (
                                     <>
-                                        <Link href="/radar" className="w-full text-center py-4 rounded-xl border border-border uppercase text-[10px] font-bold tracking-widest">Radar</Link>
                                         <Link href="/praetorium" className="w-full text-center py-4 rounded-xl bg-primary/10 text-primary border border-primary/20 uppercase text-[10px] font-bold tracking-widest">Portal Agentes</Link>
                                     </>
                                 ) : (

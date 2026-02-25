@@ -7,7 +7,7 @@ import {
     Clock, MapPin, LayoutDashboard, Plus, MoreHorizontal, Share2,
     ChevronLeft, Maximize2, Bed, Bath, Sparkles, TrendingUp, Wind,
     Trees, ShoppingBag, Umbrella, Tag, Calendar, ShieldCheck, Star,
-    Trash2, Edit2, Upload, Loader2, User, LogOut, Settings
+    Trash2, Edit2, Upload, Loader2, User, LogOut, Settings, Menu, X
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -17,26 +17,26 @@ import { useRouter } from "next/navigation";
 
 // Defined Pipeline Stages
 const PIPELINE_STAGES = [
-    { id: "prospect", label: "Prospect", color: "bg-blue-500" },
-    { id: "qualified", label: "Qualified", color: "bg-amber-500" },
+    { id: "prospect", label: "Prospecto", color: "bg-blue-500" },
+    { id: "qualified", label: "Cualificado", color: "bg-amber-500" },
     { id: "due-diligence", label: "Due Diligence", color: "bg-purple-500" },
-    { id: "offer", label: "Offer / LOI", color: "bg-emerald-500" },
-    { id: "closing", label: "Closing", color: "bg-primary" },
+    { id: "offer", label: "Oferta / LOI", color: "bg-emerald-500" },
+    { id: "closing", label: "Cierre", color: "bg-primary" },
 ];
 
 // Pipeline stage IDs match lead status values directly — no need for mapping objects.
 const VALID_STAGES = new Set(PIPELINE_STAGES.map(s => s.id));
 
 const MOCK_ACTIVITY = [
-    { id: "a1", action: "DOWNLOADED_DOCUMENT", detail: "Alberto Gala downloaded 'Nota Simple - Palacio Gran Vía'", time: "10 mins ago" },
-    { id: "a2", action: "VIEWED_PROPERTY", detail: "Sofia Martinez viewed 'Azure Seafront Villa'", time: "2 hours ago" },
-    { id: "a3", action: "PROFILE_UPDATED", detail: "Eduardo Santacruz completed Voice Onboarding", time: "5 hours ago" },
+    { id: "a1", action: "DOCUMENTO_DESCARGADO", detail: "Alberto Gala descargó 'Nota Simple - Palacio Gran Vía'", time: "hace 10 min" },
+    { id: "a2", action: "PROPIEDAD_VISTA", detail: "Sofia Martinez vio 'Azure Seafront Villa'", time: "hace 2 horas" },
+    { id: "a3", action: "PERFIL_ACTUALIZADO", detail: "Eduardo Santacruz completó el Onboarding de Voz", time: "hace 5 horas" },
 ];
 
 const MOCK_TEMPLATES = [
-    { id: "t1", name: "NDA - Acuerdo de Confidencialidad", type: "Legal", lastUsed: "1 day ago" },
-    { id: "t2", name: "LoI - Carta de Intención de Compra", type: "Legal", lastUsed: "3 days ago" },
-    { id: "t3", name: "Perfil de Inversión Resumido", type: "Internal", lastUsed: "Today" },
+    { id: "t1", name: "NDA - Acuerdo de Confidencialidad", type: "Legal", lastUsed: "hace 1 día" },
+    { id: "t2", name: "LoI - Carta de Intención de Compra", type: "Legal", lastUsed: "hace 3 días" },
+    { id: "t3", name: "Perfil de Inversión Resumido", type: "Interno", lastUsed: "Hoy" },
 ];
 
 export default function AdminDashboard() {
@@ -47,6 +47,8 @@ export default function AdminDashboard() {
     const [leads, setLeads] = useState<any[]>([]);
     const [interactions, setInteractions] = useState<any[]>([]);
     const [investors, setInvestors] = useState<any[]>([]);
+    const [mandatarios, setMandatarios] = useState<any[]>([]);
+    const [collaborators, setCollaborators] = useState<any[]>([]);
     const [properties, setProperties] = useState<any[]>([]);
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const [showToast, setShowToast] = useState(false);
@@ -59,8 +61,12 @@ export default function AdminDashboard() {
     const [_loading, setLoading] = useState(true);
     const [selectedAgentToEdit, setSelectedAgentToEdit] = useState<any>(null);
     const [selectedInvestorToEdit, setSelectedInvestorToEdit] = useState<any>(null);
+    const [selectedMandatarioToEdit, setSelectedMandatarioToEdit] = useState<any>(null);
     const [isAddingAgent, setIsAddingAgent] = useState(false);
     const [isAddingInvestor, setIsAddingInvestor] = useState(false);
+    const [isAddingMandatario, setIsAddingMandatario] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isAddingCollaborator, setIsAddingCollaborator] = useState(false);
     const [isUploadingPdf, setIsUploadingPdf] = useState(false);
     const [isSelectingInvestorForLead, setIsSelectingInvestorForLead] = useState(false);
     const [targetPropertyForLead, setTargetPropertyForLead] = useState<any>(null);
@@ -71,10 +77,29 @@ export default function AdminDashboard() {
         email: "",
         phone: "",
         investor_type: "",
-        min_ticket_eur: 0,
-        max_ticket_eur: 0,
+        budget_min: 0,
+        budget_max: 0,
         labels: []
     });
+    const [mandatarioForm, setMandatarioForm] = useState<any>({
+        full_name: "",
+        company_name: "",
+        email: "",
+        phone: "",
+        mandatario_type: "",
+        labels: []
+    });
+    const [collaboratorForm, setCollaboratorForm] = useState({
+        full_name: "",
+        company_name: "",
+        email: "",
+        phone: "",
+        specialty: ""
+    });
+    const [investorAssignSearch, setInvestorAssignSearch] = useState("");
+    const [isCreatingGlobalLead, setIsCreatingGlobalLead] = useState(false);
+    const [stepInGlobalLead, setStepInGlobalLead] = useState(1); // 1: Asset, 2: Investor
+    const [assetSearch, setAssetSearch] = useState("");
 
     const fetchData = async () => {
         try {
@@ -94,9 +119,17 @@ export default function AdminDashboard() {
             // Fetch Investors
             const { data: investorsData } = await supabase.from('investors').select('*');
 
+            // Fetch Collaborators
+            const { data: collaboratorsData } = await supabase.from('collaborators').select('*').order('created_at', { ascending: false });
+
+            // Fetch Mandatarios
+            const { data: mandatariosData } = await supabase.from('mandatarios').select('*').order('created_at', { ascending: false });
+
             if (leadsData) setLeads(leadsData);
             if (propertiesData) setProperties(propertiesData);
             if (investorsData) setInvestors(investorsData);
+            if (mandatariosData) setMandatarios(mandatariosData);
+            if (collaboratorsData) setCollaborators(collaboratorsData);
         } catch (error) {
             console.error("Error fetching data:", error);
         }
@@ -401,8 +434,8 @@ export default function AdminDashboard() {
                 company_name: investor.company_name,
                 phone: investor.phone,
                 investor_type: investor.investor_type,
-                min_ticket_eur: investor.min_ticket_eur,
-                max_ticket_eur: investor.max_ticket_eur,
+                budget_min: investor.budget_min,
+                budget_max: investor.budget_max,
                 labels: investor.labels
             })
             .eq('id', investor.id);
@@ -414,6 +447,48 @@ export default function AdminDashboard() {
             setTimeout(() => setShowToast(false), 3000);
         } else {
             console.error("Error updating investor:", error);
+        }
+    };
+
+    const handleUpdateLeadFunnel = async (leadId: string, updates: any) => {
+        const lead = leads.find(l => l.id === leadId);
+        if (!lead) return;
+
+        const { error } = await supabase
+            .from('leads')
+            .update(updates)
+            .eq('id', leadId);
+
+        if (!error) {
+            setLeads(prev => prev.map(l => l.id === leadId ? { ...l, ...updates } : l));
+            if (selectedLead?.id === leadId) {
+                setSelectedLead((prev: any) => ({ ...prev, ...updates }));
+            }
+
+            // Sync with Property (Asset) Price Information
+            if (lead.property_id && (updates.alea_commission !== undefined || updates.intermediaries !== undefined)) {
+                const updatedLeadState = { ...lead, ...updates };
+                const propUpdates: any = {};
+
+                if (updates.alea_commission !== undefined) {
+                    propUpdates.comision_interna = updates.alea_commission;
+                }
+
+                if (updates.intermediaries !== undefined) {
+                    const totalExternal = (updates.intermediaries || []).reduce((acc: number, curr: any) => acc + (parseFloat(curr.commission) || 0), 0);
+                    propUpdates.comision_tercero = totalExternal;
+                }
+
+                if (Object.keys(propUpdates).length > 0) {
+                    await supabase.from('properties').update(propUpdates).eq('id', lead.property_id);
+                    setProperties(prev => prev.map(p => p.id === lead.property_id ? { ...p, ...propUpdates } : p));
+                }
+            }
+
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        } else {
+            console.error("Error updating lead funnel:", error);
         }
     };
 
@@ -461,8 +536,8 @@ export default function AdminDashboard() {
                     email: "",
                     phone: "",
                     investor_type: "",
-                    min_ticket_eur: 0,
-                    max_ticket_eur: 0,
+                    budget_min: 0,
+                    budget_max: 0,
                     labels: []
                 });
                 setShowToast(true);
@@ -471,7 +546,122 @@ export default function AdminDashboard() {
                 console.error("Error creating investor:", error);
             }
         } catch (error) {
-            console.error("Catch error creating investor:", error);
+            console.error("Error creating investor:", error);
+        }
+    };
+
+    const handleCreateMandatario = async () => {
+        try {
+            const { error } = await supabase
+                .from('mandatarios')
+                .insert([{
+                    ...mandatarioForm,
+                    status: 'nuevo',
+                    kyc_status: 'pending',
+                    created_at: new Date().toISOString()
+                }]);
+
+            if (!error) {
+                await fetchData(); // Refresh list
+                setIsAddingMandatario(false);
+                setMandatarioForm({
+                    full_name: "",
+                    company_name: "",
+                    email: "",
+                    phone: "",
+                    mandatario_type: "",
+                    labels: []
+                });
+                setShowToast(true);
+                setTimeout(() => setShowToast(false), 3000);
+            } else {
+                console.error("Error creating mandatario:", error);
+            }
+        } catch (error) {
+            console.error("Error creating mandatario:", error);
+        }
+    };
+
+    const handleUpdateMandatario = async (mandatario: any) => {
+        const { error } = await supabase
+            .from('mandatarios')
+            .update({
+                full_name: mandatario.full_name,
+                company_name: mandatario.company_name,
+                phone: mandatario.phone,
+                mandatario_type: mandatario.mandatario_type,
+                labels: mandatario.labels
+            })
+            .eq('id', mandatario.id);
+
+        if (!error) {
+            setMandatarios(prev => prev.map(m => m.id === mandatario.id ? { ...m, ...mandatario } : m));
+            setSelectedMandatarioToEdit(null);
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        } else {
+            console.error("Error updating mandatario:", error);
+        }
+    };
+
+    const handleDeleteMandatario = async (id: string) => {
+        const { error } = await supabase
+            .from('mandatarios')
+            .delete()
+            .eq('id', id);
+
+        if (!error) {
+            setMandatarios(prev => prev.filter(m => m.id !== id));
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        } else {
+            console.error("Error deleting mandatario:", error);
+        }
+    };
+
+    const handleCreateCollaborator = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('collaborators')
+                .insert([{
+                    ...collaboratorForm,
+                    created_at: new Date().toISOString()
+                }])
+                .select();
+
+            if (!error) {
+                if (data) setCollaborators(prev => [data[0], ...prev]);
+                setIsAddingCollaborator(false);
+                setCollaboratorForm({
+                    full_name: "",
+                    company_name: "",
+                    email: "",
+                    phone: "",
+                    specialty: ""
+                });
+                setShowToast(true);
+                setTimeout(() => setShowToast(false), 3000);
+            } else {
+                console.error("Error creating collaborator:", error);
+            }
+        } catch (error) {
+            console.error("Catch error creating collaborator:", error);
+        }
+    };
+
+    const handleDeleteCollaborator = async (id: string) => {
+        if (!confirm("¿Estás seguro de que quieres eliminar a este colaborador?")) return;
+        const { error } = await supabase
+            .from('collaborators')
+            .delete()
+            .eq('id', id);
+
+        if (!error) {
+            setCollaborators(prev => prev.filter(c => c.id !== id));
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        } else {
+            console.error("Error deleting collaborator", error);
         }
     };
 
@@ -602,7 +792,7 @@ export default function AdminDashboard() {
                             <h3 className="text-[10px] uppercase tracking-[0.2em] text-primary font-bold mb-6">Tesis de Inversión</h3>
                             <div className="space-y-4">
                                 <div>
-                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Ticket Preferido</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Ticket Preferencial</p>
                                     <p className="text-lg font-serif">{investor.ticket}</p>
                                 </div>
                                 <div>
@@ -934,7 +1124,9 @@ export default function AdminDashboard() {
                                         <label className="text-[10px] text-muted-foreground uppercase tracking-widest font-black mb-2 block">Precio Base (€)</label>
                                         <input
                                             type="number"
-                                            value={priceForm.price}
+                                            value={priceForm.price || ""}
+                                            placeholder="0"
+                                            onFocus={(e) => e.target.select()}
                                             onChange={(e) => setPriceForm(f => ({ ...f, price: Number(e.target.value) }))}
                                             className="w-full bg-muted/50 border border-border rounded-2xl px-5 py-3 text-2xl font-serif font-medium focus:outline-none focus:border-primary/60 transition-all"
                                         />
@@ -945,17 +1137,21 @@ export default function AdminDashboard() {
                                             <input
                                                 type="number"
                                                 step="0.1"
-                                                value={priceForm.comision_tercero}
+                                                value={priceForm.comision_tercero || ""}
+                                                placeholder="0"
+                                                onFocus={(e) => e.target.select()}
                                                 onChange={(e) => setPriceForm(f => ({ ...f, comision_tercero: Number(e.target.value) }))}
                                                 className="w-full bg-muted/50 border border-border rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-primary/60 transition-all"
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] text-muted-foreground uppercase tracking-widest font-black mb-2 block">Comisión Interna (%)</label>
+                                            <label className="text-[10px] text-muted-foreground uppercase tracking-widest font-black mb-2 block">Comisión Alea (%)</label>
                                             <input
                                                 type="number"
                                                 step="0.1"
-                                                value={priceForm.comision_interna}
+                                                value={priceForm.comision_interna || ""}
+                                                placeholder="0"
+                                                onFocus={(e) => e.target.select()}
                                                 onChange={(e) => setPriceForm(f => ({ ...f, comision_interna: Number(e.target.value) }))}
                                                 className="w-full bg-muted/50 border border-border rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-primary/60 transition-all"
                                             />
@@ -973,7 +1169,7 @@ export default function AdminDashboard() {
                                             <span>€{(priceForm.price * priceForm.comision_tercero / 100).toLocaleString()}</span>
                                         </div>
                                         <div className="flex justify-between text-sm font-medium">
-                                            <span className="text-muted-foreground">Com. interna ({priceForm.comision_interna}%):</span>
+                                            <span className="text-muted-foreground">Com. Alea ({priceForm.comision_interna}%):</span>
                                             <span>€{(priceForm.price * priceForm.comision_interna / 100).toLocaleString()}</span>
                                         </div>
                                         <div className="flex justify-between items-center pt-3 border-t border-border mt-2">
@@ -1003,7 +1199,7 @@ export default function AdminDashboard() {
                                                 <span className="text-foreground">€{(Number(property.price) * (Number(property.comision_tercero) || 2) / 100).toLocaleString()}</span>
                                             </div>
                                             <div className="flex justify-between items-center text-sm font-medium">
-                                                <span className="text-muted-foreground">Comisión interna ({Number(property.comision_interna) || 1}%):</span>
+                                                <span className="text-muted-foreground">Comisión Alea ({Number(property.comision_interna) || 1}%):</span>
                                                 <span className="text-foreground">€{(Number(property.price) * (Number(property.comision_interna) || 1) / 100).toLocaleString()}</span>
                                             </div>
                                         </div>
@@ -1070,33 +1266,33 @@ export default function AdminDashboard() {
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
-                className="fixed inset-0 top-[110px] left-[256px] bg-background z-40 flex overflow-hidden"
+                className="fixed inset-0 top-0 md:top-[110px] left-0 md:left-[256px] bg-background z-40 flex flex-col lg:flex-row overflow-hidden"
             >
                 {/* Left Area: The "Sala" (Interaction Hub) - Expansive */}
-                <div className="flex-1 flex flex-col border-r border-border/50 bg-muted/5">
+                <div className="flex-1 flex flex-col border-r border-border/50 bg-muted/5 overflow-y-auto">
                     {/* Header of the Sala */}
                     <div className="p-8 border-b border-border/50 flex justify-between items-center bg-card/30 backdrop-blur-md">
-                        <div>
-                            <div className="flex items-center space-x-3 mb-1">
-                                <h2 className="text-2xl font-serif font-medium">{lead.investor}</h2>
-                                <span className="px-3 py-1 bg-primary/10 text-primary text-[9px] font-black uppercase tracking-[0.2em] rounded-full leading-none">
-                                    Dealing Room
+                        <div className="flex-1">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 mb-1">
+                                <h2 className="text-xl md:text-2xl font-serif font-medium truncate">{lead.investor}</h2>
+                                <span className="inline-block mt-2 sm:mt-0 px-3 py-1 bg-primary/10 text-primary text-[8px] md:text-[9px] font-black uppercase tracking-[0.2em] rounded-full leading-none w-fit">
+                                    Sala de Negociación
                                 </span>
                             </div>
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Activo: {lead.property}</p>
+                            <p className="text-[9px] md:text-[10px] text-muted-foreground uppercase tracking-widest font-bold truncate">Activo: {lead.property}</p>
                         </div>
-                        <div className="flex items-center space-x-6">
-                            <div className="text-right">
-                                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black mb-1">Score de Match IAI</p>
+                        <div className="flex items-center space-x-2 md:space-x-6">
+                            <div className="text-right hidden sm:block">
+                                <p className="text-[8px] md:text-[10px] text-muted-foreground uppercase tracking-widest font-black mb-1">Score de Match IAI</p>
                                 <div className="flex items-center space-x-2">
-                                    <div className="w-24 bg-muted-foreground/10 h-1.5 rounded-full overflow-hidden">
+                                    <div className="w-16 md:w-24 bg-muted-foreground/10 h-1.5 rounded-full overflow-hidden">
                                         <motion.div
                                             initial={{ width: 0 }}
                                             animate={{ width: `${lead.matchScore}%` }}
                                             className="h-full bg-primary shadow-[0_0_10px_rgba(255,255,255,0.3)]"
                                         />
                                     </div>
-                                    <span className="text-sm font-serif text-primary italic">{lead.matchScore}%</span>
+                                    <span className="text-xs md:text-sm font-serif text-primary italic">{lead.matchScore}%</span>
                                 </div>
                             </div>
                             <button
@@ -1117,13 +1313,254 @@ export default function AdminDashboard() {
 
                     {/* Content of the Sala */}
                     <div className="flex-1 overflow-y-auto p-8 space-y-12">
-                        {/* 1. IAI Predictions & Insights (Future) */}
+                        {/* 0. Visual Funnel Architecture */}
+                        <section className="space-y-6">
+                            <h3 className="text-[10px] uppercase tracking-[0.3em] text-primary font-black flex items-center">
+                                <Sparkles size={14} className="mr-2" />
+                                Arquitectura de la Operación
+                            </h3>
+
+                            <div className="bg-card border border-border/50 rounded-[2.5rem] p-8 relative overflow-hidden">
+                                {/* Level 1: The Asset */}
+                                <div className="flex flex-col items-center mb-12 relative z-10">
+                                    <div
+                                        onClick={() => lead.properties && setSelectedProperty(lead.properties)}
+                                        className="p-4 bg-primary/10 rounded-2xl border border-primary/20 flex items-center space-x-4 max-w-sm w-full shadow-sm cursor-pointer hover:bg-primary/20 transition-all group"
+                                    >
+                                        <div className="w-12 h-12 rounded-xl bg-muted overflow-hidden shrink-0">
+                                            <img src={lead.properties?.images?.[0] || "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80"} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                        </div>
+                                        <div className="flex-1 overflow-hidden">
+                                            <p className="text-[8px] text-primary font-black uppercase tracking-widest mb-1">Activo Principal</p>
+                                            <p className="text-xs font-bold truncate group-hover:text-primary transition-colors">{lead.properties?.title || lead.property}</p>
+                                        </div>
+                                    </div>
+                                    <div className="w-px h-8 bg-gradient-to-b from-primary/30 to-border mt-2" />
+                                </div>
+
+                                {/* Level 2: Entities & Intermediary */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-4 items-center mb-12 relative z-10">
+                                    {/* Comprador Side */}
+                                    <div className="flex flex-col items-center space-y-4">
+                                        <div className="w-full p-5 bg-muted/30 rounded-3xl border border-border/50 text-center relative group">
+                                            <p className="text-[8px] text-muted-foreground font-black uppercase tracking-widest mb-2">Comprador</p>
+                                            <p className="text-sm font-bold truncate">{lead.investors?.full_name || lead.investor}</p>
+
+                                            <button
+                                                onClick={() => handleUpdateLeadFunnel(lead.id, { is_buyer_mandatario: !lead.is_buyer_mandatario })}
+                                                className={`mt-3 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest transition-all border ${lead.is_buyer_mandatario ? 'bg-amber-500 text-white border-amber-600' : 'bg-muted text-muted-foreground border-border'}`}
+                                            >
+                                                {lead.is_buyer_mandatario ? 'Gestionado por Mandatario' : 'Acceso Directo'}
+                                            </button>
+
+                                            {lead.is_buyer_mandatario && (
+                                                <div className="mt-3">
+                                                    <select
+                                                        value={lead.buyer_mandatario_id || ""}
+                                                        onChange={(e) => handleUpdateLeadFunnel(lead.id, { buyer_mandatario_id: e.target.value })}
+                                                        className="w-full bg-muted/50 border border-amber-500/30 rounded-xl px-3 py-1.5 text-[9px] font-bold focus:outline-none focus:border-amber-500 transition-all text-center appearance-none"
+                                                    >
+                                                        <option value="">Seleccionar Mandatario</option>
+                                                        {mandatarios.map((m: any) => (
+                                                            <option key={m.id} value={m.id}>{m.full_name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col items-center relative">
+                                        <div className="absolute top-1/2 left-[-20%] right-[-20%] h-px bg-border -z-10" />
+                                        <div className="w-16 h-16 bg-foreground text-background rounded-full flex items-center justify-center shadow-2xl border-4 border-background ring-4 ring-primary/20 transition-transform hover:scale-105">
+                                            <Sparkles size={24} />
+                                        </div>
+                                        <div className="mt-3 text-center">
+                                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary">Intermediario</p>
+                                            <p className="text-[7px] text-muted-foreground uppercase font-bold mb-2">Alea Signature</p>
+
+                                            <div className="flex flex-col items-center space-y-1">
+                                                <div className="flex items-center space-x-1 bg-card border border-border/50 rounded-lg px-2 py-0.5 shadow-sm">
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        className="bg-transparent border-none w-10 text-[10px] font-black focus:outline-none text-right"
+                                                        value={lead.alea_commission || 0}
+                                                        onFocus={(e) => e.target.select()}
+                                                        onChange={(e) => handleUpdateLeadFunnel(lead.id, { alea_commission: parseFloat(e.target.value) || 0 })}
+                                                    />
+                                                    <span className="text-[9px] font-black text-primary">%</span>
+                                                </div>
+                                                {lead.properties?.price && (
+                                                    <p className="text-[8px] text-primary font-bold">
+                                                        {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((lead.properties.price * (lead.alea_commission || 0)) / 100)}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Vendedor Side */}
+                                    <div className="flex flex-col items-center space-y-4">
+                                        <div className="w-full p-5 bg-muted/30 rounded-3xl border border-border/50 text-center relative group">
+                                            <p className="text-[8px] text-muted-foreground font-black uppercase tracking-widest mb-2">Vendedor / Propiedad</p>
+                                            <input
+                                                type="text"
+                                                placeholder="Nombre del Vendedor..."
+                                                defaultValue={lead.seller_name || ""}
+                                                onBlur={(e) => handleUpdateLeadFunnel(lead.id, { seller_name: e.target.value })}
+                                                className="bg-transparent border-none text-sm font-bold text-center w-full focus:outline-none placeholder:text-muted-foreground/30"
+                                            />
+
+                                            <button
+                                                onClick={() => handleUpdateLeadFunnel(lead.id, { is_seller_mandatario: !lead.is_seller_mandatario })}
+                                                className={`mt-3 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest transition-all border ${lead.is_seller_mandatario ? 'bg-amber-500 text-white border-amber-600' : 'bg-muted text-muted-foreground border-border'}`}
+                                            >
+                                                {lead.is_seller_mandatario ? 'Gestionado por Mandatario' : 'Acceso Directo'}
+                                            </button>
+
+                                            {lead.is_seller_mandatario && (
+                                                <div className="mt-3">
+                                                    <select
+                                                        value={lead.seller_mandatario_id || ""}
+                                                        onChange={(e) => handleUpdateLeadFunnel(lead.id, { seller_mandatario_id: e.target.value })}
+                                                        className="w-full bg-muted/50 border border-amber-500/30 rounded-xl px-3 py-1.5 text-[9px] font-bold focus:outline-none focus:border-amber-500 transition-all text-center appearance-none"
+                                                    >
+                                                        <option value="">Seleccionar Mandatario</option>
+                                                        {mandatarios.map((m: any) => (
+                                                            <option key={m.id} value={m.id}>{m.full_name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Level 3: Collaborators */}
+                                <div className="flex flex-col items-center relative z-10">
+                                    <div className="w-px h-8 bg-gradient-to-b from-border to-primary/30 mb-2" />
+                                    <div className="w-full max-w-2xl bg-muted/20 border border-border/40 rounded-3xl p-8">
+                                        <div className="flex justify-between items-center mb-6">
+                                            <div>
+                                                <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest">Colaboradores Externos</p>
+                                                <p className="text-[7px] text-primary uppercase font-bold tracking-tighter">Gestión de Intermediarios y Comisiones</p>
+                                            </div>
+
+                                            <div className="relative group">
+                                                <button className="p-2 bg-primary/10 hover:bg-primary/20 rounded-xl text-primary transition-all flex items-center space-x-2">
+                                                    <Plus size={14} />
+                                                    <span className="text-[10px] font-black uppercase tracking-widest">Añadir</span>
+                                                </button>
+
+                                                <div className="absolute right-0 top-full mt-2 w-64 bg-card border border-border rounded-2xl shadow-2xl p-4 hidden group-hover:block z-50">
+                                                    <p className="text-[9px] font-black uppercase tracking-widest mb-3 text-muted-foreground">Seleccionar Colaborador</p>
+                                                    <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
+                                                        {collaborators
+                                                            .filter(c => !(lead.intermediaries || []).find((i: any) => i.id === c.id))
+                                                            .map((c: any) => (
+                                                                <button
+                                                                    key={c.id}
+                                                                    onClick={() => {
+                                                                        const currentCols = lead.intermediaries || [];
+                                                                        handleUpdateLeadFunnel(lead.id, {
+                                                                            intermediaries: [...currentCols, {
+                                                                                id: c.id,
+                                                                                name: c.full_name,
+                                                                                specialty: c.specialty,
+                                                                                commission: 0
+                                                                            }]
+                                                                        });
+                                                                    }}
+                                                                    className="w-full text-left p-2 hover:bg-primary/5 rounded-lg transition-all"
+                                                                >
+                                                                    <p className="text-xs font-bold">{c.full_name}</p>
+                                                                    <p className="text-[8px] text-primary uppercase font-black">{c.specialty}</p>
+                                                                </button>
+                                                            ))
+                                                        }
+                                                        {collaborators.length === 0 && (
+                                                            <p className="text-[10px] text-muted-foreground italic p-2 text-center">No hay colaboradores registrados</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            {(lead.intermediaries || []).map((col: any, idx: number) => (
+                                                <div key={idx} className="p-4 bg-card border border-border/50 rounded-2xl flex items-center justify-between shadow-sm group">
+                                                    <div className="flex items-center space-x-4">
+                                                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary text-[10px] font-black">
+                                                            {col.name?.charAt(0)}
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-xs font-bold block">{col.name}</span>
+                                                            <span className="text-[8px] text-muted-foreground uppercase font-black">{col.specialty}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center space-x-6">
+                                                        <div className="text-right">
+                                                            <div className="flex items-center space-x-2">
+                                                                <span className="text-[9px] font-black uppercase text-muted-foreground">Fee:</span>
+                                                                <div className="flex items-center bg-muted/50 border border-border/50 rounded-lg px-2 py-1">
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        className="bg-transparent border-none w-12 text-[10px] font-black focus:outline-none text-right"
+                                                                        value={col.commission || 0}
+                                                                        onFocus={(e) => e.target.select()}
+                                                                        onChange={(e) => {
+                                                                            const newCols = [...lead.intermediaries];
+                                                                            newCols[idx] = { ...col, commission: parseFloat(e.target.value) || 0 };
+                                                                            handleUpdateLeadFunnel(lead.id, { intermediaries: newCols });
+                                                                        }}
+                                                                    />
+                                                                    <span className="text-[9px] font-black text-primary ml-1">%</span>
+                                                                </div>
+                                                            </div>
+                                                            {lead.properties?.price && (
+                                                                <p className="text-[8px] text-primary font-bold mt-1">
+                                                                    {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((lead.properties.price * (col.commission || 0)) / 100)}
+                                                                </p>
+                                                            )}
+                                                        </div>
+
+                                                        <button
+                                                            onClick={() => {
+                                                                const newCols = [...lead.intermediaries];
+                                                                newCols.splice(idx, 1);
+                                                                handleUpdateLeadFunnel(lead.id, { intermediaries: newCols });
+                                                            }}
+                                                            className="p-2 text-muted-foreground hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {(lead.intermediaries || []).length === 0 && (
+                                                <div className="text-center py-6 border-2 border-dashed border-border/40 rounded-2xl flex flex-col items-center">
+                                                    <Share2 size={24} className="text-muted-foreground/30 mb-2" />
+                                                    <p className="text-[10px] text-muted-foreground/50 uppercase font-black tracking-widest italic">No hay colaboradores externos asignados</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Background Decorative Element */}
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-[80px]" />
+                            </div>
+                        </section>
+
                         <section className="space-y-4">
                             <h3 className="text-[10px] uppercase tracking-[0.3em] text-primary font-black flex items-center">
                                 <Activity size={14} className="mr-2" />
-                                IAI Sentinel — Predicciones Estratégicas
+                                Centinela IAI — Predicciones Estratégicas
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                 <div className="p-6 bg-gradient-to-br from-primary/[0.05] to-transparent border border-primary/10 rounded-[2rem] relative overflow-hidden group">
                                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                                         <ArrowUpRight size={40} />
@@ -1147,12 +1584,11 @@ export default function AdminDashboard() {
 
                         {/* 2. Main Timeline (Emails, Notes, Milestones) */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                            {/* Sala de Interacciones */}
                             <section className="space-y-6">
                                 <div className="flex justify-between items-center">
                                     <h3 className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground font-black flex items-center">
                                         <Mail size={14} className="mr-2" />
-                                        Canales de Comunicación
+                                        Canal de Comunicación y Notas
                                     </h3>
                                     <div className="flex space-x-2">
                                         <button className="px-3 py-1 bg-muted rounded-full text-[9px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all">Nota</button>
@@ -1182,7 +1618,7 @@ export default function AdminDashboard() {
                                     <div className="p-8 border-2 border-dashed border-border/40 rounded-[2.5rem] flex flex-col items-center justify-center text-center bg-muted/5 opacity-40">
                                         <Mail size={32} className="text-muted-foreground mb-4" />
                                         <p className="text-[10px] uppercase tracking-[0.3em] font-black text-muted-foreground">Sincronización de Email</p>
-                                        <p className="text-[9px] text-muted-foreground/60 mt-1">Conecta O365 / Gmail para volcar hilos</p>
+                                        <p className="text-[9px] text-muted-foreground/60 mt-1">Conecta Office365 / Gmail para volcar hilos de conversación</p>
                                     </div>
                                 </div>
                             </section>
@@ -1215,9 +1651,8 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Right Area: Investor Details & KYC - Compact Sidebar */}
-                <div className="w-[380px] flex flex-col bg-card/50 backdrop-blur-xl shrink-0 overflow-y-auto">
+                <div className="w-full lg:w-[380px] flex flex-col bg-card/50 backdrop-blur-xl shrink-0 overflow-y-auto border-t lg:border-t-0 lg:border-l border-border/50">
                     <div className="p-8 space-y-10">
-                        {/* Profile Summary */}
                         <div className="text-center">
                             <div className="w-20 h-20 bg-primary/10 rounded-[2rem] flex items-center justify-center text-3xl font-serif text-primary mx-auto mb-6 border border-primary/20">
                                 {lead.investor?.charAt(0) || 'I'}
@@ -1229,7 +1664,7 @@ export default function AdminDashboard() {
                         {/* Essential Info */}
                         <div className="space-y-6">
                             <div className="p-5 bg-muted/30 rounded-[2rem] border border-border/50">
-                                <h4 className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-black mb-4">Core Information</h4>
+                                <h4 className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-black mb-4">Información Principal</h4>
                                 <div className="space-y-4">
                                     <div className="flex items-center space-x-3 text-sm">
                                         <Mail size={16} className="text-primary/40 shrink-0" />
@@ -1237,7 +1672,7 @@ export default function AdminDashboard() {
                                     </div>
                                     <div className="flex items-center space-x-3 text-sm">
                                         <Activity size={16} className="text-primary/40 shrink-0" />
-                                        <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-500">KYC Status: Verified</span>
+                                        <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-500">Estado KYC: Verificado</span>
                                     </div>
                                     <div className="flex items-center space-x-3 text-sm pt-2 border-t border-border/30">
                                         <div className="w-5 h-5 bg-primary/10 rounded-full flex items-center justify-center text-[9px] text-primary font-bold">
@@ -1249,7 +1684,7 @@ export default function AdminDashboard() {
                             </div>
 
                             <div className="p-5 bg-muted/30 rounded-[2rem] border border-border/50">
-                                <h4 className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-black mb-4">Investment Power</h4>
+                                <h4 className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-black mb-4">Capacidad de Inversión</h4>
                                 <div className="space-y-2">
                                     <p className="text-2xl font-serif text-primary">{lead.ticket}</p>
                                     <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-medium">Liquidez Nominal Detectada</p>
@@ -1264,14 +1699,14 @@ export default function AdminDashboard() {
                                 <div className="p-4 bg-muted/20 border border-border/40 rounded-2xl flex items-center justify-between group hover:bg-muted/50 transition-all cursor-pointer">
                                     <div className="flex items-center space-x-3">
                                         <FileText size={16} className="text-primary/60" />
-                                        <span className="text-[10px] font-black uppercase tracking-wider">NDA Execution</span>
+                                        <span className="text-[10px] font-black uppercase tracking-wider">Ejecución de NDA</span>
                                     </div>
                                     <Download size={14} className="text-muted-foreground" />
                                 </div>
                                 <div className="p-4 bg-muted/20 border border-border/40 rounded-2xl flex items-center justify-between group hover:bg-muted/50 transition-all cursor-pointer">
                                     <div className="flex items-center space-x-3">
                                         <Users size={16} className="text-primary/60" />
-                                        <span className="text-[10px] font-black uppercase tracking-wider">UBO Declaration</span>
+                                        <span className="text-[10px] font-black uppercase tracking-wider">Declaración UBO</span>
                                     </div>
                                     <Download size={14} className="text-muted-foreground" />
                                 </div>
@@ -1309,7 +1744,7 @@ export default function AdminDashboard() {
             <aside className="w-64 bg-card border-r border-border flex flex-col hidden md:flex shrink-0 z-20 shadow-xl">
                 <div className="p-6 border-b border-border">
                     <span className="font-serif text-2xl tracking-widest font-medium">Praetorium.</span>
-                    <span className="block text-xs text-muted-foreground uppercase tracking-widest mt-1 font-semibold">Command Center</span>
+                    <span className="block text-xs text-muted-foreground uppercase tracking-widest mt-1 font-semibold">Panel de Control</span>
                 </div>
 
                 <nav className="flex-1 p-4 space-y-2">
@@ -1318,7 +1753,7 @@ export default function AdminDashboard() {
                         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "crm" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
                     >
                         <LayoutDashboard size={18} />
-                        <span>CRM Pipeline</span>
+                        <span>Pipeline CRM</span>
                     </button>
 
                     <button
@@ -1326,7 +1761,23 @@ export default function AdminDashboard() {
                         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "investors" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
                     >
                         <Users size={18} />
-                        <span>Investors (KYC)</span>
+                        <span>Inversores (KYC)</span>
+                    </button>
+
+                    <button
+                        onClick={() => { setActiveTab("mandatarios"); setSelectedInvestor(null); }}
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "mandatarios" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                    >
+                        <ShieldCheck size={18} />
+                        <span>Mandatarios</span>
+                    </button>
+
+                    <button
+                        onClick={() => { setActiveTab("collaborators"); setSelectedInvestor(null); }}
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "collaborators" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                    >
+                        <Share2 size={18} />
+                        <span>Colaboradores</span>
                     </button>
 
                     <button
@@ -1342,7 +1793,7 @@ export default function AdminDashboard() {
                         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "assets" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
                     >
                         <Building size={18} />
-                        <span>Asset Management</span>
+                        <span>Inventario Off-Market</span>
                     </button>
 
                     <button
@@ -1350,7 +1801,7 @@ export default function AdminDashboard() {
                         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "audit" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
                     >
                         <ShieldAlert size={18} />
-                        <span>Activity Logs</span>
+                        <span>Logs del Sistema</span>
                     </button>
 
                     {currentUser?.role === 'admin' && (
@@ -1367,7 +1818,7 @@ export default function AdminDashboard() {
 
                 <div className="p-4 border-t border-border bg-muted/5 space-y-3">
                     <Link href="/" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center uppercase tracking-widest font-bold">
-                        <ArrowUpRight size={12} className="mr-2" /> View Live Site
+                        <ArrowUpRight size={12} className="mr-2" /> Ver Sitio Web
                     </Link>
                     <div className="flex items-center justify-between">
                         <button
@@ -1388,33 +1839,130 @@ export default function AdminDashboard() {
                 </div>
             </aside>
 
+            {/* Mobile Sidebar Overlay */}
+            <AnimatePresence>
+                {isMobileMenuOpen && (
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] md:hidden"
+                        />
+                        <motion.aside
+                            initial={{ x: "-100%" }}
+                            animate={{ x: 0 }}
+                            exit={{ x: "-100%" }}
+                            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                            className="fixed inset-y-0 left-0 w-72 bg-card z-[101] shadow-2xl flex flex-col md:hidden"
+                        >
+                            <div className="p-6 border-b border-border flex justify-between items-center">
+                                <div>
+                                    <span className="font-serif text-2xl tracking-widest font-medium">Praetorium.</span>
+                                    <span className="block text-xs text-muted-foreground uppercase tracking-widest mt-1 font-semibold">Panel de Control</span>
+                                </div>
+                                <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 bg-muted rounded-xl">
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+                                {[
+                                    { id: "crm", label: "Pipeline CRM", icon: LayoutDashboard },
+                                    { id: "investors", label: "Inversores (KYC)", icon: Users },
+                                    { id: "mandatarios", label: "Mandatarios", icon: ShieldCheck },
+                                    { id: "collaborators", label: "Colaboradores", icon: Share2 },
+                                    { id: "templates", label: "Plantillas", icon: FileText },
+                                    { id: "assets", label: "Inventario Off-Market", icon: Building },
+                                    { id: "audit", label: "Logs del Sistema", icon: ShieldAlert },
+                                    ...(currentUser?.role === 'admin' ? [{ id: "agents", label: "Gestión de Agentes", icon: UserCheck }] : [])
+                                ].map((item) => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => {
+                                            setActiveTab(item.id);
+                                            setSelectedInvestor(null);
+                                            setIsMobileMenuOpen(false);
+                                        }}
+                                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === item.id ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                                    >
+                                        <item.icon size={18} />
+                                        <span>{item.label}</span>
+                                    </button>
+                                ))}
+                            </nav>
+
+                            <div className="p-4 border-t border-border bg-muted/5 space-y-3">
+                                <Link href="/" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center uppercase tracking-widest font-bold">
+                                    <ArrowUpRight size={12} className="mr-2" /> Ver Sitio Web
+                                </Link>
+                                <div className="flex items-center justify-between">
+                                    <button
+                                        onClick={() => { setActiveTab("profile"); setSelectedInvestor(null); setIsMobileMenuOpen(false); }}
+                                        className={`flex items-center space-x-2 px-3 py-2 rounded-xl transition-all flex-1 mr-2 text-[10px] font-bold uppercase tracking-widest ${activeTab === "profile" ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+                                    >
+                                        <User size={14} />
+                                        <span className="truncate">{currentUser?.full_name?.split(' ')[0] || 'Mi Perfil'}</span>
+                                    </button>
+                                    <button
+                                        onClick={handleLogout}
+                                        className="p-2 rounded-xl text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-all shrink-0"
+                                    >
+                                        <LogOut size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.aside>
+                    </>
+                )}
+            </AnimatePresence>
+
             {/* Main Content Area */}
             <main className="flex-1 overflow-hidden flex flex-col relative">
 
-                <header className="p-8 pb-4 flex justify-between items-center bg-background/50 backdrop-blur-sm z-10 border-b border-border/50">
-                    <div>
-                        <h1 className="font-serif text-3xl font-medium tracking-tight">
-                            {activeTab === 'crm' ? 'Operativas Off-Market' :
-                                activeTab === 'investors' ? 'Directorio de Inversores' :
-                                    activeTab === 'templates' ? 'Document Factory' :
-                                        activeTab === 'assets' ? 'Asset Portfolio' :
-                                            activeTab === 'profile' ? 'Perfil de Usuario' :
-                                                activeTab === 'agents' ? 'Control de Agentes' : 'System Logs'}
-                        </h1>
-                        <div className="flex items-center space-x-2 mt-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-                                {selectedInvestor ? `Cualificación: ${selectedInvestor.investor}` : 'Estado real de las operaciones activas.'}
-                            </p>
+                <header className="px-4 py-6 md:p-8 md:pb-4 flex justify-between items-center bg-background/50 backdrop-blur-sm z-10 border-b border-border/50">
+                    <div className="flex items-center space-x-4">
+                        <button
+                            onClick={() => setIsMobileMenuOpen(true)}
+                            className="p-2 bg-muted rounded-xl md:hidden text-foreground hover:bg-primary/10 transition-colors"
+                        >
+                            <Menu size={20} />
+                        </button>
+                        <div>
+                            <h1 className="font-serif text-xl md:text-3xl font-medium tracking-tight">
+                                {activeTab === 'crm' ? 'Operativas Off-Market' :
+                                    activeTab === 'investors' ? 'Directorio de Inversores' :
+                                        activeTab === 'mandatarios' ? 'Directorio de Mandatarios' :
+                                            activeTab === 'templates' ? 'Document Factory' :
+                                                activeTab === 'assets' ? 'Asset Portfolio' :
+                                                    activeTab === 'profile' ? 'Perfil de Usuario' :
+                                                        activeTab === 'agents' ? 'Control de Agentes' : 'System Logs'}
+                            </h1>
+                            <div className="flex items-center space-x-2 mt-1 hidden sm:flex">
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                                    {selectedInvestor ? `Cualificación: ${selectedInvestor.investor}` : 'Estado real de las operaciones activas.'}
+                                </p>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center space-x-4">
-                        <div className="bg-card border border-border px-4 py-2 rounded-full flex items-center space-x-2 focus-within:border-primary/50 transition-all shadow-sm">
+                    <div className="flex items-center space-x-3 md:space-x-4">
+                        <div className="bg-card border border-border px-4 py-2 rounded-full hidden sm:flex items-center space-x-2 focus-within:border-primary/50 transition-all shadow-sm">
                             <Search size={16} className="text-muted-foreground" />
-                            <input type="text" placeholder="Buscar operación..." className="bg-transparent border-none focus:outline-none text-sm w-48" />
+                            <input type="text" placeholder="Buscar..." className="bg-transparent border-none focus:outline-none text-sm w-24 md:w-48" />
                         </div>
-                        <button className="p-2 bg-primary/10 text-primary rounded-full hover:bg-primary hover:text-white transition-all">
+                        <button className="sm:hidden p-2 text-muted-foreground hover:text-primary transition-colors">
+                            <Search size={20} />
+                        </button>
+                        <button
+                            onClick={() => {
+                                setStepInGlobalLead(1);
+                                setIsCreatingGlobalLead(true);
+                            }}
+                            className="p-2 bg-primary text-white rounded-full hover:opacity-90 transition-all shadow-lg shadow-primary/20"
+                        >
                             <Plus size={20} />
                         </button>
                     </div>
@@ -1618,7 +2166,7 @@ export default function AdminDashboard() {
                                                                 <div>
                                                                     <p className="text-[8px] text-muted-foreground uppercase tracking-[0.2em] font-black mb-1">Capacidad Estimada</p>
                                                                     <p className="text-lg font-serif font-bold text-primary">
-                                                                        {investor.ticket_size || (investor.max_ticket_eur ? `€${Number(investor.max_ticket_eur).toLocaleString()}` : '€5M+')}
+                                                                        {investor.ticket_size || (investor.budget_max ? `€${Number(investor.budget_max).toLocaleString()}` : '€5M+')}
                                                                     </p>
                                                                 </div>
                                                                 <div className="flex -space-x-2">
@@ -1637,6 +2185,155 @@ export default function AdminDashboard() {
                                                     {investors.length === 0 && (
                                                         <div className="col-span-full text-center py-20 opacity-40 uppercase tracking-widest text-xs font-black border-2 border-dashed border-border/40 rounded-[3rem]">
                                                             No hay inversores en la base de datos
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {activeTab === "mandatarios" && (
+                                        <div className="bg-card border border-border rounded-[3rem] shadow-xl p-10 mt-10 max-w-5xl mx-auto overflow-hidden">
+                                            <div className="flex justify-between items-center mb-10 px-6">
+                                                <div>
+                                                    <h2 className="text-2xl font-serif font-medium">Directorio de Mandatarios</h2>
+                                                    <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold mt-1">Sincronizado con Supabase</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => setIsAddingMandatario(true)}
+                                                    className="px-6 py-2 bg-primary text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-primary/20"
+                                                >
+                                                    Añadir Mandatario
+                                                </button>
+                                            </div>
+                                            <div className="space-y-4">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    {mandatarios.map((mandatario: any) => (
+                                                        <motion.div
+                                                            key={mandatario.id}
+                                                            whileHover={{ y: -5 }}
+                                                            className="bg-card/50 backdrop-blur-sm border border-border/60 rounded-[2rem] p-6 flex flex-col justify-between hover:shadow-xl hover:border-primary/30 transition-all group relative overflow-hidden"
+                                                        >
+                                                            <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:bg-primary/10 transition-all" />
+
+                                                            <div className="flex items-start justify-between mb-6 relative">
+                                                                <div className="flex items-center space-x-4">
+                                                                    <div className="w-14 h-14 bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl flex items-center justify-center text-xl font-serif text-primary border border-primary/10 shadow-inner">
+                                                                        {mandatario.full_name?.charAt(0) || 'M'}
+                                                                    </div>
+                                                                    <div>
+                                                                        <h3 className="text-base font-bold text-foreground leading-tight group-hover:text-primary transition-colors">{mandatario.full_name}</h3>
+                                                                        <div className="flex items-center mt-1">
+                                                                            <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/20`}>
+                                                                                Activo
+                                                                            </span>
+                                                                            <span className="text-[9px] text-muted-foreground ml-2 font-medium uppercase tracking-wider">{mandatario.mandatario_type || 'Mandatario'}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex space-x-1">
+                                                                    <button
+                                                                        onClick={() => setSelectedMandatarioToEdit(mandatario)}
+                                                                        className="p-2.5 bg-muted/50 rounded-xl hover:bg-primary/10 hover:text-primary transition-all text-muted-foreground"
+                                                                    >
+                                                                        <Edit2 size={14} />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleDeleteMandatario(mandatario.id)}
+                                                                        className="p-2.5 bg-muted/50 rounded-xl hover:bg-red-500/10 hover:text-red-500 transition-all text-muted-foreground"
+                                                                    >
+                                                                        <Trash2 size={14} />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="space-y-3 mb-6">
+                                                                <div className="flex items-center text-[11px] text-muted-foreground/80 font-medium">
+                                                                    <Mail size={12} className="mr-2 text-primary/40" />
+                                                                    <span className="truncate">{mandatario.email || 'N/A'}</span>
+                                                                </div>
+                                                                <div className="flex items-center text-[11px] text-muted-foreground/80 font-medium">
+                                                                    <Building size={12} className="mr-2 text-primary/40" />
+                                                                    <span className="truncate">{mandatario.company_name || 'Individual'}</span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="pt-4 border-t border-border/30 flex items-end justify-between text-[10px] text-muted-foreground uppercase tracking-widest font-black">
+                                                                Verificación completada
+                                                            </div>
+                                                        </motion.div>
+                                                    ))}
+                                                    {mandatarios.length === 0 && (
+                                                        <div className="col-span-full text-center py-20 opacity-40 uppercase tracking-widest text-xs font-black border-2 border-dashed border-border/40 rounded-[3rem]">
+                                                            No hay mandatarios en la base de datos
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "collaborators" && (
+                                        <div className="max-w-6xl mx-auto w-full space-y-8 mt-10 pb-20">
+                                            <div className="bg-card border border-border rounded-[3rem] shadow-xl p-10 overflow-hidden relative">
+                                                <div className="flex justify-between items-center mb-10">
+                                                    <div>
+                                                        <h2 className="text-2xl font-serif font-medium">Red de Colaboradores</h2>
+                                                        <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold mt-1">Intermediarios y Asesores Externos</p>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => setIsAddingCollaborator(true)}
+                                                        className="flex items-center space-x-2 px-6 py-2 bg-primary text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all"
+                                                    >
+                                                        <Plus size={16} />
+                                                        <span>Registrar Colaborador</span>
+                                                    </button>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                                    {collaborators.map((col: any) => (
+                                                        <div
+                                                            key={col.id}
+                                                            className="p-6 bg-muted/20 border border-border/60 rounded-[2rem] hover:bg-muted/40 transition-all group flex flex-col justify-between"
+                                                        >
+                                                            <div className="flex items-start justify-between mb-4">
+                                                                <div className="flex items-center space-x-4">
+                                                                    <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary font-serif border border-primary/20">
+                                                                        {col.full_name?.charAt(0)}
+                                                                    </div>
+                                                                    <div>
+                                                                        <h4 className="font-bold text-sm">{col.full_name}</h4>
+                                                                        <p className="text-[10px] text-primary uppercase font-black tracking-widest">{col.specialty || 'Intermediario'}</p>
+                                                                    </div>
+                                                                </div>
+                                                                <button
+                                                                    onClick={() => handleDeleteCollaborator(col.id)}
+                                                                    className="p-2 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all pointer-events-auto"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </div>
+                                                            <div className="space-y-2 mt-2">
+                                                                <div className="flex items-center space-x-2 text-[11px] text-muted-foreground">
+                                                                    <Building size={12} className="text-primary/40" />
+                                                                    <span>{col.company_name || 'Individual'}</span>
+                                                                </div>
+                                                                <div className="flex items-center space-x-2 text-[11px] text-muted-foreground">
+                                                                    <Mail size={12} className="text-primary/40" />
+                                                                    <span>{col.email || 'N/A'}</span>
+                                                                </div>
+                                                                {col.phone && (
+                                                                    <div className="flex items-center space-x-2 text-[11px] text-muted-foreground">
+                                                                        <Activity size={12} className="text-primary/40" />
+                                                                        <span>{col.phone}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    {collaborators.length === 0 && (
+                                                        <div className="col-span-full py-20 border-2 border-dashed border-border/40 rounded-[2.5rem] flex flex-col items-center justify-center opacity-40">
+                                                            <Share2 size={32} className="mb-4 text-muted-foreground" />
+                                                            <p className="text-xs uppercase tracking-[0.2em] font-black">Sin colaboradores registrados</p>
                                                         </div>
                                                     )}
                                                 </div>
@@ -1787,16 +2484,7 @@ export default function AdminDashboard() {
                                                                 <div className="flex-1 bg-muted/40 hover:bg-primary/5 p-3 rounded-xl border border-border/60 hover:border-primary/20 transition-all flex items-center justify-center">
                                                                     <Search size={16} className="text-muted-foreground group-hover:text-primary transition-colors" />
                                                                 </div>
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        setTargetPropertyForLead(asset);
-                                                                        setIsSelectingInvestorForLead(true);
-                                                                    }}
-                                                                    className="flex-[2] bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all flex items-center justify-center"
-                                                                >
-                                                                    Generar Oportunidad
-                                                                </button>
+
                                                                 <button
                                                                     onClick={(e) => { e.stopPropagation(); /* logic for edit */ }}
                                                                     className="flex-1 bg-muted/40 hover:bg-foreground/5 p-3 rounded-xl border border-border/60 hover:border-foreground/20 transition-all flex items-center justify-center"
@@ -2204,8 +2892,9 @@ export default function AdminDashboard() {
                                     <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ticket Mínimo (EUR)</label>
                                     <input
                                         type="number"
-                                        value={selectedInvestorToEdit.min_ticket_eur || 0}
-                                        onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, min_ticket_eur: Number(e.target.value) })}
+                                        value={selectedInvestorToEdit.budget_min}
+                                        onFocus={(e) => e.target.select()}
+                                        onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, budget_min: Number(e.target.value) })}
                                         className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
                                     />
                                 </div>
@@ -2213,8 +2902,9 @@ export default function AdminDashboard() {
                                     <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ticket Máximo (EUR)</label>
                                     <input
                                         type="number"
-                                        value={selectedInvestorToEdit.max_ticket_eur || 0}
-                                        onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, max_ticket_eur: Number(e.target.value) })}
+                                        value={selectedInvestorToEdit.budget_max}
+                                        onFocus={(e) => e.target.select()}
+                                        onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, budget_max: Number(e.target.value) })}
                                         className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
                                     />
                                 </div>
@@ -2349,8 +3039,9 @@ export default function AdminDashboard() {
                                     <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ticket Mínimo (€)</label>
                                     <input
                                         type="number"
-                                        value={investorForm.min_ticket_eur}
-                                        onChange={(e) => setInvestorForm({ ...investorForm, min_ticket_eur: Number(e.target.value) })}
+                                        value={investorForm.budget_min}
+                                        onFocus={(e) => e.target.select()}
+                                        onChange={(e) => setInvestorForm({ ...investorForm, budget_min: Number(e.target.value) })}
                                         className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
                                     />
                                 </div>
@@ -2358,8 +3049,9 @@ export default function AdminDashboard() {
                                     <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ticket Máximo (€)</label>
                                     <input
                                         type="number"
-                                        value={investorForm.max_ticket_eur}
-                                        onChange={(e) => setInvestorForm({ ...investorForm, max_ticket_eur: Number(e.target.value) })}
+                                        value={investorForm.budget_max}
+                                        onFocus={(e) => e.target.select()}
+                                        onChange={(e) => setInvestorForm({ ...investorForm, budget_max: Number(e.target.value) })}
                                         className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
                                     />
                                 </div>
@@ -2407,6 +3099,190 @@ export default function AdminDashboard() {
                     </div>
                 )}
 
+                {isAddingMandatario && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            onClick={() => setIsAddingMandatario(false)}
+                            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            className="relative bg-background border border-border w-full max-w-xl rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh]"
+                        >
+                            <h2 className="font-serif text-3xl mb-2">Nuevo Mandatario</h2>
+                            <p className="text-muted-foreground text-sm mb-8 font-light">Representantes y agentes de confianza.</p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="md:col-span-2">
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Nombre Completo</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Ej: Marc Planas"
+                                        value={mandatarioForm.full_name}
+                                        onChange={(e) => setMandatarioForm({ ...mandatarioForm, full_name: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Tipo de Mandatario</label>
+                                    <select
+                                        value={mandatarioForm.mandatario_type}
+                                        onChange={(e) => setMandatarioForm({ ...mandatarioForm, mandatario_type: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    >
+                                        <option value="">Seleccionar Tipo</option>
+                                        <option value="Fiduciario">Fiduciario</option>
+                                        <option value="Agente de Representación">Agente de Representación</option>
+                                        <option value="Legal Representative">Legal Representative</option>
+                                        <option value="Asesor Directo">Asesor Directo</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Email</label>
+                                    <input
+                                        type="email"
+                                        placeholder="marc@office.com"
+                                        value={mandatarioForm.email}
+                                        onChange={(e) => setMandatarioForm({ ...mandatarioForm, email: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Compañía</label>
+                                    <input
+                                        type="text"
+                                        placeholder="MP Associates"
+                                        value={mandatarioForm.company_name}
+                                        onChange={(e) => setMandatarioForm({ ...mandatarioForm, company_name: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Teléfono</label>
+                                    <input
+                                        type="text"
+                                        placeholder="+34 ..."
+                                        value={mandatarioForm.phone}
+                                        onChange={(e) => setMandatarioForm({ ...mandatarioForm, phone: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4 mt-10">
+                                <button
+                                    onClick={() => setIsAddingMandatario(false)}
+                                    className="flex-1 px-6 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleCreateMandatario}
+                                    className="flex-1 px-6 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 shadow-xl shadow-primary/20 transition-all"
+                                >
+                                    Guardar Mandatario
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+
+                {/* Add Collaborator Modal */}
+                {isAddingCollaborator && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            onClick={() => setIsAddingCollaborator(false)}
+                            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            className="relative bg-background border border-border w-full max-w-xl rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh]"
+                        >
+                            <h2 className="font-serif text-3xl mb-2">Nuevo Colaborador</h2>
+                            <p className="text-muted-foreground text-sm mb-8 font-light">Intermediarios, arquitectos o asesores legales externos.</p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="md:col-span-2">
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Nombre Completo</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Ej: Marc Planas"
+                                        value={collaboratorForm.full_name}
+                                        onChange={(e) => setCollaboratorForm({ ...collaboratorForm, full_name: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Especialidad</label>
+                                    <select
+                                        value={collaboratorForm.specialty}
+                                        onChange={(e) => setCollaboratorForm({ ...collaboratorForm, specialty: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    >
+                                        <option value="">Seleccionar Tipo</option>
+                                        <option value="Broker Inmobiliario">Broker Inmobiliario</option>
+                                        <option value="Arquitecto">Arquitecto</option>
+                                        <option value="Asesor Legal">Asesor Legal</option>
+                                        <option value="Project Manager">Project Manager</option>
+                                        <option value="Mandatario">Mandatario</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Compañía</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Luxury Group Barcelona"
+                                        value={collaboratorForm.company_name}
+                                        onChange={(e) => setCollaboratorForm({ ...collaboratorForm, company_name: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Email</label>
+                                    <input
+                                        type="email"
+                                        placeholder="marc@luxurygroup.com"
+                                        value={collaboratorForm.email}
+                                        onChange={(e) => setCollaboratorForm({ ...collaboratorForm, email: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Teléfono</label>
+                                    <input
+                                        type="text"
+                                        placeholder="+34 670 000 000"
+                                        value={collaboratorForm.phone}
+                                        onChange={(e) => setCollaboratorForm({ ...collaboratorForm, phone: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4 mt-10">
+                                <button
+                                    onClick={() => setIsAddingCollaborator(false)}
+                                    className="flex-1 px-6 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleCreateCollaborator}
+                                    className="flex-1 px-6 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 shadow-xl shadow-primary/20 transition-all"
+                                >
+                                    Registrar
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+
                 {/* Select Investor for Opportunity Modal */}
                 {isSelectingInvestorForLead && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
@@ -2422,22 +3298,50 @@ export default function AdminDashboard() {
                             className="relative bg-background border border-border w-full max-w-xl rounded-[2.5rem] p-10 shadow-2xl overflow-hidden"
                         >
                             <h2 className="font-serif text-2xl mb-2">Asignar Inversor</h2>
-                            <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold mb-8">Vincular propiedad a un potencial comprador</p>
+                            <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold mb-6">Vincular propiedad a un potencial comprador</p>
 
-                            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-4 custom-scrollbar">
-                                {investors.map((inv: any) => (
-                                    <button
-                                        key={inv.id}
-                                        onClick={() => handleCreateLead(inv.id, targetPropertyForLead?.id)}
-                                        className="w-full text-left p-4 rounded-2xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group flex items-center justify-between"
-                                    >
-                                        <div>
-                                            <p className="font-bold text-sm group-hover:text-primary transition-colors">{inv.full_name}</p>
-                                            <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">{inv.company_name || 'Individual'}</p>
-                                        </div>
-                                        <ArrowUpRight size={16} className="text-muted-foreground group-hover:text-primary transition-all" />
-                                    </button>
-                                ))}
+                            {/* Search Bar */}
+                            <div className="relative mb-6">
+                                <div className="absolute inset-y-0 left-4 flex items-center text-muted-foreground pointer-events-none">
+                                    <Search size={16} />
+                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por nombre o empresa..."
+                                    value={investorAssignSearch}
+                                    onChange={(e) => setInvestorAssignSearch(e.target.value)}
+                                    className="w-full bg-muted/40 border border-border/60 rounded-xl py-3 pl-12 pr-4 text-xs focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                />
+                            </div>
+
+                            <div className="space-y-4 max-h-[350px] overflow-y-auto pr-4 custom-scrollbar">
+                                {investors
+                                    .filter((inv: any) =>
+                                        inv.full_name?.toLowerCase().includes(investorAssignSearch.toLowerCase()) ||
+                                        inv.company_name?.toLowerCase().includes(investorAssignSearch.toLowerCase())
+                                    )
+                                    .map((inv: any) => (
+                                        <button
+                                            key={inv.id}
+                                            onClick={() => {
+                                                handleCreateLead(inv.id, targetPropertyForLead?.id);
+                                                setInvestorAssignSearch(""); // Reset search on select
+                                            }}
+                                            className="w-full text-left p-4 rounded-2xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group flex items-center justify-between"
+                                        >
+                                            <div>
+                                                <p className="font-bold text-sm group-hover:text-primary transition-colors">{inv.full_name}</p>
+                                                <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">{inv.company_name || 'Individual'}</p>
+                                            </div>
+                                            <ArrowUpRight size={16} className="text-muted-foreground group-hover:text-primary transition-all" />
+                                        </button>
+                                    ))}
+                                {investors.length > 0 && investors.filter((inv: any) =>
+                                    inv.full_name?.toLowerCase().includes(investorAssignSearch.toLowerCase()) ||
+                                    inv.company_name?.toLowerCase().includes(investorAssignSearch.toLowerCase())
+                                ).length === 0 && (
+                                        <div className="text-center py-12 text-muted-foreground text-xs uppercase tracking-widest">No hay resultados para esta búsqueda</div>
+                                    )}
                                 {investors.length === 0 && (
                                     <div className="text-center py-12 text-muted-foreground text-xs uppercase tracking-widest">No hay inversores registrados</div>
                                 )}
@@ -2445,6 +3349,135 @@ export default function AdminDashboard() {
 
                             <button
                                 onClick={() => setIsSelectingInvestorForLead(false)}
+                                className="w-full mt-8 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
+                            >
+                                Cancelar
+                            </button>
+                        </motion.div>
+                    </div>
+                )}
+                {/* Global Opportunity Creation Modal */}
+                {isCreatingGlobalLead && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            onClick={() => {
+                                setIsCreatingGlobalLead(false);
+                                setAssetSearch("");
+                                setInvestorAssignSearch("");
+                            }}
+                            className="absolute inset-0 bg-black/80 backdrop-blur-md"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            className="relative bg-background border border-border w-full max-w-xl rounded-[2.5rem] p-10 shadow-2xl overflow-hidden"
+                        >
+                            <div className="flex items-center justify-between mb-2">
+                                <h2 className="font-serif text-2xl">Generar Nueva Oportunidad</h2>
+                                <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest rounded-full">
+                                    Paso {stepInGlobalLead} de 2
+                                </span>
+                            </div>
+                            <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold mb-8">
+                                {stepInGlobalLead === 1 ? "Selecciona el activo para la operación" : "Selecciona el inversor interesado"}
+                            </p>
+
+                            {stepInGlobalLead === 1 ? (
+                                <>
+                                    <div className="relative mb-6">
+                                        <div className="absolute inset-y-0 left-4 flex items-center text-muted-foreground pointer-events-none">
+                                            <Search size={16} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar activo por título o dirección..."
+                                            value={assetSearch}
+                                            onChange={(e) => setAssetSearch(e.target.value)}
+                                            className="w-full bg-muted/40 border border-border/60 rounded-xl py-3 pl-12 pr-4 text-xs focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div className="space-y-3 max-h-[350px] overflow-y-auto pr-4 custom-scrollbar">
+                                        {properties
+                                            .filter(p => !assetSearch ||
+                                                p.title?.toLowerCase().includes(assetSearch.toLowerCase()) ||
+                                                p.address?.toLowerCase().includes(assetSearch.toLowerCase())
+                                            )
+                                            .map((p: any) => (
+                                                <button
+                                                    key={p.id}
+                                                    onClick={() => {
+                                                        setTargetPropertyForLead(p);
+                                                        setStepInGlobalLead(2);
+                                                    }}
+                                                    className="w-full text-left p-4 rounded-2xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group flex items-start space-x-4"
+                                                >
+                                                    <div className="w-12 h-12 rounded-lg bg-muted overflow-hidden shrink-0">
+                                                        <img src={p.images?.[0] || "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80"} className="w-full h-full object-cover" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-sm group-hover:text-primary transition-colors line-clamp-1">{p.title}</p>
+                                                        <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">{p.address}</p>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="relative mb-6">
+                                        <div className="absolute inset-y-0 left-4 flex items-center text-muted-foreground pointer-events-none">
+                                            <Search size={16} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar inversor..."
+                                            value={investorAssignSearch}
+                                            onChange={(e) => setInvestorAssignSearch(e.target.value)}
+                                            className="w-full bg-muted/40 border border-border/60 rounded-xl py-3 pl-12 pr-4 text-xs focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div className="space-y-3 max-h-[350px] overflow-y-auto pr-4 custom-scrollbar">
+                                        {investors
+                                            .filter(inv => !investorAssignSearch ||
+                                                inv.full_name?.toLowerCase().includes(investorAssignSearch.toLowerCase()) ||
+                                                inv.company_name?.toLowerCase().includes(investorAssignSearch.toLowerCase())
+                                            )
+                                            .map((inv: any) => (
+                                                <button
+                                                    key={inv.id}
+                                                    onClick={() => {
+                                                        handleCreateLead(inv.id, targetPropertyForLead?.id);
+                                                        setIsCreatingGlobalLead(false);
+                                                        setAssetSearch("");
+                                                        setInvestorAssignSearch("");
+                                                    }}
+                                                    className="w-full text-left p-4 rounded-2xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group flex items-center justify-between"
+                                                >
+                                                    <div>
+                                                        <p className="font-bold text-sm group-hover:text-primary transition-colors">{inv.full_name}</p>
+                                                        <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">{inv.company_name || 'Individual'}</p>
+                                                    </div>
+                                                    <ArrowUpRight size={16} className="text-muted-foreground group-hover:text-primary transition-all" />
+                                                </button>
+                                            ))}
+                                    </div>
+                                    <button
+                                        onClick={() => setStepInGlobalLead(1)}
+                                        className="mt-4 text-[10px] font-black uppercase tracking-widest text-primary hover:underline"
+                                    >
+                                        ← Volver a seleccionar activo
+                                    </button>
+                                </>
+                            )}
+
+                            <button
+                                onClick={() => {
+                                    setIsCreatingGlobalLead(false);
+                                    setAssetSearch("");
+                                    setInvestorAssignSearch("");
+                                }}
                                 className="w-full mt-8 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
                             >
                                 Cancelar

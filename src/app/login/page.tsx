@@ -19,12 +19,22 @@ function LoginForm() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [user, setUser] = useState<any>(null);
     const [formData, setFormData] = useState({
         email: prefillEmail,
         password: "",
         fullName: ""
     });
 
+    // Handle authentication state
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setUser(session?.user ?? null);
+            if (session?.user && fromOnboarding) {
+                setFormData(prev => ({ ...prev, email: session.user.email || prefillEmail }));
+            }
+        });
+    }, [fromOnboarding, prefillEmail]);
     // If coming from onboarding, pre-fill the name from localStorage
     useEffect(() => {
         if (fromOnboarding) {
@@ -41,6 +51,23 @@ function LoginForm() {
         setError(null);
 
         try {
+            if (fromOnboarding && user) {
+                // If the user clicked the verification link, they are likely already logged in (session exists)
+                // We just need to UPDATE their password
+                const { error: updateError } = await supabase.auth.updateUser({
+                    password: formData.password,
+                    data: {
+                        full_name: formData.fullName || user.user_metadata?.full_name
+                    }
+                });
+
+                if (updateError) throw updateError;
+
+                // After setting password, go to Radar
+                router.push("/radar");
+                return;
+            }
+
             if (isRegister) {
                 const cleanEmail = formData.email.trim();
                 const { error: signUpError } = await supabase.auth.signUp({
@@ -54,7 +81,20 @@ function LoginForm() {
                     }
                 });
 
-                if (signUpError) throw signUpError;
+                if (signUpError) {
+                    // If user already exists and we are in onboarding mode, try to sign in
+                    // This handles users who already confirmed but session wasn't caught
+                    if (signUpError.message.includes("already registered") && fromOnboarding) {
+                        const { error: signInError } = await supabase.auth.signInWithPassword({
+                            email: cleanEmail,
+                            password: formData.password,
+                        });
+                        if (signInError) throw new Error("Este email ya está registrado. Por favor, inicia sesión con tu contraseña o usa 'Recuperar Contraseña'.");
+                        router.push("/radar");
+                        return;
+                    }
+                    throw signUpError;
+                }
 
                 if (fromOnboarding) {
                     // For investors from onboarding, auto sign-in after registration
@@ -69,6 +109,7 @@ function LoginForm() {
                     setSuccess(true);
                 }
             } else {
+                // ... rest of login logic
                 const { data, error: signInError } = await supabase.auth.signInWithPassword({
                     email: formData.email.trim(),
                     password: formData.password,
@@ -76,7 +117,6 @@ function LoginForm() {
 
                 if (signInError) throw signInError;
 
-                // Check if user is an agent
                 const { data: agentData, error: agentError } = await supabase
                     .from('agents')
                     .select('is_approved')
@@ -86,14 +126,12 @@ function LoginForm() {
                 if (agentError && agentError.code !== 'PGRST116') throw agentError;
 
                 if (agentData) {
-                    // User is an agent
                     if (!agentData.is_approved) {
                         await supabase.auth.signOut();
                         throw new Error("Tu cuenta está pendiente de aprobación por un administrador.");
                     }
                     router.push("/praetorium");
                 } else {
-                    // User is an investor or general user → go to radar
                     router.push("/radar");
                 }
             }

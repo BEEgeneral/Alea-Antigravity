@@ -59,6 +59,9 @@ export function VoiceChatOnboarding() {
     // AI Voice Animation Simulation
     useEffect(() => {
         setIsAiSpeaking(true);
+        // Dynamic reading time based on text length
+        const readingTime = Math.max(1200, Math.min(3000, currentStep.aiText.length * 40));
+
         const timer = setTimeout(() => {
             setIsAiSpeaking(false);
             // If it's the final loading step, redirect after "processing"
@@ -66,26 +69,16 @@ export function VoiceChatOnboarding() {
                 const saveInvestor = async () => {
                     try {
                         const finalEmail = (userData.email || "").replace(/\s+/g, '').replace(/\.$/, '').toLowerCase();
-                        const ticketValue = parseFloat(userData.ticketSize?.replace(/[^0-9.]/g, '') || "0") * 1000000;
 
-                        // 1. Create investor record in public.investors
-                        const { error: dbError } = await supabase
-                            .from('investors')
-                            .insert([{
-                                full_name: userData.name || "Anon Inversor",
-                                email: finalEmail,
-                                interests: userData.assetType ? [userData.assetType] : [],
-                                budget_max: ticketValue,
-                                status: 'nuevo',
-                                kyc_status: 'pending'
-                            }]);
+                        // Robust ticket calculation (supports decimals and explicit 'm' or 'millones')
+                        let ticketBase = userData.ticketSize?.toLowerCase() || "0";
+                        const numericMatch = ticketBase.match(/[\d.]+/);
+                        const ticketValue = numericMatch ? parseFloat(numericMatch[0]) * 1000000 : 0;
 
-                        if (dbError) console.warn("Database record creation warning:", dbError.message);
-
-                        // 2. Call Supabase signUp to trigger confirmation email
-                        // We use a temporary random password that they will change later
+                        // 1. Call Supabase signUp to trigger confirmation email first
+                        // We use a temporary random password that they will change via updateUser
                         const tempPass = Math.random().toString(36).slice(-12) + "A1!";
-                        const { error: signUpError } = await supabase.auth.signUp({
+                        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                             email: finalEmail,
                             password: tempPass,
                             options: {
@@ -98,25 +91,51 @@ export function VoiceChatOnboarding() {
                         });
 
                         if (signUpError) throw signUpError;
+                        const userId = signUpData.user?.id;
+
+                        // 2. Create investor record in public.investors using the AUTH ID
+                        if (userId) {
+                            const { error: dbError } = await supabase
+                                .from('investors')
+                                .insert([{
+                                    id: userId, // Match the Auth ID
+                                    full_name: userData.name || "Anon Inversor",
+                                    email: finalEmail,
+                                    interests: userData.assetType ? [userData.assetType] : [],
+                                    budget_max: ticketValue,
+                                    status: 'nuevo',
+                                    kyc_status: 'pending'
+                                }]);
+
+                            if (dbError) console.warn("Database record creation warning:", dbError.message);
+                        }
+
+                        // Clear local cache for security
+                        localStorage.removeItem('alea_investor_name');
 
                         // After successful signup request, show confirmation step
                         setCurrentStepIndex(STEPS.length - 1);
                     } catch (err) {
                         console.error("Error saving investor lead:", err);
-                        // Even if there's an error (like user already exists), we can show the email message
-                        // as they might just need to confirm an existing account or use forgot password
+                        // Even if there's an error (like user already exists), we show the confirmation
+                        // because they likely need to follow the email instructions.
                         setCurrentStepIndex(STEPS.length - 1);
                     }
                 };
                 saveInvestor();
             }
-        }, 2500); // Simulate AI talking time
+        }, readingTime);
         return () => clearTimeout(timer);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentStepIndex, router, currentStep.type]);
 
     const handleNext = () => {
         if (!inputValue.trim() && currentStep.type !== "loading") return;
+
+        // Save name for later steps if needed
+        if (currentStep.key === 'name') {
+            localStorage.setItem('alea_investor_name', inputValue.trim());
+        }
 
         setUserData(prev => ({ ...prev, [currentStep.key]: inputValue }));
         setInputValue("");
@@ -237,17 +256,32 @@ export function VoiceChatOnboarding() {
             </div>
 
             {/* AI Text Output */}
-            <div className="text-center mb-12 min-h-[160px] flex items-center justify-center">
+            <div className="text-center mb-12 min-h-[160px] flex flex-col items-center justify-center">
                 <AnimatePresence mode="wait">
-                    <motion.p
+                    <motion.div
                         key={currentStep.id}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
-                        className="font-serif text-2xl md:text-3xl font-medium text-foreground leading-relaxed"
+                        className="space-y-6"
                     >
-                        {currentStep.aiText}
-                    </motion.p>
+                        <p className="font-serif text-2xl md:text-3xl font-medium text-foreground leading-relaxed px-4">
+                            {currentStep.aiText}
+                        </p>
+
+                        {currentStep.type === "success" && (
+                            <motion.button
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: 1 }}
+                                onClick={() => router.push("/")}
+                                className="inline-flex items-center space-x-2 text-xs font-bold uppercase tracking-widest text-primary hover:text-foreground transition-colors"
+                            >
+                                <ChevronLeft size={14} />
+                                <span>Volver a la Home</span>
+                            </motion.button>
+                        )}
+                    </motion.div>
                 </AnimatePresence>
             </div>
 
@@ -300,3 +334,6 @@ export function VoiceChatOnboarding() {
         </div>
     );
 }
+
+// Add missing icon
+import { ChevronLeft } from "lucide-react";

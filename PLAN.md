@@ -8,17 +8,18 @@
 - [x] **Milestone 5:** Construcción UI Core (Buscador, Calculadora de Rentabilidad, Generador de PDFs).
 - [x] **Milestone 6:** Implementación de Login de Agentes e Interfaz de Aprobación.
 - [x] **Milestone 7:** Refactorización del CRM: Sidebar Detallado de Leads y Log de Interacciones.
-- [ ] **Milestone 8:** Final Sync & /audit de Quality Gate Visual/Funcional.
+- [x] **Milestone 8:** Implementación de Directorio de Mandatarios e integración en Arquitectura de Operación.
+- [ ] **Milestone 9:** Final Sync & /audit de Quality Gate Visual/Funcional.
 
 ## 📝 Current Trajectory
-**Fase de Consolidación de Operativa:** Sistema de agentes y pipeline CRM con sidebar interactivo completado. Login blindado con Supabase Auth y trigger de base de datos para control de acceso por administración.
+**Fase de Gestión de Representantes:** Implementación del Directorio de Mandatarios (Fiduciarios, Agentes, Asesores Legales) con sincronización bidireccional en Supabase. Integración en la Arquitectura de la Operación del CRM permitiendo asignar mandatarios a compradores y vendedores de forma dinámica.
 
 ## 🤖 Squad Status
 | Agent | Task | Status |
 |-------|------|--------|
-| Antigravity (Senior Product Engineer) | Agent System & Lead Sidebar Implementation | Completado |
+| Antigravity (Senior Product Engineer) | Mandatarios Tab & CRM Integration | Verified & Polished |
 
 ## 💾 State Snapshot
-- **Database:** Los ficheros `.sql` y Edge Functions están guardados. Las policies RLS blindan por completo los documentos confidenciales, y el pipeline captura coincidencias por rangos de precio.
-- **Frontend Stack:** Next.js operando de forma prístina, UI minimalista y de alto peso para institucionales. Next15 con Turbopack ha sido invocado.
-- **Estética:** Cálculos dinámicos en frontend implementados; los leads rebotan visualmente contra el candado Off-Market para incentivar su adquisición por la base de datos de Aleasignature.
+- **Database:** Tabla `mandatarios` definida y columnas de relación en `leads` añadidas para soporte de intermediación delegada.
+- **Frontend Stack:** Nueva pestaña de navegación con visualización de tarjetas premium y formularios de alta/edición de mandatarios operativos.
+- **Flujo de Negociación:** La "Sala de Negociación" ahora refleja si una parte está gestionada por un mandatario, permitiendo su selección directa.

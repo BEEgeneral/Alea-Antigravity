@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, Square, ArrowRight } from "lucide-react";
+import { Mic, Square, ArrowRight, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -28,15 +28,21 @@ const STEPS = [
     },
     {
         id: "contact",
-        aiText: "Perfecto. Por último, ¿cuál es tu email profesional para enviarte el acceso a la Data Room privada?",
+        aiText: "Perfecto. Por último, ¿cuál es tu email profesional para enviarte el acceso a Radar de Inversión?",
         type: "input",
         key: "email"
     },
     {
         id: "complete",
-        aiText: "Gracias. He configurado tu perfil. Procediendo a encriptar tus credenciales y dándote acceso a la plataforma...",
+        aiText: "Gracias. He configurado tu perfil. Procediendo a encriptar tus credenciales...",
         type: "loading",
         key: "done"
+    },
+    {
+        id: "confirmation",
+        aiText: "¡Email enviado! Por seguridad, abre el enlace de confirmación que hemos enviado a tu bandeja de entrada para activar tu cuenta y crear tu contraseña.",
+        type: "success",
+        key: "success"
     }
 ];
 
@@ -59,42 +65,47 @@ export function VoiceChatOnboarding() {
             if (currentStep.type === "loading") {
                 const saveInvestor = async () => {
                     try {
-                        // Map ticket size string to numbers
+                        const finalEmail = (userData.email || "").replace(/\s+/g, '').replace(/\.$/, '').toLowerCase();
                         const ticketValue = parseFloat(userData.ticketSize?.replace(/[^0-9.]/g, '') || "0") * 1000000;
 
-                        // Sanitize email: voice recognition often adds spaces or periods at the end
-                        const cleanEmail = (userData.email || "").replace(/\s+/g, '').replace(/\.$/, '').toLowerCase();
-
-                        const { error } = await supabase
+                        // 1. Create investor record in public.investors
+                        const { error: dbError } = await supabase
                             .from('investors')
                             .insert([{
                                 full_name: userData.name || "Anon Inversor",
-                                email: cleanEmail,
+                                email: finalEmail,
                                 interests: userData.assetType ? [userData.assetType] : [],
                                 budget_max: ticketValue,
                                 status: 'nuevo',
                                 kyc_status: 'pending'
                             }]);
 
-                        if (error) throw error;
+                        if (dbError) console.warn("Database record creation warning:", dbError.message);
 
-                        const { data: investorData } = await supabase
-                            .from('investors')
-                            .select('id')
-                            .eq('email', cleanEmail)
-                            .single();
+                        // 2. Call Supabase signUp to trigger confirmation email
+                        // We use a temporary random password that they will change later
+                        const tempPass = Math.random().toString(36).slice(-12) + "A1!";
+                        const { error: signUpError } = await supabase.auth.signUp({
+                            email: finalEmail,
+                            password: tempPass,
+                            options: {
+                                data: {
+                                    full_name: userData.name || "Anon Inversor",
+                                    role: 'investor'
+                                },
+                                emailRedirectTo: `${window.location.origin}/login?from=onboarding&email=${encodeURIComponent(finalEmail)}`
+                            }
+                        });
 
-                        if (investorData) {
-                            localStorage.setItem('alea_investor_id', investorData.id);
-                            localStorage.setItem('alea_investor_name', userData.name || "Inversor");
-                        }
+                        if (signUpError) throw signUpError;
+
+                        // After successful signup request, show confirmation step
+                        setCurrentStepIndex(STEPS.length - 1);
                     } catch (err) {
                         console.error("Error saving investor lead:", err);
-                    } finally {
-                        setTimeout(() => {
-                            const finalEmail = (userData.email || "").replace(/\s+/g, '').replace(/\.$/, '').toLowerCase();
-                            router.push(`/login?from=onboarding&email=${encodeURIComponent(finalEmail)}`);
-                        }, 2000);
+                        // Even if there's an error (like user already exists), we can show the email message
+                        // as they might just need to confirm an existing account or use forgot password
+                        setCurrentStepIndex(STEPS.length - 1);
                     }
                 };
                 saveInvestor();
@@ -207,6 +218,14 @@ export function VoiceChatOnboarding() {
                             transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
                             className="w-12 h-12 rounded-full border-t-2 border-r-2 border-primary"
                         />
+                    ) : currentStep.type === "success" ? (
+                        <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="text-primary"
+                        >
+                            <ShieldCheck size={48} />
+                        </motion.div>
                     ) : (
                         <div className="w-8 h-8 rounded-full bg-primary/20 flex gap-1 items-center justify-center">
                             <span className={`w-1 bg-primary rounded-full transition-all duration-300 ${isAiSpeaking ? 'h-4 animate-pulse' : 'h-1'}`}></span>
@@ -233,7 +252,7 @@ export function VoiceChatOnboarding() {
             </div>
 
             {/* User Input Area */}
-            {currentStep.type !== "loading" && (
+            {currentStep.type !== "loading" && currentStep.type !== "success" && (
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: isAiSpeaking ? 0.3 : 1, scale: 1 }}

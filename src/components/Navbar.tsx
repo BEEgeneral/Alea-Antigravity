@@ -12,6 +12,7 @@ export default function Navbar() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [user, setUser] = useState<any>(null);
     const [userRole, setUserRole] = useState<string | null>(null);
+    const [loadingAuth, setLoadingAuth] = useState(true);
     const pathname = usePathname();
     const isLanding = pathname === "/";
 
@@ -45,7 +46,11 @@ export default function Navbar() {
         supabase.auth.getSession().then(({ data: { session } }) => {
             const currentUser = session?.user ?? null;
             setUser(currentUser);
-            if (currentUser) fetchUserProfile(currentUser.id);
+            if (currentUser) {
+                fetchUserProfile(currentUser.id).finally(() => setLoadingAuth(false));
+            } else {
+                setLoadingAuth(false);
+            }
         });
 
         // Listen for auth changes
@@ -121,7 +126,9 @@ export default function Navbar() {
 
                     {/* Action Buttons */}
                     <div className="hidden md:flex items-center space-x-4">
-                        {!user ? (
+                        {loadingAuth ? (
+                            <div className="w-8 h-8 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+                        ) : !user ? (
                             <>
                                 <Link
                                     href="/radar"
@@ -199,7 +206,11 @@ export default function Navbar() {
                                 </a>
                             ))}
                             <div className="flex flex-col space-y-4 pt-4">
-                                {!user ? (
+                                {loadingAuth ? (
+                                    <div className="flex justify-center py-4">
+                                        <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+                                    </div>
+                                ) : !user ? (
                                     <>
                                         <Link href="/radar" className="w-full text-center py-4 rounded-xl border border-border uppercase text-[10px] font-bold tracking-widest">Radar</Link>
                                         <Link href="/praetorium" className="w-full text-center py-4 rounded-xl bg-primary/10 text-primary border border-primary/20 uppercase text-[10px] font-bold tracking-widest">Portal Agentes</Link>

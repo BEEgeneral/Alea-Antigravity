@@ -38,8 +38,8 @@ export default function Navbar() {
         >
             <div
                 className={`max-w-7xl mx-auto transition-all duration-700 ${isScrolled
-                        ? "bg-background/70 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.1)] rounded-full px-8 py-3"
-                        : "bg-transparent px-4 py-2"
+                    ? "bg-background/70 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.1)] rounded-full px-8 py-3"
+                    : "bg-transparent px-4 py-2"
                     }`}
             >
                 <div className="flex items-center justify-between">
@@ -74,11 +74,11 @@ export default function Navbar() {
                             href="/login"
                             className="text-[9px] font-black tracking-[0.2em] uppercase border border-border/50 px-6 py-2.5 rounded-full hover:bg-foreground hover:text-background transition-all duration-500"
                         >
-                            Acceso Privado
+                            Acceso Radar
                         </Link>
                         <Link
                             href="/onboarding"
-                            className="group relative text-[9px] font-black tracking-[0.2em] uppercase bg-primary text-foreground px-6 py-2.5 rounded-full overflow-hidden transition-all duration-500 hover:shadow-[0_0_20px_rgba(180,130,60,0.3)]"
+                            className="group relative text-[9px] font-black tracking-[0.2em] uppercase bg-primary/10 text-primary border border-primary/20 px-6 py-2.5 rounded-full overflow-hidden transition-all duration-500 hover:bg-primary hover:text-white hover:shadow-[0_0_20px_rgba(180,130,60,0.3)]"
                         >
                             <span className="relative z-10 flex items-center">
                                 Portal Agentes

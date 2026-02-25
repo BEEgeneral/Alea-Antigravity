@@ -50,7 +50,7 @@ export default function Navbar() {
                             <img src="/alea-monogram-white.png" alt="Logo" className="h-full w-auto transition-all duration-700 group-hover:scale-110 hidden dark:block" />
                         </div>
                         <span className="font-serif text-xl tracking-[0.2em] font-medium hidden sm:block">
-                            ALEA<span className="text-primary group-hover:text-foreground transition-colors duration-500">SIGNATURE</span>.
+                            alea<span className="text-primary group-hover:text-foreground transition-colors duration-500">signature</span>.
                         </span>
                     </Link>
 

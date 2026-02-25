@@ -1,8 +1,9 @@
 "use client";
 
-import { Mic, ArrowRight, Shield, TrendingUp, Zap, Building2, Scale, Calculator, HardHat, Paintbrush, FileSignature, Star } from "lucide-react";
+import { useState } from "react";
+import { Mic, ArrowRight, Shield, TrendingUp, Zap, Building2, Scale, Calculator, HardHat, Paintbrush, FileSignature, Star, X, MapPin } from "lucide-react";
 import Link from "next/link";
-import { motion, Variants } from "framer-motion";
+import { motion, Variants, AnimatePresence } from "framer-motion";
 
 const fadeInUp: Variants = {
   hidden: { opacity: 0, y: 40 },
@@ -17,7 +18,25 @@ const staggerContainer: Variants = {
   }
 };
 
+const CITIES = [
+  {
+    id: 'malaga',
+    name: 'Málaga',
+    tagline: 'Costa del Sol · Inversión Prime',
+    thumb: '/Malaga city.JPG',
+    full: '/Malaga city.JPG',
+  },
+  {
+    id: 'madrid',
+    name: 'Madrid',
+    tagline: 'Capital · Mercado Exclusivo',
+    thumb: '/Madrid City.JPG',
+    full: '/Madrid City.JPG',
+  },
+];
+
 export default function Home() {
+  const [openCity, setOpenCity] = useState<(typeof CITIES)[0] | null>(null);
   return (
     <main className="min-h-screen bg-background text-foreground selection:bg-primary/30 font-sans">
 
@@ -352,10 +371,28 @@ export default function Home() {
           <div>
             <h4 className="font-medium mb-4">Contacto Directo</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>+34 900 123 456</li>
-              <li>info@aleasignature.com</li>
-              <li>Madrid | Barcelona | Málaga</li>
+              <li><a href="tel:+34657174243" className="hover:text-foreground transition-colors">+34 657 174 243</a></li>
+              <li><a href="mailto:radar@aleasignature.com" className="hover:text-foreground transition-colors">radar@aleasignature.com</a></li>
             </ul>
+            {/* City presence — clickable thunder effect */}
+            <div className="flex items-center gap-4 mt-5">
+              {CITIES.map((city) => (
+                <button
+                  key={city.id}
+                  onClick={() => setOpenCity(city)}
+                  className="flex flex-col items-center gap-1.5 group cursor-pointer focus:outline-none"
+                >
+                  <div className="w-12 h-12 rounded-full overflow-hidden ring-1 ring-border group-hover:ring-primary/60 group-hover:shadow-[0_0_14px_2px_rgba(180,130,60,0.35)] transition-all duration-300 shadow-md">
+                    <img
+                      src={city.thumb}
+                      alt={city.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    />
+                  </div>
+                  <span className="text-[10px] font-medium tracking-wider uppercase text-muted-foreground group-hover:text-foreground transition-colors">{city.name}</span>
+                </button>
+              ))}
+            </div>
           </div>
           <div>
             <h4 className="font-medium mb-4">Garantías</h4>
@@ -374,6 +411,72 @@ export default function Home() {
           </div>
         </div>
       </footer>
+
+      {/* Thunder City Modal */}
+      <AnimatePresence>
+        {openCity && (
+          <>
+            {/* Flash overlay */}
+            <motion.div
+              className="fixed inset-0 z-[99] bg-white pointer-events-none"
+              initial={{ opacity: 0.9 }}
+              animate={{ opacity: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+            />
+            {/* Backdrop */}
+            <motion.div
+              className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setOpenCity(null)}
+            />
+            {/* Modal panel */}
+            <motion.div
+              className="fixed inset-0 z-[101] flex items-center justify-center p-6 pointer-events-none"
+              initial={{ scale: 0.04, opacity: 0, filter: 'brightness(4) blur(8px)' }}
+              animate={{ scale: 1, opacity: 1, filter: 'brightness(1) blur(0px)' }}
+              exit={{ scale: 1.06, opacity: 0, filter: 'brightness(3) blur(6px)' }}
+              transition={{
+                scale: { type: 'spring', stiffness: 520, damping: 28 },
+                opacity: { duration: 0.08 },
+                filter: { duration: 0.3 },
+              }}
+            >
+              <div className="relative w-full max-w-4xl rounded-2xl overflow-hidden shadow-[0_0_80px_10px_rgba(180,130,60,0.3)] pointer-events-auto">
+                {/* City image */}
+                <img
+                  src={openCity.full}
+                  alt={openCity.name}
+                  className="w-full h-[70vh] object-cover"
+                />
+                {/* Gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                {/* Content */}
+                <div className="absolute bottom-0 left-0 right-0 p-8">
+                  <div className="flex items-end justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <MapPin className="w-4 h-4 text-primary" />
+                        <span className="text-primary text-xs font-bold tracking-[0.2em] uppercase">{openCity.tagline}</span>
+                      </div>
+                      <h3 className="font-serif text-5xl text-white font-medium">{openCity.name}</h3>
+                    </div>
+                    <button
+                      onClick={() => setOpenCity(null)}
+                      className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors"
+                    >
+                      <X className="w-5 h-5 text-white" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
     </main>
   );

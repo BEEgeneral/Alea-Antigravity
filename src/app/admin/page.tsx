@@ -53,6 +53,9 @@ export default function AdminDashboard() {
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [allAgents, setAllAgents] = useState<any[]>([]);
     const [selectedProperty, setSelectedProperty] = useState<any>(null);
+    const [activeImageIndex, setActiveImageIndex] = useState(0);
+    const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+    const [priceForm, setPriceForm] = useState({ price: 0, comision_tercero: 2, comision_interna: 1 });
     const [_loading, setLoading] = useState(true);
     const [selectedAgentToEdit, setSelectedAgentToEdit] = useState<any>(null);
     const [selectedInvestorToEdit, setSelectedInvestorToEdit] = useState<any>(null);
@@ -203,6 +206,31 @@ export default function AdminDashboard() {
             setTimeout(() => setShowToast(false), 3000);
         } else {
             console.error("Error deleting property", error);
+        }
+    };
+
+    const handleUpdatePropertyPrice = async () => {
+        if (!selectedProperty) return;
+        const { error } = await supabase
+            .from('properties')
+            .update({
+                price: priceForm.price,
+                comision_tercero: priceForm.comision_tercero,
+                comision_interna: priceForm.comision_interna,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', selectedProperty.id);
+
+        if (!error) {
+            // Update local state so UI reflects immediately
+            const updated = { ...selectedProperty, ...priceForm };
+            setSelectedProperty(updated);
+            setProperties((prev: any[]) => prev.map((p: any) => p.id === selectedProperty.id ? { ...p, ...priceForm } : p));
+            setEditingPriceId(null);
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        } else {
+            console.error("Error updating property price:", error);
         }
     };
 
@@ -633,39 +661,86 @@ export default function AdminDashboard() {
                     {/* Main Content (Left Column) */}
                     <div className="lg:col-span-8 space-y-8">
                         {/* Gallery Section */}
-                        <div className="relative group">
-                            <div className="aspect-[16/10] bg-muted rounded-[2.5rem] overflow-hidden border border-border/50 relative">
-                                <img
-                                    src={property.images?.[0] || "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80"}
-                                    alt={property.title}
-                                    className="w-full h-full object-cover"
-                                />
-                                {/* Gallery Overlay */}
-                                <div className="absolute top-6 left-6 flex space-x-2">
-                                    <span className="px-4 py-1.5 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-lg flex items-center shadow-lg">
-                                        <Star size={12} className="mr-2 fill-white" />
-                                        Exclusiva
-                                    </span>
-                                    <span className="px-4 py-1.5 bg-white/90 backdrop-blur-md text-foreground text-[10px] font-black uppercase tracking-widest rounded-lg border border-white/20 shadow-lg">
-                                        Excelente
-                                    </span>
-                                </div>
-                                <div className="absolute bottom-6 right-6 px-4 py-2 bg-black/50 backdrop-blur-md text-white text-[10px] font-bold rounded-xl border border-white/10">
-                                    1 / {property.images?.length || 54}
-                                </div>
-                            </div>
-                            {/* Thumbnails */}
-                            <div className="flex space-x-4 mt-6 overflow-x-auto pb-2 no-scrollbar">
-                                {(property.images || Array(5).fill("")).slice(0, 5).map((img: string, i: number) => (
-                                    <div key={i} className={`w-24 h-16 rounded-xl overflow-hidden border-2 cursor-pointer transition-all shrink-0 ${i === 0 ? 'border-primary' : 'border-transparent opacity-70 hover:opacity-100'}`}>
-                                        <img src={img || "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80"} alt={`Vista ${i + 1}`} className="w-full h-full object-cover" />
+                        {(() => {
+                            const images: string[] = property.images?.length > 0
+                                ? property.images
+                                : ["https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80"];
+                            const total = images.length;
+                            const goTo = (idx: number) => setActiveImageIndex((idx + total) % total);
+
+                            return (
+                                <div className="relative group">
+                                    {/* Main Image */}
+                                    <div className="aspect-[16/10] bg-muted rounded-[2.5rem] overflow-hidden border border-border/50 relative">
+                                        <AnimatePresence mode="wait">
+                                            <motion.img
+                                                key={activeImageIndex}
+                                                src={images[activeImageIndex]}
+                                                alt={`${property.title} — foto ${activeImageIndex + 1}`}
+                                                initial={{ opacity: 0, scale: 1.03 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                exit={{ opacity: 0 }}
+                                                transition={{ duration: 0.3 }}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </AnimatePresence>
+
+                                        {/* Badges */}
+                                        <div className="absolute top-6 left-6 flex space-x-2">
+                                            <span className="px-4 py-1.5 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-lg flex items-center shadow-lg">
+                                                <Star size={12} className="mr-2 fill-white" />
+                                                Exclusiva
+                                            </span>
+                                        </div>
+
+                                        {/* Counter */}
+                                        <div className="absolute bottom-6 right-6 px-4 py-2 bg-black/50 backdrop-blur-md text-white text-[10px] font-bold rounded-xl border border-white/10">
+                                            {activeImageIndex + 1} / {total}
+                                        </div>
+
+                                        {/* Prev / Next arrows — only shown when >1 image */}
+                                        {total > 1 && (
+                                            <>
+                                                <button
+                                                    onClick={() => goTo(activeImageIndex - 1)}
+                                                    className="absolute left-5 top-1/2 -translate-y-1/2 w-10 h-10 rounded-2xl bg-black/40 backdrop-blur-md text-white flex items-center justify-center hover:bg-primary transition-all opacity-0 group-hover:opacity-100 border border-white/10 shadow-lg"
+                                                    aria-label="Foto anterior"
+                                                >
+                                                    <ChevronLeft size={20} />
+                                                </button>
+                                                <button
+                                                    onClick={() => goTo(activeImageIndex + 1)}
+                                                    className="absolute right-5 top-1/2 -translate-y-1/2 w-10 h-10 rounded-2xl bg-black/40 backdrop-blur-md text-white flex items-center justify-center hover:bg-primary transition-all opacity-0 group-hover:opacity-100 border border-white/10 shadow-lg"
+                                                    aria-label="Foto siguiente"
+                                                >
+                                                    <ChevronLeft size={20} className="rotate-180" />
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
-                                ))}
-                                <div className="w-24 h-16 rounded-xl bg-muted flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-muted-foreground border border-border cursor-pointer hover:bg-primary/10 hover:text-primary transition-all shrink-0">
-                                    +46
+
+                                    {/* Thumbnails strip */}
+                                    <div className="flex space-x-3 mt-5 overflow-x-auto pb-2 no-scrollbar">
+                                        {images.map((img: string, i: number) => (
+                                            <button
+                                                key={i}
+                                                onClick={() => goTo(i)}
+                                                className={`w-24 h-16 rounded-xl overflow-hidden border-2 shrink-0 transition-all duration-200 ${i === activeImageIndex
+                                                    ? 'border-primary scale-105 shadow-lg shadow-primary/20'
+                                                    : 'border-transparent opacity-60 hover:opacity-100 hover:border-border'
+                                                    }`}
+                                            >
+                                                <img
+                                                    src={img}
+                                                    alt={`Vista ${i + 1}`}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
+                            );
+                        })()}
 
                         {/* Description Section */}
                         <div className="bg-card border border-border/60 rounded-[2.5rem] p-10 shadow-sm text-white">
@@ -753,40 +828,134 @@ export default function AdminDashboard() {
                         {/* Pricing Card */}
                         <div className="bg-card border border-border/60 rounded-[2.5rem] p-10 shadow-xl relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
-                            <h3 className="flex items-center space-x-3 text-[10px] uppercase tracking-[0.2em] text-primary font-black mb-10">
-                                <Tag size={16} />
-                                <span>Información de Precio</span>
-                            </h3>
 
-                            <div className="mb-10">
-                                <div className="text-4xl md:text-5xl font-serif font-medium text-foreground mb-1 uppercase tracking-tighter">
-                                    €{Number(property.price).toLocaleString()}
-                                </div>
-                                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Precio base</p>
+                            <div className="flex items-center justify-between mb-10">
+                                <h3 className="flex items-center space-x-3 text-[10px] uppercase tracking-[0.2em] text-primary font-black">
+                                    <Tag size={16} />
+                                    <span>Información de Precio</span>
+                                </h3>
+                                {editingPriceId !== property.id ? (
+                                    <button
+                                        onClick={() => {
+                                            setEditingPriceId(property.id);
+                                            setPriceForm({
+                                                price: Number(property.price) || 0,
+                                                comision_tercero: Number(property.comision_tercero) || 2,
+                                                comision_interna: Number(property.comision_interna) || 1,
+                                            });
+                                        }}
+                                        className="p-2 rounded-xl hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all border border-transparent hover:border-primary/20"
+                                        title="Editar precios"
+                                    >
+                                        <Edit2 size={15} />
+                                    </button>
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={handleUpdatePropertyPrice}
+                                            className="px-4 py-1.5 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-primary/90 transition-all"
+                                        >
+                                            Guardar
+                                        </button>
+                                        <button
+                                            onClick={() => setEditingPriceId(null)}
+                                            className="px-4 py-1.5 bg-muted text-muted-foreground text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-muted/80 transition-all"
+                                        >
+                                            Cancelar
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
-                            <div className="space-y-6 pt-8 border-t border-border/50">
-                                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mb-4">Desglose de Comisiones</p>
-                                <div className="space-y-3">
-                                    <div className="flex justify-between items-center text-sm font-medium">
-                                        <span className="text-muted-foreground">Precio base:</span>
-                                        <span className="text-foreground">€{Number(property.price).toLocaleString()}</span>
+                            {editingPriceId === property.id ? (
+                                /* ── EDIT MODE ── */
+                                <div className="space-y-5">
+                                    <div>
+                                        <label className="text-[10px] text-muted-foreground uppercase tracking-widest font-black mb-2 block">Precio Base (€)</label>
+                                        <input
+                                            type="number"
+                                            value={priceForm.price}
+                                            onChange={(e) => setPriceForm(f => ({ ...f, price: Number(e.target.value) }))}
+                                            className="w-full bg-muted/50 border border-border rounded-2xl px-5 py-3 text-2xl font-serif font-medium focus:outline-none focus:border-primary/60 transition-all"
+                                        />
                                     </div>
-                                    <div className="flex justify-between items-center text-sm font-medium">
-                                        <span className="text-muted-foreground">Comisión tercero (2%):</span>
-                                        <span className="text-foreground">€{(Number(property.price) * 0.02).toLocaleString()}</span>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-[10px] text-muted-foreground uppercase tracking-widest font-black mb-2 block">Comisión Tercero (%)</label>
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                value={priceForm.comision_tercero}
+                                                onChange={(e) => setPriceForm(f => ({ ...f, comision_tercero: Number(e.target.value) }))}
+                                                className="w-full bg-muted/50 border border-border rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-primary/60 transition-all"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-muted-foreground uppercase tracking-widest font-black mb-2 block">Comisión Interna (%)</label>
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                value={priceForm.comision_interna}
+                                                onChange={(e) => setPriceForm(f => ({ ...f, comision_interna: Number(e.target.value) }))}
+                                                className="w-full bg-muted/50 border border-border rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-primary/60 transition-all"
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="flex justify-between items-center text-sm font-medium">
-                                        <span className="text-muted-foreground">Comisión interna (1%):</span>
-                                        <span className="text-foreground">€{(Number(property.price) * 0.01).toLocaleString()}</span>
+                                    {/* Live preview */}
+                                    <div className="bg-muted/30 rounded-2xl p-5 border border-border/40 space-y-2 mt-2">
+                                        <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-black mb-3">Preview en tiempo real</p>
+                                        <div className="flex justify-between text-sm font-medium">
+                                            <span className="text-muted-foreground">Precio base:</span>
+                                            <span>€{priceForm.price.toLocaleString()}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm font-medium">
+                                            <span className="text-muted-foreground">Com. tercero ({priceForm.comision_tercero}%):</span>
+                                            <span>€{(priceForm.price * priceForm.comision_tercero / 100).toLocaleString()}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm font-medium">
+                                            <span className="text-muted-foreground">Com. interna ({priceForm.comision_interna}%):</span>
+                                            <span>€{(priceForm.price * priceForm.comision_interna / 100).toLocaleString()}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center pt-3 border-t border-border mt-2">
+                                            <p className="text-[10px] uppercase tracking-widest text-primary font-black">Precio final:</p>
+                                            <p className="text-xl font-serif font-bold text-emerald-600">€{(priceForm.price * (1 + priceForm.comision_tercero / 100 + priceForm.comision_interna / 100)).toLocaleString()}</p>
+                                        </div>
                                     </div>
                                 </div>
-
-                                <div className="flex justify-between items-center pt-8 border-t border-border mt-8">
-                                    <p className="text-[10px] uppercase tracking-widest text-primary font-black">Precio final:</p>
-                                    <p className="text-2xl font-serif font-bold text-emerald-600">€{(Number(property.price) * 1.03).toLocaleString()}</p>
-                                </div>
-                            </div>
+                            ) : (
+                                /* ── VIEW MODE ── */
+                                <>
+                                    <div className="mb-10">
+                                        <div className="text-4xl md:text-5xl font-serif font-medium text-foreground mb-1 uppercase tracking-tighter">
+                                            €{Number(property.price).toLocaleString()}
+                                        </div>
+                                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Precio base</p>
+                                    </div>
+                                    <div className="space-y-6 pt-8 border-t border-border/50">
+                                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mb-4">Desglose de Comisiones</p>
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between items-center text-sm font-medium">
+                                                <span className="text-muted-foreground">Precio base:</span>
+                                                <span className="text-foreground">€{Number(property.price).toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm font-medium">
+                                                <span className="text-muted-foreground">Comisión tercero ({Number(property.comision_tercero) || 2}%):</span>
+                                                <span className="text-foreground">€{(Number(property.price) * (Number(property.comision_tercero) || 2) / 100).toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm font-medium">
+                                                <span className="text-muted-foreground">Comisión interna ({Number(property.comision_interna) || 1}%):</span>
+                                                <span className="text-foreground">€{(Number(property.price) * (Number(property.comision_interna) || 1) / 100).toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-between items-center pt-8 border-t border-border mt-8">
+                                            <p className="text-[10px] uppercase tracking-widest text-primary font-black">Precio final:</p>
+                                            <p className="text-2xl font-serif font-bold text-emerald-600">
+                                                €{(Number(property.price) * (1 + (Number(property.comision_tercero) || 2) / 100 + (Number(property.comision_interna) || 1) / 100)).toLocaleString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
 
                         {/* Quick Characteristics Card */}

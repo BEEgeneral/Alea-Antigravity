@@ -40,8 +40,19 @@ export async function proxy(request: NextRequest) {
             return NextResponse.redirect(loginUrl);
         }
 
-        // All protected routes require a valid session — individual page logic
-        // handles role-based access (admin vs investor) client-side.
+        const userRole = user.user_metadata?.role;
+
+        // /praetorium → only admin or approved agent
+        if (request.nextUrl.pathname.startsWith('/praetorium')) {
+            if (userRole !== 'admin' && userRole !== 'agent') {
+                return NextResponse.redirect(new URL('/', request.url));
+            }
+        }
+
+        // /radar → any authenticated user passes middleware;
+        // fine-grained role check (investor/collaborator by email) happens client-side
+        // because middleware can't efficiently query Supabase tables.
+
         return response;
     } catch {
         // If Supabase is unreachable, redirect to login as a safety net

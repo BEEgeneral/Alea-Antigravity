@@ -52,33 +52,63 @@ export default function InvestmentRadar() {
             }
 
             const userId = session.user.id;
+            const userEmail = session.user.email;
+            const userRole = session.user.user_metadata?.role;
 
-            // Check agents table
-            const { data: agent } = await supabase
-                .from('agents')
-                .select('role')
-                .eq('id', userId)
-                .single();
+            // 1. Admin or agent by auth metadata → instant access
+            if (userRole === 'admin' || userRole === 'agent') {
+                // But agents still need to be approved
+                if (userRole === 'agent') {
+                    const { data: agent } = await supabase
+                        .from('agents')
+                        .select('is_approved')
+                        .eq('id', userId)
+                        .single();
+                    if (agent?.is_approved) {
+                        setAuthChecked(true);
+                        return;
+                    }
+                } else {
+                    setAuthChecked(true);
+                    return;
+                }
+            }
 
-            if (agent && (agent.role === 'admin' || agent.role === 'agent')) {
+            // 2. Check if user is a registered investor (by email match)
+            if (userEmail) {
+                const { data: investor } = await supabase
+                    .from('investors')
+                    .select('id')
+                    .eq('email', userEmail)
+                    .maybeSingle();
+
+                if (investor) {
+                    setAuthChecked(true);
+                    return;
+                }
+            }
+
+            // 3. Check if user is a registered collaborator (by email match)
+            if (userEmail) {
+                const { data: collaborator } = await supabase
+                    .from('collaborators')
+                    .select('id')
+                    .eq('email', userEmail)
+                    .maybeSingle();
+
+                if (collaborator) {
+                    setAuthChecked(true);
+                    return;
+                }
+            }
+
+            // 4. Also check user_metadata role = 'investor'
+            if (userRole === 'investor') {
                 setAuthChecked(true);
                 return;
             }
 
-            // Check investors table
-            const { data: investor } = await supabase
-                .from('investors')
-                .select('investor_type')
-                .eq('id', userId)
-                .single();
-
-            const role = investor?.investor_type?.toLowerCase();
-            if (role === 'inversor' || role === 'colaborador') {
-                setAuthChecked(true);
-                return;
-            }
-
-            // If we reach here, user is logged in but not authorized
+            // Not authorized → redirect home
             router.push("/");
         };
         checkAuth();

@@ -483,7 +483,7 @@ export default function Home() {
                 filter: { duration: 0.3 },
               }}
             >
-              <div className="relative w-full max-w-4xl rounded-2xl overflow-hidden shadow-[0_0_80px_10px_rgba(180,130,60,0.3)] pointer-events-auto">
+              <div className="relative w-full max-w-4xl aspect-video rounded-2xl overflow-hidden shadow-[0_0_80px_10px_rgba(180,130,60,0.3)] pointer-events-auto">
                 {/* City image */}
                 <Image
                   src={openCity.full}

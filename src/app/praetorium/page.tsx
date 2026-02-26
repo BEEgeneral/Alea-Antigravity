@@ -67,6 +67,7 @@ export default function AdminDashboard() {
     const [isAddingMandatario, setIsAddingMandatario] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isAddingCollaborator, setIsAddingCollaborator] = useState(false);
+    const [editingCollaborator, setEditingCollaborator] = useState<any>(null);
     const [isUploadingPdf, setIsUploadingPdf] = useState(false);
     const [isSelectingInvestorForLead, setIsSelectingInvestorForLead] = useState(false);
     const [targetPropertyForLead, setTargetPropertyForLead] = useState<any>(null);
@@ -662,6 +663,35 @@ export default function AdminDashboard() {
             setTimeout(() => setShowToast(false), 3000);
         } else {
             console.error("Error deleting collaborator", error);
+        }
+    };
+
+    const handleUpdateCollaborator = async () => {
+        if (!editingCollaborator) return;
+        try {
+            const { data, error } = await supabase
+                .from('collaborators')
+                .update({
+                    full_name: collaboratorForm.full_name,
+                    specialty: collaboratorForm.specialty,
+                    company_name: collaboratorForm.company_name,
+                    email: collaboratorForm.email,
+                    phone: collaboratorForm.phone,
+                })
+                .eq('id', editingCollaborator.id)
+                .select();
+
+            if (!error && data) {
+                setCollaborators(prev => prev.map(c => c.id === editingCollaborator.id ? data[0] : c));
+                setEditingCollaborator(null);
+                setCollaboratorForm({ full_name: '', company_name: '', email: '', phone: '', specialty: '' });
+                setShowToast(true);
+                setTimeout(() => setShowToast(false), 3000);
+            } else {
+                console.error('Error updating collaborator:', error);
+            }
+        } catch (error) {
+            console.error('Catch error updating collaborator:', error);
         }
     };
 
@@ -2232,7 +2262,17 @@ export default function AdminDashboard() {
                                                                 </div>
                                                                 <div className="flex space-x-1">
                                                                     <button
-                                                                        onClick={() => setSelectedMandatarioToEdit(mandatario)}
+                                                                        onClick={() => {
+                                                                            setMandatarioForm({
+                                                                                full_name: mandatario.full_name || '',
+                                                                                company_name: mandatario.company_name || '',
+                                                                                email: mandatario.email || '',
+                                                                                phone: mandatario.phone || '',
+                                                                                mandatario_type: mandatario.mandatario_type || '',
+                                                                                labels: mandatario.labels || []
+                                                                            });
+                                                                            setSelectedMandatarioToEdit(mandatario);
+                                                                        }}
                                                                         className="p-2.5 bg-muted/50 rounded-xl hover:bg-primary/10 hover:text-primary transition-all text-muted-foreground"
                                                                     >
                                                                         <Edit2 size={14} />
@@ -2305,12 +2345,29 @@ export default function AdminDashboard() {
                                                                         <p className="text-[10px] text-primary uppercase font-black tracking-widest">{col.specialty || 'Intermediario'}</p>
                                                                     </div>
                                                                 </div>
-                                                                <button
-                                                                    onClick={() => handleDeleteCollaborator(col.id)}
-                                                                    className="p-2 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all pointer-events-auto"
-                                                                >
-                                                                    <Trash2 size={14} />
-                                                                </button>
+                                                                <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-all">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setEditingCollaborator(col);
+                                                                            setCollaboratorForm({
+                                                                                full_name: col.full_name || '',
+                                                                                specialty: col.specialty || '',
+                                                                                company_name: col.company_name || '',
+                                                                                email: col.email || '',
+                                                                                phone: col.phone || '',
+                                                                            });
+                                                                        }}
+                                                                        className="p-2 hover:text-primary transition-all"
+                                                                    >
+                                                                        <FileText size={14} />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleDeleteCollaborator(col.id)}
+                                                                        className="p-2 hover:text-red-500 transition-all"
+                                                                    >
+                                                                        <Trash2 size={14} />
+                                                                    </button>
+                                                                </div>
                                                             </div>
                                                             <div className="space-y-2 mt-2">
                                                                 <div className="flex items-center space-x-2 text-[11px] text-muted-foreground">
@@ -3099,12 +3156,13 @@ export default function AdminDashboard() {
                     </div>
                 )}
 
-                {isAddingMandatario && (
+                {/* Add/Edit Mandatario Modal */}
+                {(isAddingMandatario || selectedMandatarioToEdit) && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            onClick={() => setIsAddingMandatario(false)}
+                            onClick={() => { setIsAddingMandatario(false); setSelectedMandatarioToEdit(null); setMandatarioForm({ full_name: '', company_name: '', email: '', phone: '', mandatario_type: '', labels: [] }); }}
                             className="absolute inset-0 bg-black/80 backdrop-blur-sm"
                         />
                         <motion.div
@@ -3112,8 +3170,8 @@ export default function AdminDashboard() {
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             className="relative bg-background border border-border w-full max-w-xl rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh]"
                         >
-                            <h2 className="font-serif text-3xl mb-2">Nuevo Mandatario</h2>
-                            <p className="text-muted-foreground text-sm mb-8 font-light">Representantes y agentes de confianza.</p>
+                            <h2 className="font-serif text-3xl mb-2">{selectedMandatarioToEdit ? 'Editar Mandatario' : 'Nuevo Mandatario'}</h2>
+                            <p className="text-muted-foreground text-sm mb-8 font-light">{selectedMandatarioToEdit ? 'Modifica los datos del mandatario.' : 'Representantes y agentes de confianza.'}</p>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="md:col-span-2">
@@ -3174,29 +3232,35 @@ export default function AdminDashboard() {
 
                             <div className="flex gap-4 mt-10">
                                 <button
-                                    onClick={() => setIsAddingMandatario(false)}
+                                    onClick={() => { setIsAddingMandatario(false); setSelectedMandatarioToEdit(null); setMandatarioForm({ full_name: '', company_name: '', email: '', phone: '', mandatario_type: '', labels: [] }); }}
                                     className="flex-1 px-6 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
                                 >
                                     Cancelar
                                 </button>
                                 <button
-                                    onClick={handleCreateMandatario}
+                                    onClick={() => {
+                                        if (selectedMandatarioToEdit) {
+                                            handleUpdateMandatario({ ...mandatarioForm, id: selectedMandatarioToEdit.id });
+                                        } else {
+                                            handleCreateMandatario();
+                                        }
+                                    }}
                                     className="flex-1 px-6 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 shadow-xl shadow-primary/20 transition-all"
                                 >
-                                    Guardar Mandatario
+                                    {selectedMandatarioToEdit ? 'Guardar Cambios' : 'Guardar Mandatario'}
                                 </button>
                             </div>
                         </motion.div>
                     </div>
                 )}
 
-                {/* Add Collaborator Modal */}
-                {isAddingCollaborator && (
+                {/* Add/Edit Collaborator Modal */}
+                {(isAddingCollaborator || editingCollaborator) && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            onClick={() => setIsAddingCollaborator(false)}
+                            onClick={() => { setIsAddingCollaborator(false); setEditingCollaborator(null); setCollaboratorForm({ full_name: '', company_name: '', email: '', phone: '', specialty: '' }); }}
                             className="absolute inset-0 bg-black/80 backdrop-blur-sm"
                         />
                         <motion.div
@@ -3204,8 +3268,8 @@ export default function AdminDashboard() {
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             className="relative bg-background border border-border w-full max-w-xl rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh]"
                         >
-                            <h2 className="font-serif text-3xl mb-2">Nuevo Colaborador</h2>
-                            <p className="text-muted-foreground text-sm mb-8 font-light">Intermediarios, arquitectos o asesores legales externos.</p>
+                            <h2 className="font-serif text-3xl mb-2">{editingCollaborator ? 'Editar Colaborador' : 'Nuevo Colaborador'}</h2>
+                            <p className="text-muted-foreground text-sm mb-8 font-light">{editingCollaborator ? 'Modifica los datos del colaborador.' : 'Intermediarios, arquitectos o asesores legales externos.'}</p>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="md:col-span-2">
@@ -3267,16 +3331,16 @@ export default function AdminDashboard() {
 
                             <div className="flex gap-4 mt-10">
                                 <button
-                                    onClick={() => setIsAddingCollaborator(false)}
+                                    onClick={() => { setIsAddingCollaborator(false); setEditingCollaborator(null); setCollaboratorForm({ full_name: '', company_name: '', email: '', phone: '', specialty: '' }); }}
                                     className="flex-1 px-6 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
                                 >
                                     Cancelar
                                 </button>
                                 <button
-                                    onClick={handleCreateCollaborator}
+                                    onClick={editingCollaborator ? handleUpdateCollaborator : handleCreateCollaborator}
                                     className="flex-1 px-6 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 shadow-xl shadow-primary/20 transition-all"
                                 >
-                                    Registrar
+                                    {editingCollaborator ? 'Guardar Cambios' : 'Registrar'}
                                 </button>
                             </div>
                         </motion.div>

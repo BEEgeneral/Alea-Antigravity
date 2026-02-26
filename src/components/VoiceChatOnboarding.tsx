@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, Square, ArrowRight, ShieldCheck } from "lucide-react";
+import { Mic, Square, ArrowRight, ShieldCheck, ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -77,7 +77,7 @@ export function VoiceChatOnboarding() {
 
                         // 1. Call Supabase signUp to trigger confirmation email first
                         // We use a temporary random password that they will change via updateUser
-                        const tempPass = Math.random().toString(36).slice(-12) + "A1!";
+                        const tempPass = crypto.randomUUID() + "A1!";
                         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                             email: finalEmail,
                             password: tempPass,
@@ -335,5 +335,3 @@ export function VoiceChatOnboarding() {
     );
 }
 
-// Add missing icon
-import { ChevronLeft } from "lucide-react";

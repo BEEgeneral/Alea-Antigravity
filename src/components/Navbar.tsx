@@ -2,15 +2,17 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, ArrowRight, User } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import type { Session } from "@supabase/supabase-js";
 
 export default function Navbar() {
     const [isScrolled, setIsScrolled] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [user, setUser] = useState<any>(null);
+    const [user, setUser] = useState<Session['user'] | null>(null);
     const [userRole, setUserRole] = useState<string | null>(null);
     const [loadingAuth, setLoadingAuth] = useState(true);
     const pathname = usePathname();
@@ -43,7 +45,7 @@ export default function Navbar() {
         };
 
         // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
             const currentUser = session?.user ?? null;
             setUser(currentUser);
             if (currentUser) {
@@ -54,7 +56,7 @@ export default function Navbar() {
         });
 
         // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: string, session: Session | null) => {
             const currentUser = session?.user ?? null;
             setUser(currentUser);
             if (currentUser) {
@@ -102,11 +104,11 @@ export default function Navbar() {
                     {/* Logo */}
                     <Link href="/" className="flex items-center space-x-3 group">
                         <div className="relative h-9 w-9 overflow-hidden">
-                            <img src="/alea-monogram-black.png" alt="Logo" className="h-full w-auto transition-all duration-700 group-hover:scale-110 dark:hidden" />
-                            <img src="/alea-monogram-white.png" alt="Logo" className="h-full w-auto transition-all duration-700 group-hover:scale-110 hidden dark:block" />
+                            <Image src="/alea-monogram-black.png" alt="Logo" width={36} height={36} className={`h-full w-auto transition-all duration-700 group-hover:scale-110 ${isLanding && !isScrolled ? 'hidden' : 'block dark:hidden'}`} />
+                            <Image src="/alea-monogram-white.png" alt="Logo" width={36} height={36} className={`h-full w-auto transition-all duration-700 group-hover:scale-110 ${isLanding && !isScrolled ? 'block' : 'hidden dark:block'}`} />
                         </div>
-                        <span className="font-serif text-xl tracking-[0.2em] font-medium hidden sm:block">
-                            alea<span className="text-primary group-hover:text-foreground transition-colors duration-500">signature</span>.
+                        <span className={`font-serif text-xl tracking-[0.2em] font-medium hidden sm:block transition-colors duration-500 ${isLanding && !isScrolled ? 'text-white' : ''}`}>
+                            alea<span className={`transition-colors duration-500 ${isLanding && !isScrolled ? 'text-primary' : 'text-primary group-hover:text-foreground'}`}>signature</span>.
                         </span>
                     </Link>
 
@@ -116,8 +118,7 @@ export default function Navbar() {
                             <a
                                 key={link.name}
                                 href={link.href}
-                                className={`text-[10px] font-bold uppercase tracking-[0.25em] transition-all duration-300 hover:text-primary ${(link as any).active ? "text-primary px-3 py-1 bg-primary/5 rounded-full" : "text-muted-foreground"
-                                    }`}
+                                className={`text-[10px] font-bold uppercase tracking-[0.25em] transition-all duration-300 hover:text-primary ${isLanding && !isScrolled ? 'text-white/80 hover:text-white' : ((link as any).active ? "text-primary px-3 py-1 bg-primary/5 rounded-full" : "text-muted-foreground")}`}
                             >
                                 {link.name}
                             </a>

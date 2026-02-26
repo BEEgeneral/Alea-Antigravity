@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import Navbar from "@/components/Navbar";
 
 interface InvestorProfile {
     id: string;
@@ -22,27 +23,36 @@ export default function ProfilePage() {
 
     useEffect(() => {
         const fetchInvestor = async () => {
-            const id = localStorage.getItem('alea_investor_id');
-            if (!id) {
-                router.push('/onboarding');
+            // SECURITY FIX: Use authenticated session instead of localStorage ID (IDOR fix)
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.user) {
+                router.push('/login');
                 return;
             }
 
+            const userId = session.user.id;
+
             const { data } = await supabase
                 .from('investors')
-                .select('*')
-                .eq('id', id)
+                .select('id, full_name, email, kyc_status, interests, budget_max')
+                .eq('id', userId)
                 .single();
 
             if (data) {
                 setInvestor(data);
+            } else {
+                // User is authenticated but not an investor — could be an agent
+                // Redirect gracefully
+                router.push('/');
             }
             setLoading(false);
         };
         fetchInvestor();
     }, [router]);
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        // Clean up any legacy localStorage items
         localStorage.removeItem('alea_investor_id');
         localStorage.removeItem('alea_investor_name');
         router.push('/');
@@ -59,19 +69,9 @@ export default function ProfilePage() {
     return (
         <main className="min-h-screen bg-background text-foreground selection:bg-primary/30 pb-20">
 
-            {/* Navigation Layer */}
-            <nav className="w-full z-50 p-6 flex items-center justify-between border-b border-border bg-card sticky top-0">
-                <Link href="/" className="font-serif text-2xl tracking-widest font-medium">Aleasignature.</Link>
-                <div className="flex space-x-6 text-sm font-medium">
-                    <Link href="/radar" className="text-muted-foreground hover:text-foreground transition-colors">Radar</Link>
-                    <Link href="/profile" className="text-primary transition-colors">Perfil</Link>
-                    <button onClick={handleLogout} className="text-muted-foreground hover:text-red-500 transition-colors">
-                        <LogOut size={16} />
-                    </button>
-                </div>
-            </nav>
+            <Navbar />
 
-            <div className="max-w-5xl mx-auto px-6 mt-12">
+            <div className="max-w-5xl mx-auto px-6 mt-32">
                 <h1 className="font-serif text-4xl font-medium mb-8">Perfil de Inversor</h1>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -99,6 +99,16 @@ export default function ProfilePage() {
                                         ? "Su perfil ha sido verificado por el Praetorium de Aleasignature. Tiene acceso total a los activos Off-Market."
                                         : "Su perfil está siendo revisado por el Praetorium de Aleasignature. Una vez verificado, se desbloqueará el acceso total a activos Off-Market."}
                                 </p>
+                            </div>
+
+                            <div className="pt-4 mt-4 border-t border-border">
+                                <button
+                                    onClick={handleLogout}
+                                    className="flex items-center space-x-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-red-500 transition-colors w-full justify-center py-3 rounded-xl border border-border hover:border-red-500/30"
+                                >
+                                    <LogOut size={14} />
+                                    <span>Cerrar Sesión</span>
+                                </button>
                             </div>
                         </div>
 

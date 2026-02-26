@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Mail, Lock, ArrowRight, UserPlus, AlertCircle, ChevronLeft, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Suspense } from "react";
@@ -28,7 +29,7 @@ function LoginForm() {
 
     // Handle authentication state
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        supabase.auth.getSession().then(({ data: { session } }: { data: { session: any } }) => {
             setUser(session?.user ?? null);
             if (session?.user && fromOnboarding) {
                 setFormData(prev => ({ ...prev, email: session.user.email || prefillEmail }));
@@ -70,7 +71,7 @@ function LoginForm() {
 
             if (isRegister) {
                 const cleanEmail = formData.email.trim();
-                const { error: signUpError } = await supabase.auth.signUp({
+                const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                     email: cleanEmail,
                     password: formData.password,
                     options: {
@@ -106,6 +107,22 @@ function LoginForm() {
                     if (signInError) throw signInError;
                     router.push("/radar");
                 } else {
+                    // Agent registration — create record in agents table for admin approval
+                    const userId = signUpData.user?.id;
+                    if (userId) {
+                        const { error: agentInsertError } = await supabase
+                            .from('agents')
+                            .insert([{
+                                id: userId,
+                                full_name: formData.fullName,
+                                email: cleanEmail,
+                                is_approved: false,
+                                role: 'agent'
+                            }]);
+                        if (agentInsertError) {
+                            console.warn("Agent record creation warning:", agentInsertError.message);
+                        }
+                    }
                     setSuccess(true);
                 }
             } else {
@@ -169,14 +186,18 @@ function LoginForm() {
                 {/* Branding matching Home */}
                 <div className="text-center mb-12">
                     <div className="flex flex-col items-center space-y-4">
-                        <img
+                        <Image
                             src="/alea-monogram-white.png"
                             alt="Aleasignature Logo"
+                            width={64}
+                            height={64}
                             className="h-16 w-auto opacity-90 transition-opacity hover:opacity-100 hidden dark:block"
                         />
-                        <img
+                        <Image
                             src="/alea-monogram-black.png"
                             alt="Aleasignature Logo"
+                            width={64}
+                            height={64}
                             className="h-16 w-auto opacity-90 transition-opacity hover:opacity-100 dark:hidden"
                         />
                         <h1 className="font-serif text-3xl tracking-widest font-medium">Aleasignature.</h1>
@@ -211,10 +232,15 @@ function LoginForm() {
                                 initial={{ opacity: 0, height: 0 }}
                                 animate={{ opacity: 1, height: 'auto' }}
                                 exit={{ opacity: 0, height: 0 }}
-                                className="mb-6 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl flex items-center space-x-3 text-emerald-500 text-xs font-medium"
+                                className="mb-6 p-5 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl flex flex-col space-y-2 text-emerald-600 text-xs font-medium"
                             >
-                                <Shield size={16} className="shrink-0" />
-                                <span>Solicitud recibida. Pendiente de validación.</span>
+                                <div className="flex items-center space-x-3">
+                                    <Shield size={16} className="shrink-0" />
+                                    <span className="font-bold">Solicitud enviada correctamente</span>
+                                </div>
+                                <p className="text-emerald-600/80 text-[11px] leading-relaxed pl-7">
+                                    Confirma tu email y un administrador revisará tu solicitud. Recibirás acceso al Praetorium una vez aprobado.
+                                </p>
                             </motion.div>
                         )}
                     </AnimatePresence>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     MapPin,
@@ -88,7 +89,7 @@ export default function InvestmentRadar() {
         const fetchRadarProperties = async () => {
             const { data } = await supabase
                 .from('properties')
-                .select('*');
+                .select('id, title, address, price, status, is_off_market, asset_type, thumbnail_url');
 
             if (data) setProperties(data as RadarProperty[]);
             setLoading(false);
@@ -214,10 +215,12 @@ export default function InvestmentRadar() {
 
                                             {/* Main Image */}
                                             <div className="relative aspect-[16/10] overflow-hidden">
-                                                <img
+                                                <Image
                                                     src={property.thumbnail_url || "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80"}
                                                     alt="Activo"
-                                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-[2s]"
+                                                    fill
+                                                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                                    className="object-cover group-hover:scale-110 transition-transform duration-[2s]"
                                                 />
                                                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                                             </div>

@@ -127,7 +127,7 @@ export default function Home() {
               className="md:col-span-2 md:row-span-2 relative group overflow-hidden rounded-3xl border border-white/5 shadow-2xl"
             >
               <Image
-                src="/wealth-management.jpg"
+                src="https://plus.unsplash.com/premium_photo-1725408023984-f535e86aa58f?q=80&w=2071&auto=format&fit=crop"
                 alt="Estructuración Patrimonial"
                 fill
                 priority
@@ -150,8 +150,8 @@ export default function Home() {
               className="md:col-span-2 md:row-span-1 relative group overflow-hidden rounded-3xl border border-white/5 shadow-xl"
             >
               <Image
-                src="https://images.unsplash.com/photo-1560179707-f14e90ef3623?q=80&w=2073&auto=format&fit=crop"
-                alt="Terciario Yield"
+                src="https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?q=80&w=2070&auto=format&fit=crop"
+                alt="Reposicionamiento Patrimonial"
                 fill
                 sizes="(max-width: 768px) 100vw, 50vw"
                 className="object-cover transition-transform duration-1000 group-hover:scale-110"
@@ -214,7 +214,7 @@ export default function Home() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="font-serif text-3xl font-medium mb-4">Métricas de Auditoría Fiduciaria</h2>
+            <h2 className="font-serif text-3xl font-medium mb-4">Pilares de Auditoría Fiduciaria</h2>
             <p className="text-muted-foreground">Resultados probados bajo el rigor de la originación directa.</p>
           </motion.div>
 
@@ -229,11 +229,10 @@ export default function Home() {
               <div className="font-medium text-lg mb-1">Mandatos Reservados</div>
               <p className="text-sm text-muted-foreground">Operaciones originadas fuera de los circuitos públicos.</p>
             </motion.div>
-            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.3 }} className="relative">
-              <div className="absolute -inset-4 bg-primary/5 rounded-2xl border border-primary/20 -z-10" />
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.3 }}>
               <div className="font-serif text-3xl font-medium text-primary mb-3">Independencia Total</div>
               <div className="font-medium text-lg mb-1">Ausencia de Conflicto</div>
-              <p className="text-sm text-muted-foreground text-foreground">Defensa fiduciaria orientada exclusivamente al comprador.</p>
+              <p className="text-sm text-muted-foreground">Defensa fiduciaria orientada exclusivamente al comprador.</p>
             </motion.div>
           </div>
         </div>

@@ -127,7 +127,7 @@ export default function Home() {
               className="md:col-span-2 md:row-span-2 relative group overflow-hidden rounded-3xl border border-white/5 shadow-2xl"
             >
               <Image
-                src="https://plus.unsplash.com/premium_photo-1725408023984-f535e86aa58f?q=80&w=2071&auto=format&fit=crop"
+                src="https://buesoinchausti-rein.com/images/proyectos-arquitectura/arquitectura-residencial/torres-up-site-bucharest/torres-up-site-bucharest--01.jpg?v=2"
                 alt="Estructuración Patrimonial"
                 fill
                 priority

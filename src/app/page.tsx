@@ -71,15 +71,15 @@ export default function Home() {
         >
           <motion.div variants={fadeInUp} className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-md border border-white/20 px-5 py-2.5 rounded-full text-sm font-medium mb-8 text-white/90 shadow-lg">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_2px_rgba(52,211,153,0.5)]" />
-            <span className="tracking-wider uppercase text-[11px] font-bold">Sistema Off-Market Activo</span>
+            <span className="tracking-wider uppercase text-[11px] font-bold">Originación Privada</span>
           </motion.div>
 
           <motion.h1 variants={fadeInUp} className="font-serif text-4xl md:text-5xl lg:text-6xl font-medium mb-6 tracking-tight text-white drop-shadow-[0_2px_20px_rgba(0,0,0,0.4)] leading-[1.1]">
-            Acceso Exclusivo a Oportunidades Inmobiliarias <span className="text-primary">Off-Market.</span>
+            Independencia, Inteligencia y Acceso en la <span className="text-primary">Defensa del Capital.</span>
           </motion.h1>
 
           <motion.p variants={fadeInUp} className="text-lg md:text-xl text-white/70 mb-12 max-w-2xl mx-auto font-light leading-relaxed">
-            Descubre propiedades y proyectos de inversión únicos en España y Portugal, lejos del mercado tradicional. Tu puerta de entrada a la inversión discreta y rentable.
+            Alineación total con el inversor institucional. Consultoría estratégica para Family Offices, fondos y firmas fiduciarias mediante mandatos estrictos de originación privada.
           </motion.p>
 
           <motion.div variants={fadeInUp} className="flex items-center justify-center">
@@ -88,7 +88,7 @@ export default function Home() {
               className="relative flex items-center space-x-3 bg-white text-black px-8 py-4 rounded-full font-medium text-lg transition-all shadow-2xl hover:-translate-y-1 hover:shadow-primary/30 hover:shadow-3xl w-full sm:w-auto justify-center group backdrop-blur-sm"
             >
               <Mic className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
-              <span>Comenzar Búsqueda Exclusiva</span>
+              <span>Solicitar Acceso Privado</span>
             </Link>
           </motion.div>
         </motion.div>
@@ -128,7 +128,7 @@ export default function Home() {
             >
               <Image
                 src="https://images.unsplash.com/photo-1613490493576-7fde63acd811?q=80&w=2071&auto=format&fit=crop"
-                alt="Villa de Lujo"
+                alt="Activo Prime"
                 fill
                 priority
                 sizes="(max-width: 768px) 100vw, 50vw"
@@ -136,10 +136,10 @@ export default function Home() {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="absolute bottom-8 left-8 drop-shadow-lg">
-                <p className="text-primary text-xs font-bold tracking-[0.2em] uppercase mb-2 drop-shadow-md">Luxury Living</p>
-                <h3 className="font-serif text-3xl text-white mb-2 drop-shadow-md">Villas de Lujo Exclusivas</h3>
+                <p className="text-primary text-xs font-bold tracking-[0.2em] uppercase mb-2 drop-shadow-md">Property Intelligence</p>
+                <h3 className="font-serif text-3xl text-white mb-2 drop-shadow-md">Escasez y Análisis de Datos</h3>
                 <p className="text-white/80 text-sm max-w-xs opacity-0 group-hover:opacity-100 transition-opacity duration-500 font-light drop-shadow-sm">
-                  Residencias de alto standing con infinity pool, vistas privilegiadas y acabados de diseño premium.
+                  Evaluación avanzada de riesgos, historiales y tendencias de apreciación. Decisiones basadas en datos en milisegundos.
                 </p>
               </div>
             </motion.div>
@@ -151,16 +151,16 @@ export default function Home() {
             >
               <Image
                 src="https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?q=80&w=2070&auto=format&fit=crop"
-                alt="Hotel Boutique de Lujo"
+                alt="Terciario Yield"
                 fill
                 sizes="(max-width: 768px) 100vw, 50vw"
                 className="object-cover transition-transform duration-1000 group-hover:scale-110"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
               <div className="absolute bottom-6 left-6 drop-shadow-lg">
-                <p className="text-primary text-[10px] font-bold tracking-[0.2em] uppercase mb-1 drop-shadow-md">Hospitality</p>
-                <h3 className="font-serif text-xl text-white drop-shadow-md">Hoteles Boutique Premium</h3>
-                <p className="text-white/80 text-xs opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-sm">Activos hoteleros exclusivos en ubicaciones prime con altos rendimientos operativos.</p>
+                <p className="text-primary text-[10px] font-bold tracking-[0.2em] uppercase mb-1 drop-shadow-md">Strategic Value-Add</p>
+                <h3 className="font-serif text-xl text-white drop-shadow-md">Reposicionamiento Patrimonial</h3>
+                <p className="text-white/80 text-xs opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-sm">Transformación de activos obsoletos en espacios contemporáneos y sostenibles de alto rendimiento.</p>
               </div>
             </motion.div>
 
@@ -171,15 +171,15 @@ export default function Home() {
             >
               <Image
                 src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=2075&auto=format&fit=crop"
-                alt="Casa de Lujo Moderna"
+                alt="Residencial Core"
                 fill
                 sizes="(max-width: 768px) 100vw, 25vw"
                 className="object-cover transition-transform duration-1000 group-hover:scale-110"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
               <div className="absolute bottom-4 left-4 drop-shadow-lg">
-                <p className="text-primary text-[8px] font-bold tracking-[0.2em] uppercase drop-shadow-md">Residencial</p>
-                <h3 className="font-serif text-sm text-white drop-shadow-md">Casas de Lujo</h3>
+                <p className="text-primary text-[8px] font-bold tracking-[0.2em] uppercase drop-shadow-md">Market Access</p>
+                <h3 className="font-serif text-sm text-white drop-shadow-md">Originación Confidencial</h3>
               </div>
             </motion.div>
 
@@ -197,8 +197,8 @@ export default function Home() {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
               <div className="absolute bottom-4 left-4 drop-shadow-lg">
-                <p className="text-primary text-[8px] font-bold tracking-[0.2em] uppercase drop-shadow-md">Premium</p>
-                <h3 className="font-serif text-sm text-white drop-shadow-md">Edificios Residenciales</h3>
+                <p className="text-primary text-[8px] font-bold tracking-[0.2em] uppercase drop-shadow-md">Wealth Management</p>
+                <h3 className="font-serif text-sm text-white drop-shadow-md">Multi-Family Offices</h3>
               </div>
             </motion.div>
           </motion.div>
@@ -214,36 +214,36 @@ export default function Home() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="font-serif text-3xl font-medium mb-4">Números que hablan por sí solos</h2>
-            <p className="text-muted-foreground">Resultados reales de nuestro mercado exclusivo.</p>
+            <h2 className="font-serif text-3xl font-medium mb-4">Métricas de Auditoría Fiduciaria</h2>
+            <p className="text-muted-foreground">Resultados probados bajo el rigor de la originación directa.</p>
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }}>
-              <div className="font-serif text-5xl font-medium text-primary mb-2">500+</div>
-              <div className="font-medium text-lg mb-1">Propiedades Exclusivas</div>
-              <p className="text-sm text-muted-foreground">Fuera del escaparate público.</p>
+              <div className="font-serif text-5xl font-medium text-primary mb-2">95%</div>
+              <div className="font-medium text-lg mb-1">Precisión Analítica</div>
+              <p className="text-sm text-muted-foreground">Property Intelligence integrado.</p>
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 }}>
-              <div className="font-serif text-5xl font-medium text-primary mb-2">1,200+</div>
-              <div className="font-medium text-lg mb-1">Inversores Registrados</div>
-              <p className="text-sm text-muted-foreground">Operaciones cerradas con éxito.</p>
+              <div className="font-serif text-5xl font-medium text-primary mb-2">100%</div>
+              <div className="font-medium text-lg mb-1">Mandatos Reservados</div>
+              <p className="text-sm text-muted-foreground">Operaciones originadas fuera de los circuitos públicos.</p>
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.3 }}>
-              <div className="font-serif text-5xl font-medium text-primary mb-2">18%</div>
-              <div className="font-medium text-lg mb-1">Rentabilidad Media Anual</div>
-              <p className="text-sm text-muted-foreground">Sobre el mercado tradicional.</p>
+              <div className="font-serif text-5xl font-medium text-primary mb-2">0</div>
+              <div className="font-medium text-lg mb-1">Inventario Propio</div>
+              <p className="text-sm text-muted-foreground">Independencia total y ausencia de conflicto.</p>
             </motion.div>
           </div>
         </div>
       </section>
 
       {/* Value Proposition */}
-      <section id="ventajas" className="py-32 px-6">
+      <section id="modelo" className="py-32 px-6">
         <div className="max-w-7xl mx-auto">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={staggerContainer} className="text-center max-w-3xl mx-auto mb-20">
-            <motion.h2 variants={fadeInUp} className="font-serif text-4xl md:text-5xl font-medium mb-6">¿Por qué el mercado Off-Market?</motion.h2>
-            <motion.p variants={fadeInUp} className="text-lg text-muted-foreground">Accede a oportunidades inmobiliarias exclusivas que no están disponibles al público general, maximizando tu ROI desde el primer día.</motion.p>
+            <motion.h2 variants={fadeInUp} className="font-serif text-4xl md:text-5xl font-medium mb-6">El Modelo Alea</motion.h2>
+            <motion.p variants={fadeInUp} className="text-lg text-muted-foreground">Huye del volumen y abraza la selectividad. Una estructura operativa diseñada para defender y rentabilizar grandes patrimonios en capitales europeas.</motion.p>
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -253,8 +253,8 @@ export default function Home() {
             >
               <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/10 rounded-full blur-[60px] group-hover:bg-primary/20 transition-all" />
               <Shield className="w-12 h-12 text-primary mb-8" />
-              <h3 className="font-serif text-2xl font-medium mb-4 tracking-tight">Exclusividad Total</h3>
-              <p className="text-muted-foreground leading-relaxed font-light">Propiedades que no aparecen en portales públicos. Acceso privilegiado a las mejores oportunidades antes de que lleguen a tu competencia.</p>
+              <h3 className="font-serif text-2xl font-medium mb-4 tracking-tight">Independencia Institucional</h3>
+              <p className="text-muted-foreground leading-relaxed font-light">No representamos inventario propio; actuamos como la extensión estratégica de Family Offices y fondos institucionales, alineando el capital con la oportunidad ideal.</p>
             </motion.div>
 
             <motion.div
@@ -263,8 +263,8 @@ export default function Home() {
             >
               <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/10 rounded-full blur-[60px] group-hover:bg-primary/20 transition-all" />
               <TrendingUp className="w-12 h-12 text-primary mb-8" />
-              <h3 className="font-serif text-2xl font-medium mb-4 tracking-tight">Rentabilidad Superior</h3>
-              <p className="text-muted-foreground leading-relaxed font-light">Precios más competitivos al evitar la especulación del mercado abierto. Márgenes de beneficio superiores garantizados en cada operación.</p>
+              <h3 className="font-serif text-2xl font-medium mb-4 tracking-tight">Inteligencia y Datos</h3>
+              <p className="text-muted-foreground leading-relaxed font-light">De la conexión al rigor institucional. Análisis 360º de riesgos, valoración algorítmica de activos e integración de datos para maximizar la rentabilidad del fondo.</p>
             </motion.div>
 
             <motion.div
@@ -272,9 +272,9 @@ export default function Home() {
               className="bg-card/40 backdrop-blur-md p-10 rounded-[2rem] border border-white/10 shadow-sm group hover:border-primary/50 transition-all duration-500 relative overflow-hidden"
             >
               <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/10 rounded-full blur-[60px] group-hover:bg-primary/20 transition-all" />
-              <Zap className="w-12 h-12 text-primary mb-8" />
-              <h3 className="font-serif text-2xl font-medium mb-4 tracking-tight">Eficiencia Operativa</h3>
-              <p className="text-muted-foreground leading-relaxed font-light">Sin intermediarios innecesarios. Negociación directa y estructuración ágil para un cierre mucho más rápido y limpio.</p>
+              <Building2 className="w-12 h-12 text-primary mb-8" />
+              <h3 className="font-serif text-2xl font-medium mb-4 tracking-tight">Acceso Exclusivo UHNWI</h3>
+              <p className="text-muted-foreground leading-relaxed font-light">El guardián del mercado invisible. Acceso a propiedades trofeo reservadas para nuestra red privada de grandes patrimonios y fondos soberanos forjada durante años.</p>
             </motion.div>
           </div>
         </div>
@@ -314,10 +314,10 @@ export default function Home() {
             >
               <h2 className="font-serif text-5xl md:text-7xl font-medium mb-8 leading-tight">Praetorium.</h2>
               <p className="text-xl text-muted-foreground mb-10 font-light leading-relaxed max-w-xl">
-                Nuestra división de élite multidisciplinar. Un equipo que te acompaña desde la firma del NDA hasta la entrega final de tu inversión, garantizando <strong className="text-foreground font-semibold">excelencia institucional</strong> y <strong className="text-foreground font-semibold">discreción absoluta</strong> en cada etapa del proceso.
+                Nuestra división de élite multidisciplinar operativa para institucionales. Inteligencia, análisis de viabilidad técnica y estructuración fiscal de vanguardia para garantizar la <strong className="text-foreground font-semibold">excelencia corporativa</strong> y la <strong className="text-foreground font-semibold">preservación patrimonial</strong> de MFOs y Fondos en cada etapa del ciclo de inversión.
               </p>
               <Link href="/onboarding" className="group inline-flex items-center space-x-4 bg-foreground text-background px-8 py-4 rounded-full font-medium transition-all hover:bg-foreground/90 hover:-translate-y-1 shadow-xl">
-                <span className="text-sm uppercase tracking-[0.2em] font-bold">Solicitar Acceso Privado</span>
+                <span className="text-sm uppercase tracking-[0.2em] font-bold">Descubrir Inteligencia Avanzada</span>
                 <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
               </Link>
             </motion.div>
@@ -351,17 +351,17 @@ export default function Home() {
               <div className="flex space-x-1 text-primary mb-6">
                 {[1, 2, 3, 4, 5].map(i => <Star key={i} size={16} fill="currentColor" />)}
               </div>
-              <p className="text-lg italic mb-6">&ldquo;Encontré mi propiedad ideal en 3 semanas. El acceso exclusivo marca la diferencia real comparado con el mercado tradicional.&rdquo;</p>
+              <p className="text-lg italic mb-6">&ldquo;La aproximación de Alea Signature carece completamente de la presión de venta tradicional. Ejercen como auditores independientes, priorizando la reducción de riesgos y la rentabilidad del fondo con discreción absoluta.&rdquo;</p>
               <div>
                 <p className="font-medium">María Carmen</p>
-                <p className="text-sm text-muted-foreground">Inversora, Madrid</p>
+                <p className="text-sm text-muted-foreground">UHNWI, Madrid</p>
               </div>
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }} className="bg-card p-8 rounded-2xl border border-border">
               <div className="flex space-x-1 text-primary mb-6">
                 {[1, 2, 3, 4, 5].map(i => <Star key={i} size={16} fill="currentColor" />)}
               </div>
-              <p className="text-lg italic mb-6">&ldquo;La rentabilidad obtenida superó mis expectativas. El servicio técnico del Praetorium fue excepcional y muy discreto.&rdquo;</p>
+              <p className="text-lg italic mb-6">&ldquo;Su capa de Property Intelligence nos permitió descartar activos sobrevalorados y enfocar el capital en reposicionamientos estratégicos con rendimientos probados.&rdquo;</p>
               <div>
                 <p className="font-medium">Javier Ruiz</p>
                 <p className="text-sm text-muted-foreground">Family Office, Barcelona</p>
@@ -371,10 +371,10 @@ export default function Home() {
               <div className="flex space-x-1 text-primary mb-6">
                 {[1, 2, 3, 4, 5].map(i => <Star key={i} size={16} fill="currentColor" />)}
               </div>
-              <p className="text-lg italic mb-6">&ldquo;Acceso íntegro a propiedades hoteleras que jamás hubiera encontrado por mi cuenta. Altamente recomendado para tickets grandes.&rdquo;</p>
+              <p className="text-lg italic mb-6">&ldquo;Alea controla la originación privada con un rigor institucional absoluto. Sus activos reservados aseguran yields fiables, forjados en años coordinando mandatos confidenciales de primer nivel.&rdquo;</p>
               <div>
-                <p className="font-medium">Ana López</p>
-                <p className="text-sm text-muted-foreground">Inversora, Valencia</p>
+                <p className="font-medium">Javier Santos</p>
+                <p className="text-sm text-muted-foreground">Fondo Institucional, Valencia</p>
               </div>
             </motion.div>
           </div>
@@ -385,14 +385,14 @@ export default function Home() {
       <section className="py-32 px-6 bg-foreground text-background text-center relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80')] opacity-10 bg-cover bg-center mix-blend-overlay" />
         <div className="max-w-3xl mx-auto relative z-10">
-          <h2 className="font-serif text-4xl md:text-5xl font-medium mb-6">¿Listo para descubrir tu próxima oportunidad?</h2>
-          <p className="text-lg text-gray-400 mb-12">Nuestro asistente inteligente cualificará tu perfil para darte acceso a las propiedades exclusivas que mejor se adapten a tu tesis de inversión.</p>
+          <h2 className="font-serif text-4xl md:text-5xl font-medium mb-6">Alineación Estratégica</h2>
+          <p className="text-lg text-gray-400 mb-12">Acceda a oportunidades estructuradas bajo mandato riguroso. Solicite una evaluación para su Family Office o Fondo de Inversión, protegiendo su patrimonio frente a las dinámicas del mercado abierto.</p>
           <Link
             href="/onboarding"
             className="inline-flex items-center space-x-3 bg-primary text-foreground px-8 py-4 rounded-full font-medium text-lg transition-all hover:scale-105"
           >
             <Mic className="w-5 h-5" />
-            <span>Comenzar Validación por Voz</span>
+            <span>Validación de Capital y Perfil</span>
           </Link>
         </div>
       </section>
@@ -402,7 +402,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
           <div className="md:col-span-2">
             <span className="font-serif text-2xl tracking-widest font-medium block mb-4">Aleasignature.</span>
-            <p className="text-muted-foreground text-sm max-w-sm">Tu socio de confianza en inversiones inmobiliarias exclusivas off-market. Discreción, calidad y resultados excepcionales para altos patrimonios.</p>
+            <p className="text-muted-foreground text-sm max-w-sm">Boutique de originación privada y gestión patrimonial. Independencia integral, rigor fiduciario y acceso reservado para la protección e incremento del capital en Europa.</p>
           </div>
           <div>
             <h4 className="font-medium mb-4">Contacto Directo</h4>
@@ -443,9 +443,12 @@ export default function Home() {
         </div>
         <div className="max-w-7xl mx-auto pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center text-xs text-muted-foreground">
           <p>© {new Date().getFullYear()} Aleasignature. Todos los derechos reservados.</p>
-          <div className="flex space-x-4 mt-4 md:mt-0">
-            <a href="#" className="hover:text-foreground">Política de Privacidad</a>
-            <a href="#" className="hover:text-foreground">Términos y Condiciones</a>
+          <div className="flex flex-wrap justify-end gap-x-4 gap-y-2 mt-4 md:mt-0 max-w-xl text-right">
+            <Link href="/aviso-legal" className="hover:text-foreground">Aviso Legal</Link>
+            <Link href="/privacidad" className="hover:text-foreground">Privacidad</Link>
+            <Link href="/cookies" className="hover:text-foreground">Cookies</Link>
+            <Link href="/terminos" className="hover:text-foreground">Términos y Condiciones</Link>
+            <Link href="/cumplimiento" className="hover:text-foreground">Cumplimiento (KYC/AML)</Link>
           </div>
         </div>
       </footer>

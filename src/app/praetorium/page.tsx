@@ -14,6 +14,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import ValuationAgent from "@/components/admin/ValuationAgent";
 
 // Defined Pipeline Stages
 const PIPELINE_STAGES = [
@@ -382,7 +383,7 @@ export default function AdminDashboard() {
                 meters: parsedMeters || 150,
                 thumbnail_url: extractedImages[0] || null,
                 images: extractedImages,
-                status: 'Off-Market',
+                status: 'Origen Privado',
                 asset_type: 'Activo Extraído',
                 is_off_market: true,
                 dossier_url: pdfUrl
@@ -448,6 +449,21 @@ export default function AdminDashboard() {
             setTimeout(() => setShowToast(false), 3000);
         } else {
             console.error("Error updating investor:", error);
+        }
+    };
+
+    const handleToggleVerification = async (investorId: string, currentStatus: boolean) => {
+        const { error } = await supabase
+            .from('investors')
+            .update({ is_verified: !currentStatus })
+            .eq('id', investorId);
+
+        if (!error) {
+            setInvestors(prev => prev.map(i => i.id === investorId ? { ...i, is_verified: !currentStatus } : i));
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        } else {
+            console.error("Error updating verification status:", error);
         }
     };
 
@@ -1084,7 +1100,7 @@ export default function AdminDashboard() {
                                     { label: "Características", tags: property.features || ["Patio"], icon: Star },
                                     { label: "Climatización", tags: property.climatization || ["Aire Acondicionado"], icon: Wind },
                                     { label: "Entorno", tags: property.entorno || ["Cerca de Tiendas", "Cerca del Mar", "Cerca de Colegios"], icon: MapPin },
-                                    { label: "Categoría", tags: property.category || ["Lujo", "Reventa", "Casas de vacaciones", "Oportunidad"], icon: Tag }
+                                    { label: "Categoría", tags: property.category || ["Institucional", "Residencial Core", "Terciario Yield", "Prime"], icon: Tag }
                                 ].map((section, i) => (
                                     <div key={i}>
                                         <p className="text-[10px] uppercase tracking-widest text-primary font-black mb-4 flex items-center">
@@ -1823,7 +1839,15 @@ export default function AdminDashboard() {
                         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "assets" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
                     >
                         <Building size={18} />
-                        <span>Inventario Off-Market</span>
+                        <span>Directorio Confidencial</span>
+                    </button>
+
+                    <button
+                        onClick={() => { setActiveTab("intelligence"); setSelectedInvestor(null); }}
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "intelligence" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                    >
+                        <Sparkles size={18} />
+                        <span>Alea Intelligence</span>
                     </button>
 
                     <button
@@ -1904,7 +1928,8 @@ export default function AdminDashboard() {
                                     { id: "mandatarios", label: "Mandatarios", icon: ShieldCheck },
                                     { id: "collaborators", label: "Colaboradores", icon: Share2 },
                                     { id: "templates", label: "Plantillas", icon: FileText },
-                                    { id: "assets", label: "Inventario Off-Market", icon: Building },
+                                    { id: "assets", label: "Directorio Confidencial", icon: Building },
+                                    { id: "intelligence", label: "Alea Intelligence", icon: Sparkles },
                                     { id: "audit", label: "Logs del Sistema", icon: ShieldAlert },
                                     ...(currentUser?.role === 'admin' ? [{ id: "agents", label: "Gestión de Agentes", icon: UserCheck }] : [])
                                 ].map((item) => (
@@ -1961,13 +1986,14 @@ export default function AdminDashboard() {
                         </button>
                         <div>
                             <h1 className="font-serif text-xl md:text-3xl font-medium tracking-tight">
-                                {activeTab === 'crm' ? 'Operativas Off-Market' :
+                                {activeTab === 'crm' ? 'Mandatos Activos' :
                                     activeTab === 'investors' ? 'Directorio de Inversores' :
                                         activeTab === 'mandatarios' ? 'Directorio de Mandatarios' :
                                             activeTab === 'templates' ? 'Document Factory' :
                                                 activeTab === 'assets' ? 'Asset Portfolio' :
-                                                    activeTab === 'profile' ? 'Perfil de Usuario' :
-                                                        activeTab === 'agents' ? 'Control de Agentes' : 'System Logs'}
+                                                    activeTab === 'intelligence' ? 'Alea Intelligence Core' :
+                                                        activeTab === 'profile' ? 'Perfil de Usuario' :
+                                                            activeTab === 'agents' ? 'Control de Agentes' : 'System Logs'}
                             </h1>
                             <div className="flex items-center space-x-2 mt-1 hidden sm:flex">
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -2160,6 +2186,13 @@ export default function AdminDashboard() {
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex space-x-1">
+                                                                    <button
+                                                                        onClick={() => handleToggleVerification(investor.id, !!investor.is_verified)}
+                                                                        className={`p-2.5 rounded-xl transition-all ${investor.is_verified ? 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20' : 'bg-muted/50 text-muted-foreground hover:bg-emerald-500/10 hover:text-emerald-500'}`}
+                                                                        title={investor.is_verified ? "Revocar Verificación/NDA" : "Verificar/Aprobar NDA"}
+                                                                    >
+                                                                        <ShieldCheck size={14} />
+                                                                    </button>
                                                                     <button
                                                                         onClick={() => setSelectedInvestorToEdit(investor)}
                                                                         className="p-2.5 bg-muted/50 rounded-xl hover:bg-primary/10 hover:text-primary transition-all text-muted-foreground"
@@ -2433,7 +2466,7 @@ export default function AdminDashboard() {
                                             <div className="flex justify-between items-center mb-10 px-6">
                                                 <div>
                                                     <h2 className="text-2xl font-serif font-medium">Asset Portfolio</h2>
-                                                    <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold mt-1">Propiedades Off-Market</p>
+                                                    <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold mt-1">Directorio Confidencial</p>
                                                 </div>
                                                 <div className="flex items-center space-x-4">
                                                     <div className="relative">
@@ -2623,6 +2656,10 @@ export default function AdminDashboard() {
                                                 </div>
                                             </div>
                                         </div>
+                                    )}
+
+                                    {activeTab === "intelligence" && (
+                                        <ValuationAgent />
                                     )}
 
                                     {activeTab === "audit" && (
@@ -3035,7 +3072,7 @@ export default function AdminDashboard() {
                             className="relative bg-background border border-border w-full max-w-2xl rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh]"
                         >
                             <h2 className="font-serif text-3xl mb-2">Alta de Nuevo Inversor</h2>
-                            <p className="text-muted-foreground text-sm mb-8 font-light">Complete los datos para añadir al directorio off-market.</p>
+                            <p className="text-muted-foreground text-sm mb-8 font-light">Complete los datos para añadir al directorio confidencial.</p>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="md:col-span-2">

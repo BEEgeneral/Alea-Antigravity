@@ -14,13 +14,13 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Aleasignature | Exclusividad Inmobiliaria Off-Market",
-  description: "Plataforma de inversión privada para activos inmobiliarios exclusivos. Accede a hoteles, edificios y propiedades de lujo fuera del mercado tradicional en España y Portugal.",
-  keywords: ["real estate", "luxury", "off-market", "investment", "spain", "portugal", "hotels", "private equity"],
+  title: "Aleasignature | Originación Privada y Gestión Patrimonial",
+  description: "Boutique de originación estratégica y defensa del capital. Mandatos de inversión privada para Multi-Family Offices y fondos institucionales en España y Portugal.",
+  keywords: ["real estate", "family office", "wealth management", "private equity", "originación privada", "spain", "portugal"],
   authors: [{ name: "Aleasignature" }],
   openGraph: {
-    title: "Aleasignature | Inversión Inmobiliaria Off-Market",
-    description: "Tu puerta de entrada a la inversión discreta y rentable en activos exclusivos.",
+    title: "Aleasignature | Originación Privada Inmobiliaria",
+    description: "Defensa del capital y acceso estratégico a oportunidades reservadas.",
     url: "https://aleasignature.com",
     siteName: "Aleasignature",
     locale: "es_ES",
@@ -28,8 +28,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Aleasignature | Inversión Inmobiliaria Off-Market",
-    description: "Acceso exclusivo a oportunidades inmobiliarias únicas lejos del mercado tradicional.",
+    title: "Aleasignature | Originación Privada",
+    description: "Gestión rigurosa de mandatos de inversión y acceso a oportunidades de originación directa.",
   },
 };
 

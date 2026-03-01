@@ -45,7 +45,7 @@ export default function PropertiesPage() {
                 <div className="max-w-7xl mx-auto">
                     <h1 className="font-serif text-4xl md:text-5xl font-medium mb-4">Exclusividad Operativa</h1>
                     <p className="text-lg text-muted-foreground max-w-2xl font-sans">
-                        El portfolio reservado de Aleasignature. Completa tu verificación en el Perfil para desbloquear la Data Room de activos Off-Market.
+                        El portfolio reservado de Aleasignature. Completa tu verificación en el Perfil para desbloquear la Data Room de activos de origen privado.
                     </p>
                 </div>
             </section>

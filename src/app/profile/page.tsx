@@ -96,8 +96,8 @@ export default function ProfilePage() {
                                 </div>
                                 <p className="text-[11px] text-muted-foreground leading-relaxed">
                                     {investor.kyc_status === 'verified'
-                                        ? "Su perfil ha sido verificado por el Praetorium de Aleasignature. Tiene acceso total a los activos Off-Market."
-                                        : "Su perfil está siendo revisado por el Praetorium de Aleasignature. Una vez verificado, se desbloqueará el acceso total a activos Off-Market."}
+                                        ? "Su perfil ha sido verificado por el Praetorium de Aleasignature. Tiene acceso total a los activos de origen privado."
+                                        : "Su perfil está siendo revisado por el Praetorium de Aleasignature. Una vez verificado, se desbloqueará el acceso total a activos de origen privado."}
                                 </p>
                             </div>
 
@@ -192,7 +192,7 @@ export default function ProfilePage() {
                                         </div>
                                         <div>
                                             <h4 className="font-medium text-sm">NDA Maestro Aleasignature</h4>
-                                            <p className="text-[11px] text-muted-foreground">Requerido para acceder a financieros Off-Market.</p>
+                                            <p className="text-[11px] text-muted-foreground">Requerido para acceder a financieros de origen privado.</p>
                                         </div>
                                     </div>
                                     <span className="text-[10px] font-black text-amber-500 uppercase tracking-wider bg-amber-500/10 px-2 py-1 rounded">Pendiente</span>

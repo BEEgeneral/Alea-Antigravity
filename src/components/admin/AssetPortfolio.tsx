@@ -15,7 +15,7 @@ export default function AssetPortfolio({ properties, onSelectProperty }: AssetPo
             <div className="flex justify-between items-center mb-10 px-6">
                 <div>
                     <h2 className="text-2xl font-serif font-medium">Asset Portfolio</h2>
-                    <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold mt-1">Propiedades Off-Market</p>
+                    <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold mt-1">Directorio Confidencial</p>
                 </div>
                 <button className="px-6 py-2 bg-primary text-white rounded-xl text-xs font-bold uppercase tracking-widest">Publicar Activo</button>
             </div>

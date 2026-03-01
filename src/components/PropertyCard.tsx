@@ -54,7 +54,7 @@ export function PropertyCard({ property, userStatus }: PropertyCardProps) {
                     <div className="absolute inset-0 flex flex-col items-center justify-center z-10 p-6 text-center">
                         <Lock size={32} className="text-primary mb-4" />
                         <h3 className="text-white font-serif text-xl font-medium mb-2">Restricted Access</h3>
-                        <p className="text-white/80 text-sm font-sans mb-4">You must be a verified investor to view details of this off-market asset.</p>
+                        <p className="text-white/80 text-sm font-sans mb-4">Se requiere verificación institucional para acceder a la Data Room de este mandato privado.</p>
                         <button className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2.5 rounded-full font-medium text-sm transition-colors">
                             Request Access
                         </button>

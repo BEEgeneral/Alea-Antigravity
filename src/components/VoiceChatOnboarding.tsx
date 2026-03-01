@@ -10,37 +10,43 @@ import { supabase } from "@/lib/supabase";
 const STEPS = [
     {
         id: "welcome",
-        aiText: "Bienvenido a Aleasignature. Soy tu asistente IA para la búsqueda de activos exclusivos. Para acceder, necesito cualificar tu perfil. ¿Cómo te llamas?",
+        aiText: "Bienvenido a Aleasignature. Soy tu asistente de calificación institucional. Para iniciar el proceso, ¿cómo te llamas o qué entidad representas?",
         type: "input",
         key: "name"
     },
     {
-        id: "interests",
-        aiText: "Un placer. ¿Qué tipo de activos buscas principalmente? (Ej: Hoteles, Edificios residenciales, Villas de lujo)",
+        id: "investor_type",
+        aiText: "Un placer. ¿Qué perfil de inversión tienes? (Multi-Family Office, Fondo Institucional, UHNWI, Private Equity)",
         type: "input",
-        key: "assetType"
+        key: "investorType"
     },
     {
         id: "ticket",
-        aiText: "Entendido. ¿Cuál es tu ticket medio de inversión esperado en millones de euros?",
+        aiText: "Entendido. ¿Cuál es el volumen de capital o ticket medio disponible para inversión (en millones de euros)?",
         type: "input",
         key: "ticketSize"
     },
     {
-        id: "contact",
-        aiText: "Perfecto. Por último, ¿cuál es tu email profesional para enviarte el acceso a Radar de Inversión?",
+        id: "email",
+        aiText: "Perfecto. Por favor, facilítame tu email corporativo para enviarte la documentación de acceso al Radar.",
         type: "input",
         key: "email"
     },
     {
+        id: "nda",
+        aiText: "Como último paso legal, requiere confirmación expresa. ¿Aceptas las condiciones del Acuerdo de Confidencialidad (NDA) para acceder a los activos off-market? (Responde 'Sí')",
+        type: "input",
+        key: "ndaAccepted"
+    },
+    {
         id: "complete",
-        aiText: "Gracias. He configurado tu perfil. Procediendo a encriptar tus credenciales...",
+        aiText: "Cualificación registrada. Generando tu identificador cifrado y procesando las credenciales...",
         type: "loading",
         key: "done"
     },
     {
         id: "confirmation",
-        aiText: "¡Email enviado! Por seguridad, abre el enlace de confirmación que hemos enviado a tu bandeja de entrada para activar tu cuenta y crear tu contraseña.",
+        aiText: "¡Registro completado! Revisa tu bandeja de entrada para confirmar el email. Tu acceso al Radar permanecerá bloqueado bajo NDA hasta que el equipo de Praetorium valide el perfil.",
         type: "success",
         key: "success"
     }
@@ -101,10 +107,11 @@ export function VoiceChatOnboarding() {
                                     id: userId, // Match the Auth ID
                                     full_name: userData.name || "Anon Inversor",
                                     email: finalEmail,
-                                    interests: userData.assetType ? [userData.assetType] : [],
+                                    investor_type: userData.investorType || 'Private Investor',
                                     budget_max: ticketValue,
                                     status: 'nuevo',
-                                    kyc_status: 'pending'
+                                    kyc_status: 'pending',
+                                    is_verified: false
                                 }]);
 
                             if (dbError) console.warn("Database record creation warning:", dbError.message);

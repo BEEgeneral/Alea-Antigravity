@@ -79,8 +79,8 @@ export default function Navbar() {
 
     const navLinks = isLanding
         ? [
-            { name: "Ventajas", href: "#ventajas" },
-            { name: "Praetorium", href: "#praetorium" },
+            { name: "Modelo", href: "#modelo" },
+            { name: "Inteligencia", href: "#praetorium" },
             { name: "Testimonios", href: "#testimonios" },
         ]
         : [];

@@ -41,6 +41,7 @@ export default function InvestmentRadar() {
         return null;
     });
     const [showContactSuccess, setShowContactSuccess] = useState(false);
+    const [ndaRequired, setNdaRequired] = useState(false);
 
     // Auth & Permission guard
     useEffect(() => {
@@ -78,12 +79,17 @@ export default function InvestmentRadar() {
             if (userEmail) {
                 const { data: investor } = await supabase
                     .from('investors')
-                    .select('id')
+                    .select('id, is_verified')
                     .eq('email', userEmail)
                     .maybeSingle();
 
                 if (investor) {
-                    setAuthChecked(true);
+                    if (investor.is_verified) {
+                        setAuthChecked(true);
+                    } else {
+                        setNdaRequired(true);
+                        setAuthChecked(true);
+                    }
                     return;
                 }
             }
@@ -104,6 +110,7 @@ export default function InvestmentRadar() {
 
             // 4. Also check user_metadata role = 'investor'
             if (userRole === 'investor') {
+                setNdaRequired(true);
                 setAuthChecked(true);
                 return;
             }
@@ -163,6 +170,40 @@ export default function InvestmentRadar() {
         );
     }
 
+    if (ndaRequired) {
+        return (
+            <div className="min-h-screen bg-background text-foreground selection:bg-primary/30 font-sans overflow-x-hidden">
+                <Navbar />
+                <main className="pt-40 pb-24 px-6 min-h-[80vh] flex flex-col items-center justify-center">
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="max-w-2xl mx-auto text-center space-y-8 bg-card/50 backdrop-blur-xl border border-white/10 p-12 rounded-[3.5rem] shadow-2xl relative overflow-hidden"
+                    >
+                        <div className="absolute -top-32 -right-32 w-64 h-64 bg-primary/20 rounded-full blur-[80px] pointer-events-none" />
+                        <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-primary/20 rounded-full blur-[80px] pointer-events-none" />
+
+                        <div className="relative z-10 space-y-8">
+                            <ShieldCheck size={64} className="mx-auto text-primary animate-pulse" />
+                            <h1 className="text-4xl md:text-5xl font-serif font-medium leading-tight">Acceso Restringido</h1>
+                            <p className="text-muted-foreground text-lg font-light leading-relaxed">
+                                El acceso a nuestra inteligencia de mercado y oportunidades de originación privada está estrictamente reservado para <strong className="text-foreground">inversores corporativos</strong>, <strong className="text-foreground">fondos</strong> y <strong className="text-foreground">Family Offices</strong> cualificados.
+                                <br /><br />
+                                Se requiere la firma de un <strong className="text-foreground">Acuerdo de Confidencialidad (NDA)</strong> y la validación de su capital por el equipo de Praetorium para desbloquear el Radar.
+                            </p>
+                            <div className="pt-8">
+                                <Link href="/onboarding" className="inline-flex items-center space-x-3 bg-foreground text-background px-8 py-4 rounded-full font-medium text-lg transition-all hover:scale-105 shadow-xl">
+                                    <Lock className="w-5 h-5 text-background/80" />
+                                    <span>Firmar NDA y Solicitar Acceso</span>
+                                </Link>
+                            </div>
+                        </div>
+                    </motion.div>
+                </main>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-background text-foreground selection:bg-primary/30 font-sans overflow-x-hidden">
             <Navbar />
@@ -183,7 +224,7 @@ export default function InvestmentRadar() {
                                 Radar de <span className="italic">Inversión.</span>
                             </h1>
                             <p className="text-muted-foreground text-lg max-w-2xl font-light leading-relaxed">
-                                Detectamos activos exclusivos off-market con alta rentabilidad estratégica.
+                                Detectamos activos exclusivos de originación privada con alta rentabilidad estratégica.
                                 La información detallada se encuentra <span className="text-foreground font-medium">encriptada</span> por motivos de seguridad.
                                 Solicite una sesión con un agente para el desbloqueo total.
                             </p>
@@ -238,7 +279,7 @@ export default function InvestmentRadar() {
                                                 <div className="bg-black/50 backdrop-blur-md border border-white/10 px-4 py-1.5 rounded-full flex items-center space-x-2">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                                     <span className="text-[10px] font-black uppercase tracking-widest text-white">
-                                                        {property.is_off_market ? 'Off-Market' : property.asset_type}
+                                                        {property.is_off_market ? 'Origen Privado' : property.asset_type}
                                                     </span>
                                                 </div>
                                             </div>

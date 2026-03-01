@@ -79,7 +79,7 @@ export default function Home() {
           </motion.h1>
 
           <motion.p variants={fadeInUp} className="text-lg md:text-xl text-white/70 mb-12 max-w-2xl mx-auto font-light leading-relaxed">
-            Alineación total con el inversor institucional. Consultoría estratégica para Family Offices, fondos y firmas fiduciarias mediante mandatos estrictos de originación privada.
+            Defensa patrimonial bajo rigor fiduciario. Consultoría estratégica para despachos, Family Offices y fondos institucionales mediante mandatos estrictos de originación privada.
           </motion.p>
 
           <motion.div variants={fadeInUp} className="flex items-center justify-center">
@@ -127,8 +127,8 @@ export default function Home() {
               className="md:col-span-2 md:row-span-2 relative group overflow-hidden rounded-3xl border border-white/5 shadow-2xl"
             >
               <Image
-                src="https://images.unsplash.com/photo-1613490493576-7fde63acd811?q=80&w=2071&auto=format&fit=crop"
-                alt="Activo Prime"
+                src="/wealth-management.jpg"
+                alt="Estructuración Patrimonial"
                 fill
                 priority
                 sizes="(max-width: 768px) 100vw, 50vw"
@@ -136,10 +136,10 @@ export default function Home() {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="absolute bottom-8 left-8 drop-shadow-lg">
-                <p className="text-primary text-xs font-bold tracking-[0.2em] uppercase mb-2 drop-shadow-md">Property Intelligence</p>
-                <h3 className="font-serif text-3xl text-white mb-2 drop-shadow-md">Escasez y Análisis de Datos</h3>
+                <p className="text-primary text-xs font-bold tracking-[0.2em] uppercase mb-2 drop-shadow-md">Wealth Management</p>
+                <h3 className="font-serif text-3xl text-white mb-2 drop-shadow-md">Estructuración Patrimonial</h3>
                 <p className="text-white/80 text-sm max-w-xs opacity-0 group-hover:opacity-100 transition-opacity duration-500 font-light drop-shadow-sm">
-                  Evaluación avanzada de riesgos, historiales y tendencias de apreciación. Decisiones basadas en datos en milisegundos.
+                  Alineación total con firmas fiduciarias y Multi-Family Offices. Confidencialidad y rigor institucional.
                 </p>
               </div>
             </motion.div>
@@ -150,7 +150,7 @@ export default function Home() {
               className="md:col-span-2 md:row-span-1 relative group overflow-hidden rounded-3xl border border-white/5 shadow-xl"
             >
               <Image
-                src="https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?q=80&w=2070&auto=format&fit=crop"
+                src="https://images.unsplash.com/photo-1560179707-f14e90ef3623?q=80&w=2073&auto=format&fit=crop"
                 alt="Terciario Yield"
                 fill
                 sizes="(max-width: 768px) 100vw, 50vw"
@@ -160,7 +160,7 @@ export default function Home() {
               <div className="absolute bottom-6 left-6 drop-shadow-lg">
                 <p className="text-primary text-[10px] font-bold tracking-[0.2em] uppercase mb-1 drop-shadow-md">Strategic Value-Add</p>
                 <h3 className="font-serif text-xl text-white drop-shadow-md">Reposicionamiento Patrimonial</h3>
-                <p className="text-white/80 text-xs opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-sm">Transformación de activos obsoletos en espacios contemporáneos y sostenibles de alto rendimiento.</p>
+                <p className="text-white/80 text-xs opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-sm">Transformación estratégica de edificios históricos en activos contemporáneos de alto rendimiento.</p>
               </div>
             </motion.div>
 
@@ -170,8 +170,8 @@ export default function Home() {
               className="md:col-span-1 md:row-span-1 relative group overflow-hidden rounded-3xl border border-white/5 shadow-lg"
             >
               <Image
-                src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=2075&auto=format&fit=crop"
-                alt="Residencial Core"
+                src="/market-access.jpg"
+                alt="Originación Confidencial"
                 fill
                 sizes="(max-width: 768px) 100vw, 25vw"
                 className="object-cover transition-transform duration-1000 group-hover:scale-110"
@@ -189,16 +189,16 @@ export default function Home() {
               className="md:col-span-1 md:row-span-1 relative group overflow-hidden rounded-3xl border border-white/5 shadow-lg"
             >
               <Image
-                src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?q=80&w=2070&auto=format&fit=crop"
-                alt="Edificio Residencial Premium"
+                src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=2015&auto=format&fit=crop"
+                alt="Property Intelligence"
                 fill
                 sizes="(max-width: 768px) 100vw, 25vw"
                 className="object-cover transition-transform duration-1000 group-hover:scale-110"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
               <div className="absolute bottom-4 left-4 drop-shadow-lg">
-                <p className="text-primary text-[8px] font-bold tracking-[0.2em] uppercase drop-shadow-md">Wealth Management</p>
-                <h3 className="font-serif text-sm text-white drop-shadow-md">Multi-Family Offices</h3>
+                <p className="text-primary text-[8px] font-bold tracking-[0.2em] uppercase drop-shadow-md">Data Analysis</p>
+                <h3 className="font-serif text-sm text-white drop-shadow-md">Property Intelligence</h3>
               </div>
             </motion.div>
           </motion.div>
@@ -220,19 +220,20 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }}>
-              <div className="font-serif text-5xl font-medium text-primary mb-2">95%</div>
+              <div className="font-serif text-3xl font-medium text-primary mb-3">Auditoría Estricta</div>
               <div className="font-medium text-lg mb-1">Precisión Analítica</div>
-              <p className="text-sm text-muted-foreground">Property Intelligence integrado.</p>
+              <p className="text-sm text-muted-foreground">Property Intelligence integrado y control de riesgo.</p>
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 }}>
-              <div className="font-serif text-5xl font-medium text-primary mb-2">100%</div>
+              <div className="font-serif text-3xl font-medium text-primary mb-3">Acceso Protegido</div>
               <div className="font-medium text-lg mb-1">Mandatos Reservados</div>
               <p className="text-sm text-muted-foreground">Operaciones originadas fuera de los circuitos públicos.</p>
             </motion.div>
-            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.3 }}>
-              <div className="font-serif text-5xl font-medium text-primary mb-2">0</div>
-              <div className="font-medium text-lg mb-1">Inventario Propio</div>
-              <p className="text-sm text-muted-foreground">Independencia total y ausencia de conflicto.</p>
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.3 }} className="relative">
+              <div className="absolute -inset-4 bg-primary/5 rounded-2xl border border-primary/20 -z-10" />
+              <div className="font-serif text-3xl font-medium text-primary mb-3">Independencia Total</div>
+              <div className="font-medium text-lg mb-1">Ausencia de Conflicto</div>
+              <p className="text-sm text-muted-foreground text-foreground">Defensa fiduciaria orientada exclusivamente al comprador.</p>
             </motion.div>
           </div>
         </div>

@@ -14,6 +14,7 @@ export default function Navbar() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [user, setUser] = useState<Session['user'] | null>(null);
     const [userRole, setUserRole] = useState<string | null>(null);
+    const [isVerified, setIsVerified] = useState<boolean>(false);
     const [loadingAuth, setLoadingAuth] = useState(true);
     const pathname = usePathname();
     const isLanding = pathname === "/";
@@ -29,18 +30,20 @@ export default function Navbar() {
 
             if (agent) {
                 setUserRole(agent.role); // 'admin' or 'agent'
+                setIsVerified(true); // Agents are always verified
                 return;
             }
 
             // Check investors
             const { data: investor } = await supabase
                 .from('investors')
-                .select('investor_type')
+                .select('is_verified')
                 .eq('id', userId)
                 .single();
 
             if (investor) {
-                setUserRole(investor.investor_type?.toLowerCase()); // 'inversor' or 'colaborador'
+                setUserRole('investor');
+                setIsVerified(!!investor.is_verified);
             }
         };
 
@@ -63,6 +66,7 @@ export default function Navbar() {
                 fetchUserProfile(currentUser.id);
             } else {
                 setUserRole(null);
+                setIsVerified(false);
             }
         });
 
@@ -86,8 +90,12 @@ export default function Navbar() {
         : [];
 
     // ACL Logic
-    const canSeeRadar = userRole === 'admin' || userRole === 'inversor' || userRole === 'colaborador' || userRole === 'agent';
-    const canSeeDashboard = userRole === 'admin' || userRole === 'agent';
+    const isInvestor = userRole === 'investor';
+    const isAdminOrAgent = userRole === 'admin' || userRole === 'agent';
+    const canSeeRadar = isAdminOrAgent || (isInvestor && isVerified);
+    const canSeeDashboard = isAdminOrAgent;
+    const canSeeProfile = isInvestor && isVerified;
+    const hideAgentsPortal = isInvestor; // Si es inversor logueado, ocultar portal de agentes
 
     return (
         <nav
@@ -118,7 +126,7 @@ export default function Navbar() {
                             <a
                                 key={link.name}
                                 href={link.href}
-                                className={`text-[10px] font-bold uppercase tracking-[0.25em] transition-all duration-300 hover:text-primary ${isLanding && !isScrolled ? 'text-white/80 hover:text-white' : ((link as any).active ? "text-primary px-3 py-1 bg-primary/5 rounded-full" : "text-muted-foreground")}`}
+                                className={`text-[10px] font-bold uppercase tracking-[0.25em] transition-all duration-300 hover:text-primary ${isLanding && !isScrolled ? 'text-white/80 hover:text-white' : "text-muted-foreground"}`}
                             >
                                 {link.name}
                             </a>
@@ -151,7 +159,7 @@ export default function Navbar() {
                                         Radar
                                     </Link>
                                 )}
-                                {canSeeDashboard && (
+                                {!hideAgentsPortal && canSeeDashboard && (
                                     <Link
                                         href="/praetorium"
                                         className="text-[9px] font-black tracking-[0.2em] uppercase bg-primary text-white border border-primary px-6 py-2.5 rounded-full hover:opacity-90 transition-all duration-500 shadow-lg shadow-primary/20"
@@ -159,13 +167,15 @@ export default function Navbar() {
                                         Portal Agentes
                                     </Link>
                                 )}
-                                <Link
-                                    href="/profile"
-                                    className="flex items-center justify-center w-10 h-10 rounded-full border border-primary/20 bg-primary/5 text-primary hover:bg-primary hover:text-white transition-all duration-500 shadow-sm"
-                                    title="Mi Perfil"
-                                >
-                                    <User size={20} />
-                                </Link>
+                                {canSeeProfile && (
+                                    <Link
+                                        href="/profile"
+                                        className="flex items-center justify-center w-10 h-10 rounded-full border border-primary/20 bg-primary/5 text-primary hover:bg-primary hover:text-white transition-all duration-500 shadow-sm"
+                                        title="Mi Perfil"
+                                    >
+                                        <User size={20} />
+                                    </Link>
+                                )}
                             </div>
                         )}
                     </div>
@@ -214,17 +224,19 @@ export default function Navbar() {
                                         {canSeeRadar && (
                                             <Link href="/radar" onClick={() => setMobileMenuOpen(false)} className="w-full text-center py-4 rounded-xl border border-border uppercase text-[10px] font-bold tracking-widest">Radar</Link>
                                         )}
-                                        {canSeeDashboard && (
+                                        {!hideAgentsPortal && canSeeDashboard && (
                                             <Link href="/praetorium" onClick={() => setMobileMenuOpen(false)} className="w-full text-center py-4 rounded-xl border border-border uppercase text-[10px] font-bold tracking-widest">Portal Agentes</Link>
                                         )}
-                                        <Link
-                                            href="/profile"
-                                            onClick={() => setMobileMenuOpen(false)}
-                                            className="w-full flex items-center justify-center space-x-2 py-4 rounded-xl bg-primary/10 text-primary border border-primary/20 uppercase text-[10px] font-bold tracking-widest"
-                                        >
-                                            <User size={16} />
-                                            <span>Mi Perfil</span>
-                                        </Link>
+                                        {canSeeProfile && (
+                                            <Link
+                                                href="/profile"
+                                                onClick={() => setMobileMenuOpen(false)}
+                                                className="w-full flex items-center justify-center space-x-2 py-4 rounded-xl bg-primary/10 text-primary border border-primary/20 uppercase text-[10px] font-bold tracking-widest"
+                                            >
+                                                <User size={16} />
+                                                <span>Mi Perfil</span>
+                                            </Link>
+                                        )}
                                     </>
                                 )}
                             </div>

@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabase";
 const STEPS = [
     {
         id: "welcome",
-        aiText: "Bienvenido a Aleasignature. Iniciamos su proceso de calificación institucional. Para comenzar, ¿cómo se llama o a qué entidad representa?",
+        aiText: "Bienvenido a Aleasignature. Iniciamos su proceso de calificación. Para comenzar, ¿cómo se llama o a qué entidad representa?",
         type: "input",
         key: "name"
     },
@@ -28,7 +28,7 @@ const STEPS = [
     },
     {
         id: "alea_basics",
-        aiText: "AleaSignature proporciona un listado opaco de activos con localización, horquilla de precio y rentabilidad. Si hay interés, un agente le contactará por email para los detalles financieros. ¿Acepta este protocolo? (Responda 'Sí' o 'Acepto')",
+        aiText: "Operamos bajo un protocolo de originación ciega: facilitamos ubicación estratégica y rentabilidad estimada. Tras su interés, un agente coordinará los detalles financieros. ¿Acepta este protocolo?",
         type: "input",
         key: "basicsAccepted"
     },
@@ -52,7 +52,7 @@ const STEPS = [
     },
     {
         id: "confirmation",
-        aiText: "¡Registro completado! Revisa tu bandeja de entrada para confirmar el email. Tu acceso al Radar permanecerá bloqueado bajo NDA hasta que el equipo de Praetorium valide el perfil.",
+        aiText: "¡Registro completado! Revisa tu bandeja de entrada para confirmar el email. Tu acceso al Radar permanecerá bloqueado bajo aprobación hasta que el equipo de Praetorium valide el perfil.",
         type: "success",
         key: "success"
     }
@@ -87,9 +87,13 @@ export function VoiceChatOnboarding() {
                         const numericMatch = ticketBase.match(/[\d.]+/);
                         const ticketValue = numericMatch ? parseFloat(numericMatch[0]) * 1000000 : 0;
 
-                        // 1. Call Supabase signUp to trigger confirmation email first
-                        // We use a temporary random password that they will change via updateUser
+                        console.log("Onboarding: [DEBUG] Starting saveInvestor");
+                        console.log("Onboarding: [DEBUG] finalEmail:", finalEmail);
+                        console.log("Onboarding: [DEBUG] userData:", userData);
+
                         const tempPass = crypto.randomUUID() + "A1!";
+
+                        console.log("Onboarding: [DEBUG] Attempting auth.signUp...");
                         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                             email: finalEmail,
                             password: tempPass,
@@ -102,8 +106,18 @@ export function VoiceChatOnboarding() {
                             }
                         });
 
-                        if (signUpError) throw signUpError;
+                        if (signUpError) {
+                            console.error("Onboarding: [ERROR] signUpError:", signUpError);
+                            console.dir(signUpError);
+                            throw signUpError;
+                        }
+
+                        console.log("Onboarding: [DEBUG] signUp Success. Data:", signUpData);
                         const userId = signUpData.user?.id;
+
+                        if (!userId) {
+                            console.warn("Onboarding: [WARN] No userId returned from signUp. This might happen if the user already exists and confirmation is required.");
+                        }
 
                         // 2. Create investor record in public.investors using the AUTH ID
                         if (userId) {
@@ -112,16 +126,31 @@ export function VoiceChatOnboarding() {
                                 .insert([{
                                     id: userId, // Match the Auth ID
                                     full_name: userData.name || "Anon Inversor",
-                                    email: finalEmail,
                                     phone: userData.phone || "",
-                                    investor_type: userData.investorType || 'Private Investor',
-                                    budget_max: ticketValue,
-                                    status: 'nuevo',
-                                    kyc_status: 'pending',
+                                    source_of_funds: 'hnwi', // Default mapping for now
+                                    max_ticket_eur: ticketValue,
                                     is_verified: false
                                 }]);
 
                             if (dbError) console.warn("Database record creation warning:", dbError.message);
+
+                            // 3. Trigger Phase 1: Welcome & Identity Confirmation
+                            await supabase.functions.invoke('send-welcome-email', {
+                                body: {
+                                    email: finalEmail,
+                                    name: userData.name || "Inversor"
+                                }
+                            });
+
+                            // 4. Trigger Phase 2: Instant Access (Magic Link)
+                            // Even though they confirm in phase 1, we send the magic link immediately 
+                            // so they have it in their inbox for future one-click access.
+                            await supabase.functions.invoke('send-access-email', {
+                                body: {
+                                    email: finalEmail,
+                                    name: userData.name || "Inversor"
+                                }
+                            });
                         }
 
                         // Clear local cache for security
@@ -130,7 +159,12 @@ export function VoiceChatOnboarding() {
                         // After successful signup request, show confirmation step
                         setCurrentStepIndex(STEPS.length - 1);
                     } catch (err) {
-                        console.error("Error saving investor lead:", err);
+                        console.error("Onboarding: [CRITICAL ERROR] Error saving investor lead:", err);
+                        console.dir(err);
+                        if (err && typeof err === 'object' && 'name' in err) {
+                            console.log("Onboarding: Error Name:", (err as any).name);
+                            console.log("Onboarding: Error Message:", (err as any).message);
+                        }
                         // Even if there's an error (like user already exists), we show the confirmation
                         // because they likely need to follow the email instructions.
                         setCurrentStepIndex(STEPS.length - 1);
@@ -143,15 +177,24 @@ export function VoiceChatOnboarding() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentStepIndex, router, currentStep.type]);
 
+    const [countryCode, setCountryCode] = useState("+34");
+
     const handleNext = () => {
         if (!inputValue.trim() && currentStep.type !== "loading") return;
 
-        // Save name for later steps if needed
-        if (currentStep.key === 'name') {
-            localStorage.setItem('alea_investor_name', inputValue.trim());
+        let finalValue = inputValue.trim();
+
+        // Concatenate country code for phone number
+        if (currentStep.key === 'phone') {
+            finalValue = `${countryCode} ${finalValue}`;
         }
 
-        setUserData(prev => ({ ...prev, [currentStep.key]: inputValue }));
+        // Save name for later steps if needed
+        if (currentStep.key === 'name') {
+            localStorage.setItem('alea_investor_name', finalValue);
+        }
+
+        setUserData(prev => ({ ...prev, [currentStep.key]: finalValue }));
         setInputValue("");
 
         if (currentStepIndex < STEPS.length - 1) {
@@ -316,13 +359,40 @@ export function VoiceChatOnboarding() {
                             {isRecording ? <Square size={20} className="fill-current" /> : <Mic size={20} />}
                         </button>
 
+                        {currentStep.key === 'phone' && (
+                            <div className="flex items-center">
+                                <select
+                                    value={countryCode}
+                                    onChange={(e) => setCountryCode(e.target.value)}
+                                    className="bg-muted/50 border-none focus:outline-none focus:ring-0 px-3 py-4 rounded-l-xl font-sans text-sm text-foreground appearance-none cursor-pointer hover:bg-muted/80 transition-colors border-r border-border/50"
+                                >
+                                    <option value="+34">🇪🇸 +34</option>
+                                    <option value="+1">🇺🇸 +1</option>
+                                    <option value="+44">🇬🇧 +44</option>
+                                    <option value="+49">🇩🇪 +49</option>
+                                    <option value="+33">🇫🇷 +33</option>
+                                    <option value="+39">🇮🇹 +39</option>
+                                    <option value="+351">🇵🇹 +351</option>
+                                    <option value="+41">🇨🇭 +41</option>
+                                    <option value="+32">🇧🇪 +32</option>
+                                    <option value="+31">🇳🇱 +31</option>
+                                    <option value="+52">🇲🇽 +52</option>
+                                    <option value="+54">🇦🇷 +54</option>
+                                    <option value="+55">🇧🇷 +55</option>
+                                    <option value="+56">🇨联合 +56</option>
+                                    <option value="+57">🇨🇴 +57</option>
+                                    <option value="+51">🇵🇪 +51</option>
+                                </select>
+                            </div>
+                        )}
+
                         <input
                             type="text"
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
                             disabled={isAiSpeaking || isRecording}
-                            placeholder={isRecording ? "Escuchando..." : "Escribe tu respuesta aquí..."}
-                            className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 px-4 font-sans text-lg text-foreground placeholder:text-muted-foreground"
+                            placeholder={isRecording ? "Escuchando..." : (currentStep.key === 'phone' ? "Nº de teléfono (ej: 600 000 000)" : "Escribe tu respuesta aquí...")}
+                            className={`flex-1 bg-transparent border-none focus:outline-none focus:ring-0 px-4 font-sans text-lg text-foreground placeholder:text-muted-foreground ${currentStep.key === 'phone' ? 'rounded-r-xl pl-2' : 'rounded-xl'}`}
                             onKeyDown={(e) => e.key === 'Enter' && handleNext()}
                         />
 

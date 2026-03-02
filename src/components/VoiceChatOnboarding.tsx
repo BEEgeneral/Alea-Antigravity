@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabase";
 const STEPS = [
     {
         id: "welcome",
-        aiText: "Bienvenido a Aleasignature. Soy tu asistente de calificación institucional. Para iniciar el proceso, ¿cómo te llamas o qué entidad representas?",
+        aiText: "Bienvenido a Aleasignature. Iniciamos su proceso de calificación institucional. Para comenzar, ¿cómo se llama o a qué entidad representa?",
         type: "input",
         key: "name"
     },
@@ -27,16 +27,22 @@ const STEPS = [
         key: "ticketSize"
     },
     {
+        id: "alea_basics",
+        aiText: "AleaSignature proporciona un listado opaco de activos con localización, horquilla de precio y rentabilidad. Si hay interés, un agente le contactará por email para los detalles financieros. ¿Acepta este protocolo? (Responda 'Sí' o 'Acepto')",
+        type: "input",
+        key: "basicsAccepted"
+    },
+    {
+        id: "phone",
+        aiText: "Excelente. Por favor, facilite un número de teléfono de contacto para una comunicación ágil durante la calificación.",
+        type: "input",
+        key: "phone"
+    },
+    {
         id: "email",
         aiText: "Perfecto. Por favor, facilítame tu email corporativo para enviarte la documentación de acceso al Radar.",
         type: "input",
         key: "email"
-    },
-    {
-        id: "nda",
-        aiText: "Como último paso legal, requiere confirmación expresa. ¿Aceptas las condiciones del Acuerdo de Confidencialidad (NDA) para acceder a los activos off-market? (Responde 'Sí')",
-        type: "input",
-        key: "ndaAccepted"
     },
     {
         id: "complete",
@@ -107,6 +113,7 @@ export function VoiceChatOnboarding() {
                                     id: userId, // Match the Auth ID
                                     full_name: userData.name || "Anon Inversor",
                                     email: finalEmail,
+                                    phone: userData.phone || "",
                                     investor_type: userData.investorType || 'Private Investor',
                                     budget_max: ticketValue,
                                     status: 'nuevo',

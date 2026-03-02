@@ -433,11 +433,11 @@ export default function Home() {
             </div>
           </div>
           <div>
-            <h4 className="font-medium mb-4">Garantías</h4>
+            <h4 className="font-medium mb-4">Rigor y Salvaguarda</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>Colegio de Agentes Inmobiliarios</li>
-              <li>Seguro Responsabilidad Civil</li>
-              <li>Auditoría Legal Externa</li>
+              <li>Adscripción Colegio de Agentes (API)</li>
+              <li>Póliza de Responsabilidad Civil Prof.</li>
+              <li>Auditoría y Control Legal Externo</li>
             </ul>
           </div>
         </div>

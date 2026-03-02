@@ -24,11 +24,12 @@ function LoginForm() {
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }: { data: { session: any } }) => {
             if (session?.user && !fromOnboarding) {
-                // If already logged in and not coming from a specific flow, go to Radar
-                router.push("/radar");
+                const redirectTo = searchParams.get("redirectTo");
+                // If already logged in and not coming from a specific flow, go to intended destination or Radar
+                router.push(redirectTo || "/radar");
             }
         });
-    }, [fromOnboarding, router]);
+    }, [fromOnboarding, router, searchParams]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -36,11 +37,13 @@ function LoginForm() {
         setError(null);
         setSuccess(null);
 
+        const redirectTo = searchParams.get("redirectTo") || "/radar";
+
         try {
             const { error: signInError } = await supabase.auth.signInWithOtp({
                 email: email.trim(),
                 options: {
-                    emailRedirectTo: `${window.location.origin}/radar`,
+                    emailRedirectTo: `${window.location.origin}${redirectTo}`,
                 },
             });
 

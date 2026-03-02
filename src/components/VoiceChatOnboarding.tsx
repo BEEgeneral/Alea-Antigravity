@@ -91,18 +91,16 @@ export function VoiceChatOnboarding() {
                         console.log("Onboarding: [DEBUG] finalEmail:", finalEmail);
                         console.log("Onboarding: [DEBUG] userData:", userData);
 
-                        const tempPass = crypto.randomUUID() + "A1!";
-
-                        console.log("Onboarding: [DEBUG] Attempting auth.signUp...");
+                        console.log("Onboarding: [DEBUG] Attempting passwordless auth.signUp...");
                         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                             email: finalEmail,
-                            password: tempPass,
+                            password: crypto.randomUUID() + "A1!", // Supabase still requires a password for signUp unless using OTP specific methods, but we'll treat it as internal and never show it.
                             options: {
                                 data: {
                                     full_name: userData.name || "Anon Inversor",
                                     role: 'investor'
                                 },
-                                emailRedirectTo: `${window.location.origin}/login?from=onboarding&email=${encodeURIComponent(finalEmail)}`
+                                emailRedirectTo: `${window.location.origin}/radar`
                             }
                         });
 

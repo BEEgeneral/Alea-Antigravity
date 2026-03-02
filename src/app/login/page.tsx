@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Mail, Lock, ArrowRight, UserPlus, AlertCircle, ChevronLeft, Eye, EyeOff } from "lucide-react";
+import { Shield, Mail, ArrowRight, AlertCircle, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -15,145 +15,40 @@ function LoginForm() {
     const fromOnboarding = searchParams.get("from") === "onboarding";
     const prefillEmail = searchParams.get("email") || "";
 
-    const [isRegister, setIsRegister] = useState(fromOnboarding);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
-    const [user, setUser] = useState<any>(null);
-    const [formData, setFormData] = useState({
-        email: prefillEmail,
-        password: "",
-        fullName: ""
-    });
+    const [success, setSuccess] = useState<string | null>(null);
+    const [email, setEmail] = useState(prefillEmail);
 
-    // Handle authentication state
+    // Handle initial auth state check
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }: { data: { session: any } }) => {
-            setUser(session?.user ?? null);
-            if (session?.user && fromOnboarding) {
-                setFormData(prev => ({ ...prev, email: session.user.email || prefillEmail }));
+            if (session?.user && !fromOnboarding) {
+                // If already logged in and not coming from a specific flow, go to Radar
+                router.push("/radar");
             }
         });
-    }, [fromOnboarding, prefillEmail]);
-    // If coming from onboarding, pre-fill the name from localStorage
-    useEffect(() => {
-        if (fromOnboarding) {
-            const savedName = localStorage.getItem('alea_investor_name');
-            if (savedName) {
-                setFormData(prev => ({ ...prev, fullName: savedName }));
-            }
-        }
-    }, [fromOnboarding]);
+    }, [fromOnboarding, router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
+        setSuccess(null);
 
         try {
-            if (fromOnboarding && user) {
-                // If the user clicked the verification link, they are likely already logged in (session exists)
-                // We just need to UPDATE their password
-                const { error: updateError } = await supabase.auth.updateUser({
-                    password: formData.password,
-                    data: {
-                        full_name: formData.fullName || user.user_metadata?.full_name
-                    }
-                });
+            const { error: signInError } = await supabase.auth.signInWithOtp({
+                email: email.trim(),
+                options: {
+                    emailRedirectTo: `${window.location.origin}/radar`,
+                },
+            });
 
-                if (updateError) throw updateError;
+            if (signInError) throw signInError;
 
-                // After setting password, go to Radar
-                router.push("/radar");
-                return;
-            }
-
-            if (isRegister) {
-                const cleanEmail = formData.email.trim();
-                const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-                    email: cleanEmail,
-                    password: formData.password,
-                    options: {
-                        data: {
-                            full_name: formData.fullName,
-                            role: fromOnboarding ? 'investor' : 'agent'
-                        }
-                    }
-                });
-
-                if (signUpError) {
-                    // If user already exists and we are in onboarding mode, try to sign in
-                    // This handles users who already confirmed but session wasn't caught
-                    if (signUpError.message.includes("already registered") && fromOnboarding) {
-                        const { error: signInError } = await supabase.auth.signInWithPassword({
-                            email: cleanEmail,
-                            password: formData.password,
-                        });
-                        if (signInError) throw new Error("Este email ya está registrado. Por favor, inicia sesión con tu contraseña o usa 'Recuperar Contraseña'.");
-                        router.push("/radar");
-                        return;
-                    }
-                    throw signUpError;
-                }
-
-                if (fromOnboarding) {
-                    // For investors from onboarding, auto sign-in after registration
-                    const { error: signInError } = await supabase.auth.signInWithPassword({
-                        email: cleanEmail,
-                        password: formData.password,
-                    });
-
-                    if (signInError) throw signInError;
-                    router.push("/radar");
-                } else {
-                    // Agent registration — create record in agents table for admin approval
-                    const userId = signUpData.user?.id;
-                    if (userId) {
-                        const { error: agentInsertError } = await supabase
-                            .from('agents')
-                            .insert([{
-                                id: userId,
-                                full_name: formData.fullName,
-                                email: cleanEmail,
-                                is_approved: false,
-                                role: 'agent'
-                            }]);
-                        if (agentInsertError) {
-                            console.warn("Agent record creation warning:", agentInsertError.message);
-                        }
-                    }
-                    setSuccess(true);
-                }
-            } else {
-                // ... rest of login logic
-                const { data, error: signInError } = await supabase.auth.signInWithPassword({
-                    email: formData.email.trim(),
-                    password: formData.password,
-                });
-
-                if (signInError) throw signInError;
-
-                const { data: agentData, error: agentError } = await supabase
-                    .from('agents')
-                    .select('is_approved')
-                    .eq('id', data.user.id)
-                    .single();
-
-                if (agentError && agentError.code !== 'PGRST116') throw agentError;
-
-                if (agentData) {
-                    if (!agentData.is_approved) {
-                        await supabase.auth.signOut();
-                        throw new Error("Tu cuenta está pendiente de aprobación por un administrador.");
-                    }
-                    router.push("/praetorium");
-                } else {
-                    router.push("/radar");
-                }
-            }
-        } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : "Error desconocido");
+            setSuccess("Enlace de acceso enviado. Revisa tu bandeja de entrada para entrar sin contraseña.");
+        } catch (err: any) {
+            setError(err.message || "Error al solicitar el enlace de acceso");
         } finally {
             setLoading(false);
         }
@@ -203,7 +98,7 @@ function LoginForm() {
                         <h1 className="font-serif text-3xl tracking-widest font-medium">Aleasignature.</h1>
                     </div>
                     <p className="text-muted-foreground uppercase tracking-widest text-[10px] font-bold mt-4">
-                        {fromOnboarding ? "Crea tu contraseña para acceder al Radar" : "Acceso Reservado — Praetorium"}
+                        Acceso Reservado — Protocolo Magic Link
                     </p>
                 </div>
 
@@ -211,7 +106,7 @@ function LoginForm() {
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
 
                     <h2 className="text-2xl font-serif mb-8 text-center">
-                        {fromOnboarding ? "Crear Contraseña de Acceso" : isRegister ? "Solicitar Acceso" : "Seguridad de Acceso"}
+                        {fromOnboarding ? "Confirmar Acceso" : "Identificación Digital"}
                     </h2>
 
                     <AnimatePresence mode="wait">
@@ -236,38 +131,19 @@ function LoginForm() {
                             >
                                 <div className="flex items-center space-x-3">
                                     <Shield size={16} className="shrink-0" />
-                                    <span className="font-bold">Solicitud enviada correctamente</span>
+                                    <span className="font-bold">Enlace enviado</span>
                                 </div>
                                 <p className="text-emerald-600/80 text-[11px] leading-relaxed pl-7">
-                                    Confirma tu email y un administrador revisará tu solicitud. Recibirás acceso al Praetorium una vez aprobado.
+                                    {success}
                                 </p>
                             </motion.div>
                         )}
                     </AnimatePresence>
 
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        {(isRegister || fromOnboarding) && (
-                            <div className="space-y-2">
-                                <label className="text-[10px] uppercase tracking-widest text-muted-foreground ml-4 font-bold">Nombre Completo</label>
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 left-5 flex items-center text-muted-foreground">
-                                        <UserPlus size={18} />
-                                    </div>
-                                    <input
-                                        type="text"
-                                        required
-                                        className="w-full bg-muted/30 border border-border rounded-2xl py-4 pl-14 pr-4 text-sm focus:outline-none focus:border-primary/50 focus:bg-muted/50 transition-all font-medium"
-                                        placeholder="Tu nombre completo"
-                                        value={formData.fullName}
-                                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-                        )}
-
                         <div className="space-y-2">
                             <label className="text-[10px] uppercase tracking-widest text-muted-foreground ml-4 font-bold">
-                                {fromOnboarding ? "Email Registrado" : "Correo Corporativo"}
+                                Correo Autorizado
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-5 flex items-center text-muted-foreground">
@@ -277,37 +153,11 @@ function LoginForm() {
                                     type="email"
                                     required
                                     className="w-full bg-muted/30 border border-border rounded-2xl py-4 pl-14 pr-4 text-sm focus:outline-none focus:border-primary/50 focus:bg-muted/50 transition-all font-medium"
-                                    placeholder={fromOnboarding ? "tu@email.com" : "agente@aleasignature.com"}
-                                    value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    placeholder="ejemplo@aleasignature.com"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
                                     readOnly={fromOnboarding && !!prefillEmail}
                                 />
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-[10px] uppercase tracking-widest text-muted-foreground ml-4 font-bold">
-                                {fromOnboarding ? "Crea tu Contraseña" : "Contraseña Segura"}
-                            </label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-5 flex items-center text-muted-foreground">
-                                    <Lock size={18} />
-                                </div>
-                                <input
-                                    type={showPassword ? "text" : "password"}
-                                    required
-                                    className="w-full bg-muted/30 border border-border rounded-2xl py-4 pl-14 pr-12 text-sm focus:outline-none focus:border-primary/50 focus:bg-muted/50 transition-all font-medium"
-                                    placeholder="••••••••"
-                                    value={formData.password}
-                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-4 flex items-center text-muted-foreground hover:text-foreground transition-colors outline-none"
-                                >
-                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                </button>
                             </div>
                         </div>
 
@@ -320,7 +170,7 @@ function LoginForm() {
                             ) : (
                                 <>
                                     <span className="uppercase tracking-widest text-xs">
-                                        {fromOnboarding ? "Crear Cuenta y Acceder" : isRegister ? "Enviar Solicitud" : "Iniciar Sesión"}
+                                        Solicitar Enlace de Acceso
                                     </span>
                                     <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                                 </>
@@ -328,16 +178,11 @@ function LoginForm() {
                         </button>
                     </form>
 
-                    {!fromOnboarding && (
-                        <div className="mt-8 pt-8 border-t border-border/50 text-center">
-                            <button
-                                onClick={() => setIsRegister(!isRegister)}
-                                className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground hover:text-primary transition-colors font-bold"
-                            >
-                                {isRegister ? "¿Ya tienes acceso? Identifícate" : "¿Eres nuevo agente? Solicita acceso"}
-                            </button>
-                        </div>
-                    )}
+                    <div className="mt-8 pt-8 border-t border-border/50 text-center">
+                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60 leading-relaxed max-w-[200px] mx-auto font-medium">
+                            Sin contraseñas. Acceso seguro mediante validación de identidad por email.
+                        </p>
+                    </div>
                 </div>
 
                 <div className="mt-12 flex items-center justify-center space-x-3 text-muted-foreground/40">

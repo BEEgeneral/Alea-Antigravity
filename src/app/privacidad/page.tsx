@@ -43,7 +43,7 @@ export default function PoliticaPrivacidad() {
                             <h2>3. Finalidad del Tratamiento Fiduciario</h2>
                             <p>Sometemos sus datos a un tratamiento riguroso con las siguientes finalidades restrictivas:</p>
                             <ul>
-                                <li>Ejecutar la validación de perfiles para otorgar acceso a nuestro Directorio Confidencial (Radar).</li>
+                                <li>Ejecutar la validación de perfiles para otorgar acceso a nuestra sección de Activos (Radar).</li>
                                 <li>Gestionar los "Acuerdos de Confidencialidad" (NDAs) vinculantes suscritos digital o físicamente.</li>
                                 <li>Enviar alertas precisas y alineadas con la tesis de inversión estratégica declarada por el mandatario.</li>
                                 <li>Cumplir estrictamente con obligaciones y auditorías legales, fiscales y regulatorias europeas.</li>

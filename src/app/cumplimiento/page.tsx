@@ -53,7 +53,7 @@ export default function PrevencionBlanqueo() {
                             <p>
                                 La adhesión a este Código Normativo de PBC/FT no es separada del Acuerdo Marco de Confidencialidad firmado y aceptado en
                                 nuestro protocolo de origen. El rechazo a completar la trazabilidad fiduciaria implicará automáticamente la denegación del
-                                alta al Directorio Confidencial (Radar), y/o la resolución unilateral de cualquier mandato vigente, previa comunicación a
+                                alta al módulo de Activos (Radar), y/o la resolución unilateral de cualquier mandato vigente, previa comunicación a
                                 las autoridades operativas.
                             </p>
                         </section>

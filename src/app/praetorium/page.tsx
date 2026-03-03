@@ -42,7 +42,7 @@ const MOCK_TEMPLATES = [
 
 export default function AdminDashboard() {
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState("crm");
+    const [activeTab, setActiveTab] = useState<string>("crm");
     const [selectedInvestor, setSelectedInvestor] = useState<any>(null);
     const [selectedLead, setSelectedLead] = useState<any>(null);
     const [leads, setLeads] = useState<any[]>([]);
@@ -145,18 +145,32 @@ export default function AdminDashboard() {
                 return;
             }
 
+            const isGodMode = session.user.email === 'beenocode@gmail.com';
+
             const { data: agent } = await supabase
                 .from('agents')
                 .select('*')
                 .eq('id', session.user.id)
                 .single();
 
-            if (!agent || !agent.is_approved) {
+            if (!isGodMode && (!agent || !agent.is_approved)) {
                 router.push("/login");
                 return;
             }
 
-            setCurrentUser(agent);
+            if (isGodMode && !agent) {
+                // Pre-set God Mode user if not in DB
+                setCurrentUser({
+                    id: session.user.id,
+                    full_name: 'Super Admin',
+                    email: 'beenocode@gmail.com',
+                    role: 'admin',
+                    is_approved: true
+                });
+            } else {
+                setCurrentUser(agent);
+            }
+
             await fetchData();
             setLoading(false);
         };
@@ -1321,15 +1335,15 @@ export default function AdminDashboard() {
                         <div className="flex-1">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 mb-1">
                                 <h2 className="text-xl md:text-2xl font-serif font-medium truncate">{lead.investor}</h2>
-                                <span className="inline-block mt-2 sm:mt-0 px-3 py-1 bg-primary/10 text-primary text-[8px] md:text-[9px] font-black uppercase tracking-[0.2em] rounded-full leading-none w-fit">
-                                    Sala de Negociación
+                                <span className="inline-block mt-2 sm:mt-0 px-3 py-1 bg-primary/10 text-primary text-[10px] md:text-[11px] font-black uppercase tracking-[0.2em] rounded-full leading-none w-fit">
+                                    {lead.status}
                                 </span>
                             </div>
-                            <p className="text-[9px] md:text-[10px] text-muted-foreground uppercase tracking-widest font-bold truncate">Activo: {lead.property}</p>
+                            <p className="text-[12px] md:text-[13px] text-muted-foreground uppercase tracking-widest font-bold truncate">Activo: {lead.property}</p>
                         </div>
                         <div className="flex items-center space-x-2 md:space-x-6">
                             <div className="text-right hidden sm:block">
-                                <p className="text-[8px] md:text-[10px] text-muted-foreground uppercase tracking-widest font-black mb-1">Score de Match IAI</p>
+                                <p className="text-[10px] md:text-[12px] text-muted-foreground uppercase tracking-widest font-black mb-1">Score de Match IAI</p>
                                 <div className="flex items-center space-x-2">
                                     <div className="w-16 md:w-24 bg-muted-foreground/10 h-1.5 rounded-full overflow-hidden">
                                         <motion.div
@@ -1361,8 +1375,8 @@ export default function AdminDashboard() {
                     <div className="flex-1 overflow-y-auto p-8 space-y-12">
                         {/* 0. Visual Funnel Architecture */}
                         <section className="space-y-6">
-                            <h3 className="text-[10px] uppercase tracking-[0.3em] text-primary font-black flex items-center">
-                                <Sparkles size={14} className="mr-2" />
+                            <h3 className="text-[14px] uppercase tracking-[0.3em] text-primary font-black flex items-center">
+                                <Sparkles size={16} className="mr-2" />
                                 Arquitectura de la Operación
                             </h3>
 
@@ -1377,8 +1391,8 @@ export default function AdminDashboard() {
                                             <img src={lead.properties?.images?.[0] || "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80"} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                                         </div>
                                         <div className="flex-1 overflow-hidden">
-                                            <p className="text-[8px] text-primary font-black uppercase tracking-widest mb-1">Activo Principal</p>
-                                            <p className="text-xs font-bold truncate group-hover:text-primary transition-colors">{lead.properties?.title || lead.property}</p>
+                                            <p className="text-[12px] text-primary font-black uppercase tracking-widest mb-1">Activo Principal</p>
+                                            <p className="text-sm font-bold truncate group-hover:text-primary transition-colors">{lead.properties?.title || lead.property}</p>
                                         </div>
                                     </div>
                                     <div className="w-px h-8 bg-gradient-to-b from-primary/30 to-border mt-2" />
@@ -1389,12 +1403,12 @@ export default function AdminDashboard() {
                                     {/* Comprador Side */}
                                     <div className="flex flex-col items-center space-y-4">
                                         <div className="w-full p-5 bg-muted/30 rounded-3xl border border-border/50 text-center relative group">
-                                            <p className="text-[8px] text-muted-foreground font-black uppercase tracking-widest mb-2">Comprador</p>
+                                            <p className="text-[12px] text-muted-foreground font-black uppercase tracking-widest mb-2">Comprador</p>
                                             <p className="text-sm font-bold truncate">{lead.investors?.full_name || lead.investor}</p>
 
                                             <button
                                                 onClick={() => handleUpdateLeadFunnel(lead.id, { is_buyer_mandatario: !lead.is_buyer_mandatario })}
-                                                className={`mt-3 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest transition-all border ${lead.is_buyer_mandatario ? 'bg-amber-500 text-white border-amber-600' : 'bg-muted text-muted-foreground border-border'}`}
+                                                className={`mt-3 px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-widest transition-all border ${lead.is_buyer_mandatario ? 'bg-amber-500 text-white border-amber-600' : 'bg-muted text-muted-foreground border-border'}`}
                                             >
                                                 {lead.is_buyer_mandatario ? 'Gestionado por Mandatario' : 'Acceso Directo'}
                                             </button>
@@ -1404,7 +1418,7 @@ export default function AdminDashboard() {
                                                     <select
                                                         value={lead.buyer_mandatario_id || ""}
                                                         onChange={(e) => handleUpdateLeadFunnel(lead.id, { buyer_mandatario_id: e.target.value })}
-                                                        className="w-full bg-muted/50 border border-amber-500/30 rounded-xl px-3 py-1.5 text-[9px] font-bold focus:outline-none focus:border-amber-500 transition-all text-center appearance-none"
+                                                        className="w-full bg-muted/50 border border-amber-500/30 rounded-xl px-3 py-2 text-[11px] font-bold focus:outline-none focus:border-amber-500 transition-all text-center appearance-none"
                                                     >
                                                         <option value="">Seleccionar Mandatario</option>
                                                         {mandatarios.map((m: any) => (
@@ -1422,8 +1436,8 @@ export default function AdminDashboard() {
                                             <Sparkles size={24} />
                                         </div>
                                         <div className="mt-3 text-center">
-                                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary">Intermediario</p>
-                                            <p className="text-[7px] text-muted-foreground uppercase font-bold mb-2">Alea Signature</p>
+                                            <p className="text-[12px] font-black uppercase tracking-[0.2em] text-primary">Intermediario</p>
+                                            <p className="text-[11px] text-muted-foreground uppercase font-bold mb-2">Alea Signature</p>
 
                                             <div className="flex flex-col items-center space-y-1">
                                                 <div className="flex items-center space-x-1 bg-card border border-border/50 rounded-lg px-2 py-0.5 shadow-sm">
@@ -1783,6 +1797,27 @@ export default function AdminDashboard() {
         return columns;
     }, [leads]);
 
+    const intelligenceMetrics = useMemo(() => {
+        let totalValue = 0;
+        let totalStrategicValue = 0;
+
+        leads.forEach(lead => {
+            const price = lead.properties?.price || 0;
+            const exclusivity = 0.15; // default E
+            const access = 0.10; // default A
+
+            totalValue += price;
+            totalStrategicValue += price * (1 + exclusivity + access);
+        });
+
+        return {
+            totalPipelineValue: totalValue,
+            totalStrategicValue: totalStrategicValue,
+            strategicAlpha: totalStrategicValue - totalValue,
+            activeCount: leads.length
+        };
+    }, [leads]);
+
     return (
         <div className="flex h-screen bg-muted/10 selection:bg-primary/30">
 
@@ -1795,15 +1830,15 @@ export default function AdminDashboard() {
 
                 <nav className="flex-1 p-4 space-y-2">
                     <button
-                        onClick={() => { setActiveTab("crm"); setSelectedInvestor(null); }}
+                        onClick={() => { setActiveTab("crm"); setSelectedInvestor(null); setSelectedLead(null); }}
                         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "crm" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
                     >
                         <LayoutDashboard size={18} />
-                        <span>Pipeline CRM</span>
+                        <span>Operaciones Activas</span>
                     </button>
 
                     <button
-                        onClick={() => { setActiveTab("investors"); setSelectedInvestor(null); }}
+                        onClick={() => { setActiveTab("investors"); setSelectedInvestor(null); setSelectedLead(null); }}
                         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "investors" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
                     >
                         <Users size={18} />
@@ -1811,7 +1846,7 @@ export default function AdminDashboard() {
                     </button>
 
                     <button
-                        onClick={() => { setActiveTab("mandatarios"); setSelectedInvestor(null); }}
+                        onClick={() => { setActiveTab("mandatarios"); setSelectedInvestor(null); setSelectedLead(null); }}
                         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "mandatarios" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
                     >
                         <ShieldCheck size={18} />
@@ -1819,7 +1854,7 @@ export default function AdminDashboard() {
                     </button>
 
                     <button
-                        onClick={() => { setActiveTab("collaborators"); setSelectedInvestor(null); }}
+                        onClick={() => { setActiveTab("collaborators"); setSelectedInvestor(null); setSelectedLead(null); }}
                         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "collaborators" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
                     >
                         <Share2 size={18} />
@@ -1827,7 +1862,7 @@ export default function AdminDashboard() {
                     </button>
 
                     <button
-                        onClick={() => { setActiveTab("templates"); setSelectedInvestor(null); }}
+                        onClick={() => { setActiveTab("templates"); setSelectedInvestor(null); setSelectedLead(null); }}
                         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "templates" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
                     >
                         <FileText size={18} />
@@ -1835,15 +1870,15 @@ export default function AdminDashboard() {
                     </button>
 
                     <button
-                        onClick={() => { setActiveTab("assets"); setSelectedInvestor(null); }}
+                        onClick={() => { setActiveTab("assets"); setSelectedInvestor(null); setSelectedLead(null); }}
                         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "assets" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
                     >
                         <Building size={18} />
-                        <span>Directorio Confidencial</span>
+                        <span>Activos</span>
                     </button>
 
                     <button
-                        onClick={() => { setActiveTab("intelligence"); setSelectedInvestor(null); }}
+                        onClick={() => { setActiveTab("intelligence"); setSelectedInvestor(null); setSelectedLead(null); }}
                         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "intelligence" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
                     >
                         <Sparkles size={18} />
@@ -1851,7 +1886,7 @@ export default function AdminDashboard() {
                     </button>
 
                     <button
-                        onClick={() => { setActiveTab("audit"); setSelectedInvestor(null); }}
+                        onClick={() => { setActiveTab("audit"); setSelectedInvestor(null); setSelectedLead(null); }}
                         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "audit" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
                     >
                         <ShieldAlert size={18} />
@@ -1860,7 +1895,7 @@ export default function AdminDashboard() {
 
                     {currentUser?.role === 'admin' && (
                         <button
-                            onClick={() => { setActiveTab("agents"); setSelectedInvestor(null); }}
+                            onClick={() => { setActiveTab("agents"); setSelectedInvestor(null); setSelectedLead(null); }}
                             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "agents" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
                         >
                             <UserCheck size={18} />
@@ -1876,7 +1911,7 @@ export default function AdminDashboard() {
                     </Link>
                     <div className="flex items-center justify-between">
                         <button
-                            onClick={() => { setActiveTab("profile"); setSelectedInvestor(null); }}
+                            onClick={() => { setActiveTab("profile"); setSelectedInvestor(null); setSelectedLead(null); }}
                             className={`flex items-center space-x-2 px-3 py-2 rounded-xl transition-all flex-1 mr-2 text-[10px] font-bold uppercase tracking-widest ${activeTab === "profile" ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
                         >
                             <User size={14} />
@@ -1923,12 +1958,12 @@ export default function AdminDashboard() {
 
                             <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
                                 {[
-                                    { id: "crm", label: "Pipeline CRM", icon: LayoutDashboard },
+                                    { id: "crm", label: "Operaciones Activas", icon: LayoutDashboard },
                                     { id: "investors", label: "Inversores (KYC)", icon: Users },
                                     { id: "mandatarios", label: "Mandatarios", icon: ShieldCheck },
                                     { id: "collaborators", label: "Colaboradores", icon: Share2 },
                                     { id: "templates", label: "Plantillas", icon: FileText },
-                                    { id: "assets", label: "Directorio Confidencial", icon: Building },
+                                    { id: "assets", label: "Activos", icon: Building },
                                     { id: "intelligence", label: "Alea Intelligence", icon: Sparkles },
                                     { id: "audit", label: "Logs del Sistema", icon: ShieldAlert },
                                     ...(currentUser?.role === 'admin' ? [{ id: "agents", label: "Gestión de Agentes", icon: UserCheck }] : [])
@@ -1938,6 +1973,7 @@ export default function AdminDashboard() {
                                         onClick={() => {
                                             setActiveTab(item.id);
                                             setSelectedInvestor(null);
+                                            setSelectedLead(null);
                                             setIsMobileMenuOpen(false);
                                         }}
                                         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === item.id ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
@@ -1986,7 +2022,7 @@ export default function AdminDashboard() {
                         </button>
                         <div>
                             <h1 className="font-serif text-xl md:text-3xl font-medium tracking-tight">
-                                {activeTab === 'crm' ? 'Mandatos Activos' :
+                                {activeTab === 'crm' ? 'Operaciones Activas' :
                                     activeTab === 'investors' ? 'Directorio de Inversores' :
                                         activeTab === 'mandatarios' ? 'Directorio de Mandatarios' :
                                             activeTab === 'templates' ? 'Document Factory' :
@@ -2099,7 +2135,23 @@ export default function AdminDashboard() {
                                                                         <MapPin size={12} className="mr-2 text-primary/40" />
                                                                         <span className="truncate">{lead.properties?.title || lead.property}</span>
                                                                     </div>
-                                                                    <div className="flex items-center text-[10px] text-muted-foreground/60 font-bold uppercase tracking-wider">
+
+                                                                    {/* Metrics Viability */}
+                                                                    <div className="mt-4 p-3 bg-primary/[0.03] border border-primary/10 rounded-2xl space-y-2">
+                                                                        <div className="flex items-center justify-between">
+                                                                            <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Mercado Base</span>
+                                                                            <span className="text-[10px] font-bold">€{(lead.properties?.price || 0).toLocaleString()}</span>
+                                                                        </div>
+                                                                        <div className="flex items-center justify-between">
+                                                                            <div className="flex items-center gap-1">
+                                                                                <Sparkles size={8} className="text-primary" />
+                                                                                <span className="text-[8px] font-black uppercase tracking-widest text-primary">Target (Vp)</span>
+                                                                            </div>
+                                                                            <span className="text-[10px] font-bold text-primary">€{((lead.properties?.price || 0) * 1.25).toLocaleString()}</span>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="flex items-center text-[10px] text-muted-foreground/60 font-bold uppercase tracking-wider mt-2">
                                                                         <Clock size={12} className="mr-2 text-primary/40" />
                                                                         <span>ID: {lead.id.slice(0, 8)}...</span>
                                                                     </div>
@@ -2466,7 +2518,7 @@ export default function AdminDashboard() {
                                             <div className="flex justify-between items-center mb-10 px-6">
                                                 <div>
                                                     <h2 className="text-2xl font-serif font-medium">Asset Portfolio</h2>
-                                                    <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold mt-1">Directorio Confidencial</p>
+                                                    <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold mt-1">Activos</p>
                                                 </div>
                                                 <div className="flex items-center space-x-4">
                                                     <div className="relative">
@@ -3587,6 +3639,6 @@ export default function AdminDashboard() {
                     </div>
                 )}
             </AnimatePresence>
-        </div>
+        </div >
     );
 }

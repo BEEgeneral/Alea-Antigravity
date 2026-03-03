@@ -34,7 +34,7 @@ export default function TerminosCondiciones() {
                                 de auditoría para verificar la condición, idoneidad y liquidez declarada por el Inversor o su representante legal.
                             </p>
                             <p>
-                                El uso del Radar ("Directorio Confidencial") queda sujeto a la aceptación, formalización explícita y no repudio de un
+                                El uso del Radar ("Activos") queda sujeto a la aceptación, formalización explícita y no repudio de un
                                 <strong>Acuerdo de Confidencialidad (NDA)</strong> que rige todos los activos bajo nuestra tutela off-ledger.
                             </p>
                         </section>

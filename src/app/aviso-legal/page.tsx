@@ -60,7 +60,7 @@ export default function AvisoLegal() {
                         <section className="mb-10">
                             <h2>4. Ausencia de Oferta Pública Válida</h2>
                             <p>
-                                La información contenida en la presente web y en su Directorio Confidencial (Radar) tiene carácter estrictamente
+                                La información contenida en la presente web y en su sección de Activos (Radar) tiene carácter estrictamente
                                 informativo y orientativo. En ningún caso constituirá oferta vinculante, prospecto financiero ni recomendación de compra.
                                 La Titularidad de los activos estructurados pertenece a terceros, actuando Aleasignature exclusivamente en base a
                                 mandatos preestablecidos y actuando como originador y auditor fiduciario.

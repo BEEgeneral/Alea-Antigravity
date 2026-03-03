@@ -20,7 +20,14 @@ export default function Navbar() {
     const isLanding = pathname === "/";
 
     useEffect(() => {
-        const fetchUserProfile = async (userId: string) => {
+        const fetchUserProfile = async (userId: string, email?: string) => {
+            // God Mode check for Super Admin
+            if (email === 'beenocode@gmail.com') {
+                setUserRole('admin');
+                setIsVerified(true);
+                return;
+            }
+
             // Check agents first
             const { data: agent } = await supabase
                 .from('agents')
@@ -52,7 +59,7 @@ export default function Navbar() {
             const currentUser = session?.user ?? null;
             setUser(currentUser);
             if (currentUser) {
-                fetchUserProfile(currentUser.id).finally(() => setLoadingAuth(false));
+                fetchUserProfile(currentUser.id, currentUser.email).finally(() => setLoadingAuth(false));
             } else {
                 setLoadingAuth(false);
             }
@@ -63,7 +70,7 @@ export default function Navbar() {
             const currentUser = session?.user ?? null;
             setUser(currentUser);
             if (currentUser) {
-                fetchUserProfile(currentUser.id);
+                fetchUserProfile(currentUser.id, currentUser.email);
             } else {
                 setUserRole(null);
                 setIsVerified(false);

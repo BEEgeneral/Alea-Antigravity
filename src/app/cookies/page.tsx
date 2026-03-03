@@ -29,7 +29,7 @@ export default function PoliticaCookies() {
                                 Al tratar inventario restringido, empleamos sistemas de anonimización para auditar interacciones:
                             </p>
                             <ul>
-                                <li>Registro de logs de seguridad para trazar accesos al Directorio Confidencial (Radar).</li>
+                                <li>Registro de logs de seguridad para trazar accesos al Registro de Activos (Radar).</li>
                                 <li>Analíticas de interacción ("Property Intelligence") para comprender las preferencias de asignación de capital de nuestros mandantes (e.g., clicks en "Residencial Core").</li>
                                 <li>Control estricto de accesos no autorizados a Data Rooms.</li>
                             </ul>

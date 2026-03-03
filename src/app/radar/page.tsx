@@ -56,6 +56,12 @@ export default function InvestmentRadar() {
             const userEmail = session.user.email;
             const userRole = session.user.user_metadata?.role;
 
+            // God Mode check for Super Admin
+            if (userEmail === 'beenocode@gmail.com') {
+                setAuthChecked(true);
+                return;
+            }
+
             // 1. Admin or agent by auth metadata → instant access
             if (userRole === 'admin' || userRole === 'agent') {
                 // But agents still need to be approved

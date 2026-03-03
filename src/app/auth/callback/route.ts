@@ -1,6 +1,7 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { NextResponse, type NextRequest } from 'next/server'
+
+export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
     const { searchParams, origin } = new URL(request.url)
@@ -8,36 +9,21 @@ export async function GET(request: NextRequest) {
     const next = searchParams.get('next') ?? '/radar'
 
     if (code) {
-        const cookieStore = await cookies()
-        const supabase = createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            {
-                cookies: {
-                    getAll() {
-                        return cookieStore.getAll()
-                    },
-                    setAll(cookiesToSet) {
-                        try {
-                            cookiesToSet.forEach(({ name, value, options }) =>
-                                cookieStore.set(name, value, options)
-                            )
-                        } catch (error) {
-                            // The `setAll` method was called from a Server Component.
-                            // This can be ignored if you have middleware refreshing
-                            // user sessions.
-                        }
-                    },
-                },
-            }
-        )
+        const supabase = await createSupabaseServerClient()
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
-        const { error } = await supabase.auth.exchangeCodeForSession(code)
+        if (!error && data?.user) {
+            const userEmail = data.user.email;
 
-        if (!error) {
-            return NextResponse.redirect(`${origin}${next}`)
+            // For the Super Admin, always go to Praetorium
+            const finalDestination = userEmail === 'beenocode@gmail.com'
+                ? '/praetorium'
+                : next;
+
+            console.log(`Auth Success: Redirecting ${userEmail} to ${finalDestination}`);
+            return NextResponse.redirect(`${origin}${finalDestination}`)
         } else {
-            console.error("Auth callback error:", error)
+            console.error("Auth callback exchange error:", error)
         }
     }
 

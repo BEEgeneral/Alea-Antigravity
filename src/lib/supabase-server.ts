@@ -19,7 +19,7 @@ export function createSupabaseMiddlewareClient(
                 },
                 setAll(cookiesToSet) {
                     cookiesToSet.forEach(({ name, value, options }) => {
-                        request.cookies.set(name, value);
+                        // request.cookies.set(name, value); // this line causes 404 in Next.js 14+ sometimes
                         response.cookies.set(name, value, options);
                     });
                 },

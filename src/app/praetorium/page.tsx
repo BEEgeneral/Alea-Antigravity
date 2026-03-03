@@ -1323,6 +1323,7 @@ export default function AdminDashboard() {
 
         return (
             <motion.div
+                key="lead-workplace"
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
@@ -2819,14 +2820,14 @@ export default function AdminDashboard() {
             <AnimatePresence>
                 {selectedLead && renderLeadWorkplace(selectedLead)}
                 {selectedProperty && (
-                    <div className="fixed inset-0 z-[60] bg-background overscroll-none overflow-y-auto">
+                    <div key="property-modal" className="fixed inset-0 z-[60] bg-background overscroll-none overflow-y-auto">
                         {renderPropertyDetail(selectedProperty)}
                     </div>
                 )}
 
                 {/* Edit Agent Modal */}
                 {selectedAgentToEdit && (
-                    <div className="fixed inset-0 z-[80] flex items-center justify-center p-6">
+                    <div key="edit-agent-modal" className="fixed inset-0 z-[80] flex items-center justify-center p-6">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -2896,7 +2897,7 @@ export default function AdminDashboard() {
 
                 {/* Add Agent Modal */}
                 {isAddingAgent && (
-                    <div className="fixed inset-0 z-[80] flex items-center justify-center p-6">
+                    <div key="add-agent-modal" className="fixed inset-0 z-[80] flex items-center justify-center p-6">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -2967,7 +2968,7 @@ export default function AdminDashboard() {
 
                 {/* Edit Investor Modal */}
                 {selectedInvestorToEdit && (
-                    <div className="fixed inset-0 z-[80] flex items-center justify-center p-6">
+                    <div key="edit-investor-modal" className="fixed inset-0 z-[80] flex items-center justify-center p-6">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -3111,7 +3112,7 @@ export default function AdminDashboard() {
                 )}
                 {/* Add Investor Modal */}
                 {isAddingInvestor && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <div key="add-investor-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -3247,7 +3248,7 @@ export default function AdminDashboard() {
 
                 {/* Add/Edit Mandatario Modal */}
                 {(isAddingMandatario || selectedMandatarioToEdit) && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <div key="add-mandatario-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -3345,7 +3346,7 @@ export default function AdminDashboard() {
 
                 {/* Add/Edit Collaborator Modal */}
                 {(isAddingCollaborator || editingCollaborator) && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <div key="edit-mandatario-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -3438,7 +3439,7 @@ export default function AdminDashboard() {
 
                 {/* Select Investor for Opportunity Modal */}
                 {isSelectingInvestorForLead && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <div key="add-collab-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -3511,7 +3512,7 @@ export default function AdminDashboard() {
                 )}
                 {/* Global Opportunity Creation Modal */}
                 {isCreatingGlobalLead && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <div key="edit-collab-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}

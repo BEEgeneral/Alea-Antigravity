@@ -274,7 +274,7 @@ export default function Home() {
               <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/10 rounded-full blur-[60px] group-hover:bg-primary/20 transition-all" />
               <Building2 className="w-12 h-12 text-primary mb-8" />
               <h3 className="font-serif text-2xl font-medium mb-4 tracking-tight">Acceso Exclusivo UHNWI</h3>
-              <p className="text-muted-foreground leading-relaxed font-light">El guardián del mercado invisible. Acceso a propiedades trofeo reservadas para nuestra red privada de grandes patrimonios y fondos soberanos forjada durante años.</p>
+              <p className="text-muted-foreground leading-relaxed font-light">Ofrecemos una propuesta de valor global para clientes de alto patrimonio (UHNW), poniendo al servicio de patrimonios con posibilidades excepcionales el acceso a nuestra más estricta y exclusiva gama de activos.</p>
             </motion.div>
           </div>
         </div>
@@ -433,12 +433,10 @@ export default function Home() {
             </div>
           </div>
           <div>
-            <h4 className="font-medium mb-4">Rigor y Salvaguarda</h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>Adscripción Colegio de Agentes (API)</li>
-              <li>Póliza de Responsabilidad Civil Prof.</li>
-              <li>Auditoría y Control Legal Externo</li>
-            </ul>
+            <h4 className="font-medium mb-4">Garantía de Excelencia</h4>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Supervisión legal estricta y auditoría independiente para asegurar la máxima transparencia y seguridad jurídica en cada operación.
+            </p>
           </div>
         </div>
         <div className="max-w-7xl mx-auto pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center text-xs text-muted-foreground">

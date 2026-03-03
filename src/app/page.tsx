@@ -253,7 +253,7 @@ export default function Home() {
             >
               <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/10 rounded-full blur-[60px] group-hover:bg-primary/20 transition-all" />
               <Shield className="w-12 h-12 text-primary mb-8" />
-              <h3 className="font-serif text-2xl font-medium mb-4 tracking-tight">Independencia Institucional</h3>
+              <h3 className="font-serif text-2xl font-medium mb-4 tracking-tight">Rentabilidad Optimizada</h3>
               <p className="text-muted-foreground leading-relaxed font-light">No representamos inventario propio; actuamos como la extensión estratégica de Family Offices y fondos institucionales, alineando el capital con la oportunidad ideal.</p>
             </motion.div>
 

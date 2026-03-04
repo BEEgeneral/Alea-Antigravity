@@ -131,7 +131,10 @@ export default function AdminDashboard() {
                 meters: suggestion.extracted_data.surface || 0,
                 address: suggestion.extracted_data.location || "",
                 vendor_name: suggestion.extracted_data.vendor_name || "",
-                description: suggestion.extracted_data.summary || ""
+                description: suggestion.extracted_data.summary || "",
+                comision_tercero: suggestion.extracted_data.comision_tercero || 0,
+                comision_interna: suggestion.extracted_data.comision_interna || 0,
+                extended_data: suggestion.extracted_data.extended_data || {}
             });
             setIsReviewingPropertySuggestion(true);
         } else if (suggestion.suggestion_type === 'investor') {
@@ -207,6 +210,9 @@ export default function AdminDashboard() {
                 address: propertyForm.address || null,
                 is_off_market: true,
                 vendor_name: propertyForm.vendor_name || null,
+                comision_tercero: propertyForm.comision_tercero || 0,
+                comision_interna: propertyForm.comision_interna || 0,
+                extended_data: propertyForm.extended_data || {},
                 dossier_url: pdfUrl,
                 category: selectedSuggestion ?
                     (selectedSuggestion.extracted_data?._iai_has_dossier === false ? ['IAI', 'Sin Dossier'] : ['IAI'])
@@ -526,23 +532,33 @@ export default function AdminDashboard() {
                 }
             }
 
-            // Fallback heuristics
-            const priceMatch = fullText.match(/(?:precio|price|valor)[\s:=]*([0-9.,]+)[\s]*(?:€|euros|m|k)/i);
-            const parsedPrice = priceMatch ? parseFloat(priceMatch[1].replace(/[^0-9]/g, '')) : 0;
+            // Parse text with Groq via our Next.js API Route
+            const groqResponse = await fetch('/api/parse-pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: fullText.substring(0, 15000) }) // Send up to 15k chars to avoid token limits
+            });
 
-            // Look for meters
-            const metersMatch = fullText.match(/([0-9.,]+)[\s]*(?:m2|m²|metros)/i);
-            const parsedMeters = metersMatch ? parseFloat(metersMatch[1].replace(/[^0-9]/g, '')) : 0;
+            if (!groqResponse.ok) {
+                throw new Error("Error al analizar el PDF con la IA");
+            }
+
+            const { extracted_data } = await groqResponse.json();
 
             const newProperty = {
-                title: file.name.replace('.pdf', ''),
-                description: fullText.substring(0, 800) + (fullText.length > 800 ? "..." : ""),
-                price: parsedPrice || 1000000, // mock fallback
-                meters: parsedMeters || 150,
+                title: extracted_data?.title || file.name.replace('.pdf', ''),
+                description: extracted_data?.summary || fullText.substring(0, 800) + (fullText.length > 800 ? "..." : ""),
+                price: Number(extracted_data?.price) || 0,
+                meters: Number(extracted_data?.surface) || 0,
+                address: extracted_data?.location || null,
+                vendor_name: extracted_data?.vendor_name || null,
+                comision_tercero: Number(extracted_data?.comision_tercero) || 0,
+                comision_interna: Number(extracted_data?.comision_interna) || 0,
+                extended_data: extracted_data?.extended_data || {},
                 thumbnail_url: extractedImages[0] || null,
                 images: extractedImages,
                 status: 'Origen Privado',
-                asset_type: 'Activo Extraído',
+                asset_type: extracted_data?.type || 'Activo Extraído',
                 is_off_market: true,
                 dossier_url: pdfUrl
             };
@@ -1240,25 +1256,25 @@ export default function AdminDashboard() {
 
 
 
-                        {/* Detailed Characteristics */}
+                        {/* Generic Overview */}
                         <div className="bg-card border border-border/60 rounded-[2.5rem] p-10 shadow-sm text-white">
                             <h3 className="flex items-center space-x-3 text-lg font-serif font-medium mb-10">
                                 <Building className="text-primary" size={24} />
-                                <span className="text-foreground">Características Detalladas</span>
+                                <span className="text-foreground">Resumen del Activo</span>
                             </h3>
 
                             {/* Icon Grid */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
                                 {[
-                                    { icon: Maximize2, label: "M² Útiles", value: `${property.meters || 0}` },
-                                    { icon: Building, label: "Parcela", value: `${property.parcela_meters || 279} m²` },
-                                    { icon: Sparkles, label: "Estado", value: property.status || "Excelente" },
-                                    { icon: Building, label: "Tipo", value: property.type || "Local" }
+                                    { icon: Maximize2, label: "Superficie", value: `${property.meters || property.parcela_meters || 0}` },
+                                    { icon: TrendingUp, label: "Rentabilidad", value: property.extended_data?.investment?.rentabilidad || property.rentabilidad || "Consultar" },
+                                    { icon: Sparkles, label: "Estado", value: property.status || "A consultar" },
+                                    { icon: Building, label: "Tipo", value: property.type || "Activo Comercial" }
                                 ].map((item, i) => (
                                     <div key={i} className="bg-muted/30 p-6 rounded-3xl border border-border/40 text-center flex flex-col items-center group hover:bg-primary/5 hover:border-primary/20 transition-all">
                                         <item.icon className="text-primary/40 group-hover:text-primary transition-colors mb-4" size={24} />
                                         <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black mb-1">{item.label}</p>
-                                        <p className="text-base font-bold font-serif text-foreground">{item.value}</p>
+                                        <p className="text-base font-bold font-serif text-foreground truncate w-full">{item.value}</p>
                                     </div>
                                 ))}
                             </div>
@@ -1266,15 +1282,11 @@ export default function AdminDashboard() {
                             {/* Info List */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-6 text-sm">
                                 {[
-                                    { label: "Tipo:", value: property.type || "Local" },
-                                    { label: "Referencia:", value: property.reference || "3250313UF7635S0001WO", valueClass: "font-mono font-bold" },
-                                    { label: "Estado:", value: property.status || "Excelente" },
-                                    { label: "Orientación:", value: property.orientacion || "Norte" },
-                                    { label: "Cocina:", value: property.cocina || "Equipada" },
-                                    { label: "Piscina:", value: property.piscina ? "Sí" : "Sí" },
-                                    { label: "Jardín:", value: property.jardin ? "Sí" : "Sí" },
-                                    { label: "Amueblado:", value: property.amueblado ? "Sí" : "Sí" },
-                                    { label: "Agente responsable:", value: property.agent_responsible || "Alberto BeeNoCode", valueClass: "font-serif italic" }
+                                    { label: "Tipo General:", value: property.type || "Comercial" },
+                                    { label: "Referencia Alea:", value: property.reference || "Pendiente", valueClass: "font-mono font-bold" },
+                                    { label: "Estado Actual:", value: property.status || "En evaluación" },
+                                    { label: "Ubicación:", value: property.location || property.address || "A consultar" },
+                                    { label: "Agente responsable:", value: property.agent_responsible || "Equipo Alea", valueClass: "font-serif italic text-primary" }
                                 ].map((row, i) => (
                                     <div key={i} className="flex justify-between items-center py-3 border-b border-border/30 last:border-0">
                                         <span className="text-muted-foreground uppercase tracking-widest text-[10px] font-bold">{row.label}</span>
@@ -1283,28 +1295,7 @@ export default function AdminDashboard() {
                                 ))}
                             </div>
 
-                            {/* Tags Sections */}
-                            <div className="mt-12 space-y-8">
-                                {[
-                                    { label: "Características", tags: property.features || ["Patio"], icon: Star },
-                                    { label: "Climatización", tags: property.climatization || ["Aire Acondicionado"], icon: Wind },
-                                    { label: "Entorno", tags: property.entorno || ["Cerca de Tiendas", "Cerca del Mar", "Cerca de Colegios"], icon: MapPin },
-                                    { label: "Categoría", tags: property.category || ["Institucional", "Residencial Core", "Terciario Yield", "Prime"], icon: Tag }
-                                ].map((section, i) => (
-                                    <div key={i}>
-                                        <p className="text-[10px] uppercase tracking-widest text-primary font-black mb-4 flex items-center">
-                                            <section.icon size={12} className="mr-2" />
-                                            {section.label}
-                                        </p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {section.tags?.map((tag: string) => (
-                                                <span key={tag} className="px-4 py-1.5 bg-muted rounded-xl text-[10px] font-bold uppercase tracking-wider border border-border/40 text-muted-foreground hover:bg-primary hover:text-white hover:border-primary transition-all cursor-default">{tag}</span>
-                                            ))}
-                                            {(!section.tags || section.tags.length === 0) && <span className="text-[10px] text-muted-foreground/40 uppercase tracking-widest font-bold">No especificado</span>}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+
                         </div>
 
                         {/* =========================================

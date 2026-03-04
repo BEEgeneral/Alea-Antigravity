@@ -51,7 +51,7 @@ serve(async (req) => {
           "summary": "Resumen muy breve de 1 línea de lo que intenta transmitir el correo",
           "has_dossier": true | false, // Devuelve true si el correo menciona que adjuntan un dossier, PDF, fotos, teaser o presentación de inversión. False si no.
           "extracted_data": {
-             // Si property: title (string), type (Hotel, Edificio, Suelo, Retail, Oficinas, Logístico, Otro), price (number, si lo hay o null), location (string), surface (number, metros cuadrados), vendor_name (string o null)
+             // Si property: title (string), type (Hotel, Edificio, Suelo, Retail, Oficinas, Logístico, Otro), price (number, si lo hay o null), location (string), surface (number, metros cuadrados), vendor_name (string o null), comision_tercero (number o null), comision_interna (number o null)
              // Y SIEMPRE incluye este objeto 'extended_data' para las properties:
              "extended_data": {
                 "economics": { "gastos": "string", "ibi": "string", "tasas": "string", "estado_gestion": "string" },

@@ -70,6 +70,8 @@ export default function AdminDashboard() {
     const [isAddingCollaborator, setIsAddingCollaborator] = useState(false);
     const [editingCollaborator, setEditingCollaborator] = useState<any>(null);
     const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+    const [iaiDossierFile, setIaiDossierFile] = useState<File | null>(null);
+    const [isUploadingIaiDossier, setIsUploadingIaiDossier] = useState(false);
     const [isSelectingInvestorForLead, setIsSelectingInvestorForLead] = useState(false);
     const [targetPropertyForLead, setTargetPropertyForLead] = useState<any>(null);
     const [agentForm, setAgentForm] = useState({ full_name: "", email: "", role: "agent" });
@@ -177,6 +179,24 @@ export default function AdminDashboard() {
 
     const handleSubmitPropertySuggestion = async () => {
         try {
+            setIsUploadingIaiDossier(true);
+            let pdfUrl = null;
+
+            if (iaiDossierFile) {
+                const fileExt = iaiDossierFile.name.split('.').pop();
+                const fileName = `dossiers/iai_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('properties')
+                    .upload(fileName, iaiDossierFile);
+
+                if (uploadData && !uploadError) {
+                    const { data: { publicUrl } } = supabase.storage.from('properties').getPublicUrl(fileName);
+                    pdfUrl = publicUrl;
+                } else {
+                    console.warn("Could not upload AI PDF to Storage:", uploadError);
+                }
+            }
+
             const newProperty = {
                 title: propertyForm.title,
                 description: propertyForm.description,
@@ -187,6 +207,7 @@ export default function AdminDashboard() {
                 address: propertyForm.address || null,
                 is_off_market: true,
                 vendor_name: propertyForm.vendor_name || null,
+                dossier_url: pdfUrl,
                 category: selectedSuggestion ?
                     (selectedSuggestion.extracted_data?._iai_has_dossier === false ? ['IAI', 'Sin Dossier'] : ['IAI'])
                     : []
@@ -212,9 +233,12 @@ export default function AdminDashboard() {
 
             setIsReviewingPropertySuggestion(false);
             setSelectedSuggestion(null);
+            setIaiDossierFile(null);
+            setIsUploadingIaiDossier(false);
             alert("Activo dado de alta exitosamente");
         } catch (err: any) {
             console.error("Error creating property from suggestion:", err);
+            setIsUploadingIaiDossier(false);
             alert("Error al dar de alta el activo.");
         }
     };
@@ -3582,7 +3606,11 @@ export default function AdminDashboard() {
                                     <h4 className="text-sm font-bold text-foreground mb-1">Dossier / PDF del Activo</h4>
                                     <p className="text-xs text-muted-foreground mt-1 font-medium">Sube ahora el PDF original del correo para procesarlo y guardarlo de forma segura.</p>
                                 </div>
-                                <input type="file" className="block w-full max-w-xs text-xs text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:uppercase file:tracking-widest file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer transition-all" />
+                                <input
+                                    type="file"
+                                    onChange={(e) => setIaiDossierFile(e.target.files?.[0] || null)}
+                                    className="block w-full max-w-xs text-xs text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:uppercase file:tracking-widest file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer transition-all"
+                                />
                             </div>
 
                             <div className="flex justify-end gap-3 pt-6 border-t border-border">
@@ -3594,10 +3622,20 @@ export default function AdminDashboard() {
                                 </button>
                                 <button
                                     onClick={handleSubmitPropertySuggestion}
-                                    className="px-8 py-3 bg-foreground text-background hover:scale-[1.02] shadow-xl rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all flex items-center"
+                                    disabled={isUploadingIaiDossier}
+                                    className="px-8 py-3 bg-foreground text-background hover:scale-[1.02] shadow-xl rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all flex items-center disabled:opacity-50"
                                 >
-                                    <CheckCircle2 size={16} className="mr-2" />
-                                    Confirmar y Crear Ficha
+                                    {isUploadingIaiDossier ? (
+                                        <span className="flex items-center">
+                                            <Loader2 className="animate-spin mr-2" size={16} />
+                                            Procesando...
+                                        </span>
+                                    ) : (
+                                        <span className="flex items-center">
+                                            <CheckCircle2 size={16} className="mr-2" />
+                                            Confirmar y Crear Ficha
+                                        </span>
+                                    )}
                                 </button>
                             </div>
                         </motion.div>

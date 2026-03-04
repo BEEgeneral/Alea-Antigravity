@@ -49,6 +49,7 @@ serve(async (req) => {
         {
           "type": "property" | "investor" | "mandatario" | "collaborator",
           "summary": "Resumen muy breve de 1 línea de lo que intenta transmitir el correo",
+          "has_dossier": true | false, // Devuelve true si el correo menciona que adjuntan un dossier, PDF, fotos, teaser o presentación de inversión. False si no.
           "extracted_data": {
             // Dependiendo del tipo, incluye lo máximo que puedas extraer de esta lista.
              // Si property: title (string), type (Hotel, Edificio, Suelo, Retail, Oficinas, Logístico, Otro), price (number, si lo hay o null), location (string), surface (number, metros cuadrados), vendor_name (string o null), summary (string corto)
@@ -91,7 +92,11 @@ serve(async (req) => {
                 original_email_body: text,
                 sender_email: from,
                 suggestion_type: content.type || 'property',
-                extracted_data: content.extracted_data || {},
+                extracted_data: {
+                    ...content.extracted_data,
+                    _iai_has_dossier: content.has_dossier ?? false,
+                    _iai_summary: content.summary || ''
+                },
                 status: 'pending'
             })
             .select()

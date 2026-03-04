@@ -186,7 +186,10 @@ export default function AdminDashboard() {
                 asset_type: propertyForm.type || 'Activo Extraído',
                 address: propertyForm.address || null,
                 is_off_market: true,
-                vendor_name: propertyForm.vendor_name || null
+                vendor_name: propertyForm.vendor_name || null,
+                category: selectedSuggestion ?
+                    (selectedSuggestion.extracted_data?._iai_has_dossier === false ? ['IAI', 'Sin Dossier'] : ['IAI'])
+                    : []
             };
 
             const { data: insertedData, error: insertError } = await supabase
@@ -1071,6 +1074,16 @@ export default function AdminDashboard() {
                             <MapPin size={16} className="text-primary mr-2" />
                             <span className="uppercase tracking-wider">{property.address}</span>
                         </div>
+
+                        {/* 🚨 IAI Missing Dossier Warning 🚨 */}
+                        {(property.category?.includes('IAI') && !property.dossier_url) && (
+                            <div className="mt-4 inline-flex items-center bg-red-500/10 border border-red-500/20 text-red-500 px-4 py-2.5 rounded-xl shadow-sm">
+                                <FileText size={18} className="mr-3 shrink-0" />
+                                <span className="text-xs font-bold uppercase tracking-widest">
+                                    🚨 Datos aportados por IA Alea — Falta dossier en el activo
+                                </span>
+                            </div>
+                        )}
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                         {property.dossier_url && (
@@ -2456,9 +2469,17 @@ export default function AdminDashboard() {
                                                                     <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center mr-3 shrink-0 mt-0.5">
                                                                         <Sparkles size={12} className="text-primary" />
                                                                     </div>
-                                                                    <p className="text-sm text-foreground/80 leading-relaxed font-medium">
-                                                                        <span className="font-bold text-foreground">Extracto IAI:</span> {suggestion.extracted_data.summary}
-                                                                    </p>
+                                                                    <div className="flex-1">
+                                                                        <p className="text-sm text-foreground/80 leading-relaxed font-medium mb-2">
+                                                                            <span className="font-bold text-foreground block mb-1">Extracto Inteligente:</span>
+                                                                            {suggestion.extracted_data?._iai_summary || suggestion.extracted_data?.summary || 'No hay resumen disponible.'}
+                                                                        </p>
+                                                                        {suggestion.suggestion_type === 'property' && suggestion.extracted_data?._iai_has_dossier === false && (
+                                                                            <span className="inline-block mt-1 px-3 py-1 bg-red-500/10 text-red-500 border border-red-500/20 text-[10px] font-bold uppercase tracking-wider rounded-lg">
+                                                                                ⚠️ No se detectaron PDFs ni dossiers adjuntos en el correo
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
 
                                                                 <div className="mt-6 pt-6 border-t border-border/50 grid grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">

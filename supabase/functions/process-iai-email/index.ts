@@ -51,8 +51,14 @@ serve(async (req) => {
           "summary": "Resumen muy breve de 1 línea de lo que intenta transmitir el correo",
           "has_dossier": true | false, // Devuelve true si el correo menciona que adjuntan un dossier, PDF, fotos, teaser o presentación de inversión. False si no.
           "extracted_data": {
-            // Dependiendo del tipo, incluye lo máximo que puedas extraer de esta lista.
-             // Si property: title (string), type (Hotel, Edificio, Suelo, Retail, Oficinas, Logístico, Otro), price (number, si lo hay o null), location (string), surface (number, metros cuadrados), vendor_name (string o null), summary (string corto)
+             // Si property: title (string), type (Hotel, Edificio, Suelo, Retail, Oficinas, Logístico, Otro), price (number, si lo hay o null), location (string), surface (number, metros cuadrados), vendor_name (string o null)
+             // Y SIEMPRE incluye este objeto 'extended_data' para las properties:
+             "extended_data": {
+                "economics": { "gastos": "string", "ibi": "string", "tasas": "string", "estado_gestion": "string" },
+                "surfaces": { "parcela": "number", "construida": "number", "distribucion": "string", "equipamiento": "string" },
+                "urbanistic": { "uso_principal": "string", "edificabilidad": "string", "normativa": "string" },
+                "investment": { "rentabilidad": "string", "capex": "string", "valoracion": "string" }
+             }
              // Si investor: full_name (string), company_name (string), ticket (string ej "10M - 20M"), type (HNWI, Family Office, Institutional, Private Equity), email (string), phone (string), labels (array de strings como UHNW, Core Plus, Value Add, etc.)
              // Si mandatario o collaborator: full_name, company_name, email, phone, type, labels
           }

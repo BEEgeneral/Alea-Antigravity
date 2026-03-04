@@ -1306,6 +1306,86 @@ export default function AdminDashboard() {
                                 ))}
                             </div>
                         </div>
+
+                        {/* =========================================
+                            UNIFIED ASSET FORM (MODULAR BLOCKS) 
+                            ========================================= */}
+                        {property.extended_data && Object.keys(property.extended_data).length > 0 && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* ECONOMICS BLOCK */}
+                                {property.extended_data.economics && Object.keys(property.extended_data.economics).length > 0 && (
+                                    <div className="bg-card border border-border/60 rounded-[2rem] p-8 shadow-sm">
+                                        <h4 className="flex items-center text-[10px] uppercase tracking-[0.2em] font-black text-amber-500 mb-6">
+                                            <Activity size={14} className="mr-2" />
+                                            Datos Económicos y Legales
+                                        </h4>
+                                        <div className="space-y-4">
+                                            {Object.entries(property.extended_data.economics).map(([key, value]) => (
+                                                <div key={key} className="flex justify-between items-start text-sm border-b border-border/30 pb-3 last:border-0">
+                                                    <span className="text-muted-foreground uppercase tracking-wider text-[10px] font-bold mt-1 shrink-0">{key.replace(/_/g, ' ')}</span>
+                                                    <span className="text-right font-medium text-white max-w-[60%] pl-4">{String(value)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* SURFACES BLOCK */}
+                                {property.extended_data.surfaces && Object.keys(property.extended_data.surfaces).length > 0 && (
+                                    <div className="bg-card border border-border/60 rounded-[2rem] p-8 shadow-sm">
+                                        <h4 className="flex items-center text-[10px] uppercase tracking-[0.2em] font-black text-emerald-500 mb-6">
+                                            <Maximize2 size={14} className="mr-2" />
+                                            Superficies y Características
+                                        </h4>
+                                        <div className="space-y-4">
+                                            {Object.entries(property.extended_data.surfaces).map(([key, value]) => (
+                                                <div key={key} className="flex justify-between items-start text-sm border-b border-border/30 pb-3 last:border-0">
+                                                    <span className="text-muted-foreground uppercase tracking-wider text-[10px] font-bold mt-1 shrink-0">{key.replace(/_/g, ' ')}</span>
+                                                    <span className="text-right font-medium text-white max-w-[60%] pl-4">{String(value)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* URBANISTIC BLOCK */}
+                                {property.extended_data.urbanistic && Object.keys(property.extended_data.urbanistic).length > 0 && (
+                                    <div className="bg-card border border-border/60 rounded-[2rem] p-8 shadow-sm">
+                                        <h4 className="flex items-center text-[10px] uppercase tracking-[0.2em] font-black text-purple-500 mb-6">
+                                            <MapPin size={14} className="mr-2" />
+                                            Información Urbanística
+                                        </h4>
+                                        <div className="space-y-4">
+                                            {Object.entries(property.extended_data.urbanistic).map(([key, value]) => (
+                                                <div key={key} className="flex justify-between items-start text-sm border-b border-border/30 pb-3 last:border-0">
+                                                    <span className="text-muted-foreground uppercase tracking-wider text-[10px] font-bold mt-1 shrink-0">{key.replace(/_/g, ' ')}</span>
+                                                    <span className="text-right font-medium text-white max-w-[60%] pl-4">{String(value)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* INVESTMENT BLOCK */}
+                                {property.extended_data.investment && Object.keys(property.extended_data.investment).length > 0 && (
+                                    <div className="bg-card border border-border/60 rounded-[2rem] p-8 shadow-sm md:col-span-2">
+                                        <h4 className="flex items-center text-[10px] uppercase tracking-[0.2em] font-black text-blue-500 mb-6">
+                                            <TrendingUp size={14} className="mr-2" />
+                                            Indicadores de Inversión
+                                        </h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            {Object.entries(property.extended_data.investment).map(([key, value]) => (
+                                                <div key={key} className="bg-muted/20 p-5 rounded-2xl border border-border/40 text-center">
+                                                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black mb-2">{key.replace(/_/g, ' ')}</p>
+                                                    <p className="text-lg font-bold font-serif text-white">{String(value)}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        {/* ========================================= */}
                     </div>
 
                     {/* Sidebar (Right Column) */}

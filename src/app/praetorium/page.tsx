@@ -7,7 +7,7 @@ import {
     Clock, MapPin, LayoutDashboard, Plus, MoreHorizontal, Share2,
     ChevronLeft, Maximize2, Bed, Bath, Sparkles, TrendingUp, Wind,
     Trees, ShoppingBag, Umbrella, Tag, Calendar, ShieldCheck, Star,
-    Trash2, Edit2, Upload, Loader2, User, LogOut, Settings, Menu, X
+    Trash2, Edit2, Upload, Loader2, User, LogOut, Settings, Menu, X, Inbox, BrainCircuit
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -102,6 +102,144 @@ export default function AdminDashboard() {
     const [isCreatingGlobalLead, setIsCreatingGlobalLead] = useState(false);
     const [stepInGlobalLead, setStepInGlobalLead] = useState(1); // 1: Asset, 2: Investor
     const [assetSearch, setAssetSearch] = useState("");
+
+    // IAI Suggestion Processing States
+    const [selectedSuggestion, setSelectedSuggestion] = useState<any>(null);
+    const [isReviewingPropertySuggestion, setIsReviewingPropertySuggestion] = useState(false);
+    const [propertyForm, setPropertyForm] = useState<any>({
+        title: "",
+        type: "",
+        price: 0,
+        meters: 0,
+        address: "",
+        vendor_name: "",
+        description: ""
+    });
+
+    // Mock Data for IAI Inbox Suggestions
+    const [iaiSuggestions, setIaiSuggestions] = useState([
+        {
+            id: 'iai-1',
+            created_at: new Date().toISOString(),
+            original_email_subject: 'Fwd: Oportunidad de Inversión - Hotel en Madrid',
+            sender_email: 'carlos.agente@aleasignature.com',
+            suggestion_type: 'property',
+            status: 'pending',
+            extracted_data: {
+                title: 'Hotel Boutique Centro Madrid',
+                type: 'Hotel',
+                price: 15000000,
+                location: 'Madrid, España',
+                surface: 2500,
+                summary: 'Activo hotelero off-market en el centro de Madrid, con 45 habitaciones y licencia en vigor. Mandato directo del propietario.',
+                vendor_name: 'Familia Propietaria Local'
+            }
+        },
+        {
+            id: 'iai-2',
+            created_at: new Date(Date.now() - 86400000).toISOString(),
+            original_email_subject: 'Fwd: Contacto Inversores Family Office',
+            sender_email: 'elena.agente@aleasignature.com',
+            suggestion_type: 'investor',
+            status: 'pending',
+            extracted_data: {
+                full_name: 'Guillermo Sartorius',
+                company_name: 'Sartorius Family Office',
+                ticket: '10M€ - 50M€',
+                type: 'Family Office',
+                email: 'g.sartorius@sartorius-fo.example.com',
+                phone: '+34 600 000 000',
+                summary: 'Family office buscando activos rentables tipo "Core Plus" en zonas prime de Madrid o Barcelona con tickets superiores a 10M€.'
+            }
+        }
+    ]);
+
+    const handleApproveSuggestion = (suggestion: any) => {
+        setSelectedSuggestion(suggestion);
+        if (suggestion.suggestion_type === 'property') {
+            setPropertyForm({
+                title: suggestion.extracted_data.title || "",
+                type: suggestion.extracted_data.type || "",
+                price: suggestion.extracted_data.price || 0,
+                meters: suggestion.extracted_data.surface || 0,
+                address: suggestion.extracted_data.location || "",
+                vendor_name: suggestion.extracted_data.vendor_name || "",
+                description: suggestion.extracted_data.summary || ""
+            });
+            setIsReviewingPropertySuggestion(true);
+        } else if (suggestion.suggestion_type === 'investor') {
+            setInvestorForm({
+                full_name: suggestion.extracted_data.full_name || "",
+                company_name: suggestion.extracted_data.company_name || "",
+                email: suggestion.extracted_data.email || "",
+                phone: suggestion.extracted_data.phone || "",
+                investor_type: suggestion.extracted_data.type || "",
+                budget_min: 0,
+                budget_max: parseInt((suggestion.extracted_data.ticket || "0").replace(/\D/g, "")) * 1000000 || 0,
+                labels: suggestion.extracted_data.labels || []
+            });
+            setIsAddingInvestor(true);
+        } else {
+            // Mandatario or Collaborator
+            setMandatarioForm({
+                full_name: suggestion.extracted_data.full_name || "",
+                company_name: suggestion.extracted_data.company_name || "",
+                email: suggestion.extracted_data.email || "",
+                phone: suggestion.extracted_data.phone || "",
+                mandatario_type: suggestion.extracted_data.type || "",
+                labels: suggestion.extracted_data.labels || []
+            });
+            setIsAddingMandatario(true);
+        }
+    };
+
+    const handleRejectSuggestion = (id: string) => {
+        if (confirm("¿Estás seguro de que quieres descartar esta sugerencia de IA?")) {
+            setIaiSuggestions(prev => prev.map(s => s.id === id ? { ...s, status: 'rejected' } : s));
+            // In a real app this would call supabase to update the status
+            alert("Sugerencia descartada");
+        }
+    };
+
+    const handleSubmitPropertySuggestion = async () => {
+        try {
+            const newProperty = {
+                title: propertyForm.title,
+                description: propertyForm.description,
+                price: Number(propertyForm.price) || 0,
+                meters: Number(propertyForm.meters) || 0,
+                status: 'Origen Privado',
+                asset_type: propertyForm.type || 'Activo Extraído',
+                address: propertyForm.address || null,
+                is_off_market: true,
+                vendor_name: propertyForm.vendor_name || null
+            };
+
+            const { data: insertedData, error: insertError } = await supabase
+                .from('properties')
+                .insert([newProperty])
+                .select();
+
+            if (insertError) throw insertError;
+
+            if (insertedData) {
+                setProperties(prev => [insertedData[0], ...prev]);
+                setShowToast(true);
+            }
+
+            // Mark suggestion as approved
+            if (selectedSuggestion) {
+                setIaiSuggestions(prev => prev.map(s => s.id === selectedSuggestion.id ? { ...s, status: 'approved' } : s));
+            }
+
+            setIsReviewingPropertySuggestion(false);
+            setSelectedSuggestion(null);
+            alert("Activo dado de alta exitosamente");
+        } catch (err: any) {
+            console.error("Error creating property from suggestion:", err);
+            alert("Error al dar de alta el activo.");
+        }
+    };
 
     const fetchData = async () => {
         try {
@@ -572,6 +710,12 @@ export default function AdminDashboard() {
                     labels: []
                 });
                 setShowToast(true);
+
+                if (selectedSuggestion) {
+                    setIaiSuggestions(prev => prev.map(s => s.id === selectedSuggestion.id ? { ...s, status: 'approved' } : s));
+                    setSelectedSuggestion(null);
+                }
+
                 setTimeout(() => setShowToast(false), 3000);
             } else {
                 console.error("Error creating investor:", error);
@@ -604,6 +748,12 @@ export default function AdminDashboard() {
                     labels: []
                 });
                 setShowToast(true);
+
+                if (selectedSuggestion) {
+                    setIaiSuggestions(prev => prev.map(s => s.id === selectedSuggestion.id ? { ...s, status: 'approved' } : s));
+                    setSelectedSuggestion(null);
+                }
+
                 setTimeout(() => setShowToast(false), 3000);
             } else {
                 console.error("Error creating mandatario:", error);
@@ -1336,15 +1486,15 @@ export default function AdminDashboard() {
                         <div className="flex-1">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 mb-1">
                                 <h2 className="text-xl md:text-2xl font-serif font-medium truncate">{lead.investor}</h2>
-                                <span className="inline-block mt-2 sm:mt-0 px-3 py-1 bg-primary/10 text-primary text-[10px] md:text-[11px] font-black uppercase tracking-[0.2em] rounded-full leading-none w-fit">
+                                <span className="inline-block mt-2 sm:mt-0 px-3 py-1 bg-primary/10 text-primary text-xs md:text-sm font-black uppercase tracking-[0.2em] rounded-full leading-none w-fit">
                                     {lead.status}
                                 </span>
                             </div>
-                            <p className="text-[12px] md:text-[13px] text-muted-foreground uppercase tracking-widest font-bold truncate">Activo: {lead.property}</p>
+                            <p className="text-sm md:text-base text-muted-foreground uppercase tracking-widest font-bold truncate">Activo: {lead.property}</p>
                         </div>
                         <div className="flex items-center space-x-2 md:space-x-6">
                             <div className="text-right hidden sm:block">
-                                <p className="text-[10px] md:text-[12px] text-muted-foreground uppercase tracking-widest font-black mb-1">Score de Match IAI</p>
+                                <p className="text-xs md:text-sm text-muted-foreground uppercase tracking-widest font-black mb-1">Score de Match IAI</p>
                                 <div className="flex items-center space-x-2">
                                     <div className="w-16 md:w-24 bg-muted-foreground/10 h-1.5 rounded-full overflow-hidden">
                                         <motion.div
@@ -1404,12 +1554,12 @@ export default function AdminDashboard() {
                                     {/* Comprador Side */}
                                     <div className="flex flex-col items-center space-y-4">
                                         <div className="w-full p-5 bg-muted/30 rounded-3xl border border-border/50 text-center relative group">
-                                            <p className="text-[12px] text-muted-foreground font-black uppercase tracking-widest mb-2">Comprador</p>
+                                            <p className="text-xs text-muted-foreground font-black uppercase tracking-widest mb-2">Comprador</p>
                                             <p className="text-sm font-bold truncate">{lead.investors?.full_name || lead.investor}</p>
 
                                             <button
                                                 onClick={() => handleUpdateLeadFunnel(lead.id, { is_buyer_mandatario: !lead.is_buyer_mandatario })}
-                                                className={`mt-3 px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-widest transition-all border ${lead.is_buyer_mandatario ? 'bg-amber-500 text-white border-amber-600' : 'bg-muted text-muted-foreground border-border'}`}
+                                                className={`mt-3 px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all border ${lead.is_buyer_mandatario ? 'bg-amber-500 text-white border-amber-600' : 'bg-muted text-muted-foreground border-border'}`}
                                             >
                                                 {lead.is_buyer_mandatario ? 'Gestionado por Mandatario' : 'Acceso Directo'}
                                             </button>
@@ -1437,23 +1587,23 @@ export default function AdminDashboard() {
                                             <Sparkles size={24} />
                                         </div>
                                         <div className="mt-3 text-center">
-                                            <p className="text-[12px] font-black uppercase tracking-[0.2em] text-primary">Intermediario</p>
-                                            <p className="text-[11px] text-muted-foreground uppercase font-bold mb-2">Alea Signature</p>
+                                            <p className="text-sm font-black uppercase tracking-[0.2em] text-primary">Intermediario</p>
+                                            <p className="text-xs text-muted-foreground uppercase font-bold mb-2">Alea Signature</p>
 
                                             <div className="flex flex-col items-center space-y-1">
                                                 <div className="flex items-center space-x-1 bg-card border border-border/50 rounded-lg px-2 py-0.5 shadow-sm">
                                                     <input
                                                         type="number"
                                                         step="0.01"
-                                                        className="bg-transparent border-none w-10 text-[10px] font-black focus:outline-none text-right"
+                                                        className="bg-transparent border-none w-12 text-xs font-black focus:outline-none text-right"
                                                         value={lead.alea_commission || 0}
                                                         onFocus={(e) => e.target.select()}
                                                         onChange={(e) => handleUpdateLeadFunnel(lead.id, { alea_commission: parseFloat(e.target.value) || 0 })}
                                                     />
-                                                    <span className="text-[9px] font-black text-primary">%</span>
+                                                    <span className="text-[11px] font-black text-primary">%</span>
                                                 </div>
                                                 {lead.properties?.price && (
-                                                    <p className="text-[8px] text-primary font-bold">
+                                                    <p className="text-[11px] text-primary font-bold">
                                                         {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((lead.properties.price * (lead.alea_commission || 0)) / 100)}
                                                     </p>
                                                 )}
@@ -1464,7 +1614,7 @@ export default function AdminDashboard() {
                                     {/* Vendedor Side */}
                                     <div className="flex flex-col items-center space-y-4">
                                         <div className="w-full p-5 bg-muted/30 rounded-3xl border border-border/50 text-center relative group">
-                                            <p className="text-[8px] text-muted-foreground font-black uppercase tracking-widest mb-2">Vendedor / Propiedad</p>
+                                            <p className="text-xs text-muted-foreground font-black uppercase tracking-widest mb-2">Vendedor / Propiedad</p>
                                             <input
                                                 type="text"
                                                 placeholder="Nombre del Vendedor..."
@@ -1475,7 +1625,7 @@ export default function AdminDashboard() {
 
                                             <button
                                                 onClick={() => handleUpdateLeadFunnel(lead.id, { is_seller_mandatario: !lead.is_seller_mandatario })}
-                                                className={`mt-3 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest transition-all border ${lead.is_seller_mandatario ? 'bg-amber-500 text-white border-amber-600' : 'bg-muted text-muted-foreground border-border'}`}
+                                                className={`mt-3 px-3 py-1 rounded-full text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all border ${lead.is_seller_mandatario ? 'bg-amber-500 text-white border-amber-600' : 'bg-muted text-muted-foreground border-border'}`}
                                             >
                                                 {lead.is_seller_mandatario ? 'Gestionado por Mandatario' : 'Acceso Directo'}
                                             </button>
@@ -1504,14 +1654,14 @@ export default function AdminDashboard() {
                                     <div className="w-full max-w-2xl bg-muted/20 border border-border/40 rounded-3xl p-8">
                                         <div className="flex justify-between items-center mb-6">
                                             <div>
-                                                <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest">Colaboradores Externos</p>
-                                                <p className="text-[7px] text-primary uppercase font-bold tracking-tighter">Gestión de Intermediarios y Comisiones</p>
+                                                <p className="text-xs md:text-sm text-muted-foreground font-black uppercase tracking-widest">Colaboradores Externos</p>
+                                                <p className="text-[10px] text-primary uppercase font-bold tracking-tighter">Gestión de Intermediarios y Comisiones</p>
                                             </div>
 
                                             <div className="relative group">
                                                 <button className="p-2 bg-primary/10 hover:bg-primary/20 rounded-xl text-primary transition-all flex items-center space-x-2">
                                                     <Plus size={14} />
-                                                    <span className="text-[10px] font-black uppercase tracking-widest">Añadir</span>
+                                                    <span className="text-xs font-black uppercase tracking-widest">Añadir</span>
                                                 </button>
 
                                                 <div className="absolute right-0 top-full mt-2 w-64 bg-card border border-border rounded-2xl shadow-2xl p-4 hidden group-hover:block z-50">
@@ -1564,12 +1714,12 @@ export default function AdminDashboard() {
                                                     <div className="flex items-center space-x-6">
                                                         <div className="text-right">
                                                             <div className="flex items-center space-x-2">
-                                                                <span className="text-[9px] font-black uppercase text-muted-foreground">Fee:</span>
+                                                                <span className="text-xs font-black uppercase text-muted-foreground">Fee:</span>
                                                                 <div className="flex items-center bg-muted/50 border border-border/50 rounded-lg px-2 py-1">
                                                                     <input
                                                                         type="number"
                                                                         step="0.01"
-                                                                        className="bg-transparent border-none w-12 text-[10px] font-black focus:outline-none text-right"
+                                                                        className="bg-transparent border-none w-14 text-xs font-black focus:outline-none text-right"
                                                                         value={col.commission || 0}
                                                                         onFocus={(e) => e.target.select()}
                                                                         onChange={(e) => {
@@ -1578,11 +1728,11 @@ export default function AdminDashboard() {
                                                                             handleUpdateLeadFunnel(lead.id, { intermediaries: newCols });
                                                                         }}
                                                                     />
-                                                                    <span className="text-[9px] font-black text-primary ml-1">%</span>
+                                                                    <span className="text-xs font-black text-primary ml-1">%</span>
                                                                 </div>
                                                             </div>
                                                             {lead.properties?.price && (
-                                                                <p className="text-[8px] text-primary font-bold mt-1">
+                                                                <p className="text-[10px] text-primary font-bold mt-1">
                                                                     {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format((lead.properties.price * (col.commission || 0)) / 100)}
                                                                 </p>
                                                             )}
@@ -1621,24 +1771,66 @@ export default function AdminDashboard() {
                                 <Activity size={14} className="mr-2" />
                                 Centinela IAI — Predicciones Estratégicas
                             </h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {/* Metric 1: Asset Score */}
+                                <div className="p-6 bg-card border border-border/50 rounded-[2rem] relative overflow-hidden group">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <p className="text-xs text-muted-foreground uppercase tracking-widest font-black">Alea Intelligence del Activo</p>
+                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                            <Sparkles size={16} />
+                                        </div>
+                                    </div>
+                                    <div className="flex items-baseline space-x-2">
+                                        <p className="text-4xl font-serif font-medium text-primary">{lead.ai_asset_score || 85}</p>
+                                        <p className="text-sm text-muted-foreground font-bold">/ 100</p>
+                                    </div>
+                                    <div className="mt-4 w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                                        <motion.div
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${lead.ai_asset_score || 85}%` }}
+                                            className="h-full bg-primary"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground mt-3 font-medium">Viabilidad y calidad intrínseca de la propiedad operativa.</p>
+                                </div>
+
+                                {/* Metric 2: Closing Probability */}
                                 <div className="p-6 bg-gradient-to-br from-primary/[0.05] to-transparent border border-primary/10 rounded-[2rem] relative overflow-hidden group">
                                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                                         <ArrowUpRight size={40} />
                                     </div>
-                                    <p className="text-[9px] text-primary/60 uppercase tracking-widest font-black mb-2">Probabilidad de Cierre</p>
-                                    <p className="text-2xl font-serif font-medium">Alta (82%)</p>
-                                    <p className="text-[10px] text-muted-foreground mt-2 font-medium">Basado en interacciones previas y perfil de ticket.</p>
+                                    <p className="text-xs text-primary/60 uppercase tracking-widest font-black mb-4">Tasa de Cierre (Avance)</p>
+                                    <div className="flex items-baseline space-x-2">
+                                        <p className="text-4xl font-serif font-medium">{lead.ai_closing_probability || 65}%</p>
+                                    </div>
+                                    <div className="mt-4 w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                                        <motion.div
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${lead.ai_closing_probability || 65}%` }}
+                                            className="h-full bg-emerald-500"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground mt-3 font-medium">Probabilidad de éxito basada en el progreso de la operación.</p>
                                 </div>
-                                <div className="p-6 bg-card border border-border/50 rounded-[2rem]">
-                                    <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-black mb-2">Siguiente Acción IAI</p>
-                                    <p className="text-sm font-bold">Enviar Dossier Técnico Actualizado</p>
-                                    <p className="text-[10px] text-primary mt-2 font-black uppercase tracking-widest decoration-dotted underline underline-offset-4 cursor-pointer">Sugerir Email →</p>
-                                </div>
-                                <div className="p-6 bg-card border border-border/50 rounded-[2rem]">
-                                    <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-black mb-2">Riesgos Detectados</p>
-                                    <p className="text-sm font-bold">Dilatación en Due Diligence</p>
-                                    <p className="text-[10px] text-amber-500 mt-2 font-black uppercase tracking-widest">Nivel de Riesgo: Bajo</p>
+
+                                {/* Combined: Insights & Next Action */}
+                                <div className="p-6 bg-card border border-border/50 rounded-[2rem] flex flex-col justify-between">
+                                    <div>
+                                        <p className="text-xs text-muted-foreground uppercase tracking-widest font-black mb-3">Insights de Operación</p>
+                                        <div className="space-y-2">
+                                            <div className="flex items-start space-x-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+                                                <p className="text-xs"><span className="font-bold">Riesgo:</span> Dilatación en Due Diligence (Bajo)</p>
+                                            </div>
+                                            <div className="flex items-start space-x-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
+                                                <p className="text-xs"><span className="font-bold">Siguiente:</span> Enviar Dossier Técnico Actualizado</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button className="mt-4 w-full py-2.5 bg-primary/10 text-primary rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary/20 transition-all">
+                                        Ejecutar Acción Sugerida
+                                    </button>
                                 </div>
                             </div>
                         </section>
@@ -1832,11 +2024,31 @@ export default function AdminDashboard() {
                 <nav className="flex-1 p-4 space-y-2">
                     <button
                         onClick={() => { setActiveTab("crm"); setSelectedInvestor(null); setSelectedLead(null); }}
-                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "crm" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${activeTab === "crm" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
                     >
-                        <LayoutDashboard size={18} />
-                        <span>Operaciones Activas</span>
+                        <div className="flex items-center space-x-3">
+                            <LayoutDashboard size={18} />
+                            <span>Operaciones Activas</span>
+                        </div>
                     </button>
+
+                    {/* New Line: IAI Inbox */}
+                    {currentUser?.role === 'admin' && (
+                        <button
+                            onClick={() => { setActiveTab("iai_inbox"); setSelectedInvestor(null); setSelectedLead(null); }}
+                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${activeTab === "iai_inbox" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                        >
+                            <div className="flex items-center space-x-3">
+                                <Inbox size={18} className={activeTab === "iai_inbox" ? "text-primary" : "text-muted-foreground"} />
+                                <span>Bandeja IAI</span>
+                            </div>
+                            {iaiSuggestions.filter(s => s.status === 'pending').length > 0 && (
+                                <span className="bg-primary text-background text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">
+                                    {iaiSuggestions.filter(s => s.status === 'pending').length}
+                                </span>
+                            )}
+                        </button>
+                    )}
 
                     <button
                         onClick={() => { setActiveTab("investors"); setSelectedInvestor(null); setSelectedLead(null); }}
@@ -1960,6 +2172,7 @@ export default function AdminDashboard() {
                             <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
                                 {[
                                     { id: "crm", label: "Operaciones Activas", icon: LayoutDashboard },
+                                    ...(currentUser?.role === 'admin' ? [{ id: "iai_inbox", label: "Bandeja IAI", icon: Inbox }] : []),
                                     { id: "investors", label: "Inversores (KYC)", icon: Users },
                                     { id: "mandatarios", label: "Mandatarios", icon: ShieldCheck },
                                     { id: "collaborators", label: "Colaboradores", icon: Share2 },
@@ -2024,13 +2237,14 @@ export default function AdminDashboard() {
                         <div>
                             <h1 className="font-serif text-xl md:text-3xl font-medium tracking-tight">
                                 {activeTab === 'crm' ? 'Operaciones Activas' :
-                                    activeTab === 'investors' ? 'Directorio de Inversores' :
-                                        activeTab === 'mandatarios' ? 'Directorio de Mandatarios' :
-                                            activeTab === 'templates' ? 'Document Factory' :
-                                                activeTab === 'assets' ? 'Asset Portfolio' :
-                                                    activeTab === 'intelligence' ? 'Alea Intelligence Core' :
-                                                        activeTab === 'profile' ? 'Perfil de Usuario' :
-                                                            activeTab === 'agents' ? 'Control de Agentes' : 'System Logs'}
+                                    activeTab === 'iai_inbox' ? 'Bandeja de Inteligencia Artificial (IAI)' :
+                                        activeTab === 'investors' ? 'Directorio de Inversores' :
+                                            activeTab === 'mandatarios' ? 'Directorio de Mandatarios' :
+                                                activeTab === 'templates' ? 'Document Factory' :
+                                                    activeTab === 'assets' ? 'Asset Portfolio' :
+                                                        activeTab === 'intelligence' ? 'Alea Intelligence Core' :
+                                                            activeTab === 'profile' ? 'Perfil de Usuario' :
+                                                                activeTab === 'agents' ? 'Control de Agentes' : 'System Logs'}
                             </h1>
                             <div className="flex items-center space-x-2 mt-1 hidden sm:flex">
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -2186,6 +2400,148 @@ export default function AdminDashboard() {
                                                 </div>
                                             </div>
                                         ))}
+                                    </div>
+                                )}
+
+                                {/* IAI INBOX TAB */}
+                                {activeTab === "iai_inbox" && currentUser?.role === 'admin' && (
+                                    <div className="space-y-6 max-w-5xl mx-auto px-4 lg:px-0 mt-8 mb-20">
+                                        <div className="p-6 md:p-8 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent rounded-[2rem] border border-primary/20 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden">
+                                            <div className="absolute top-0 right-0 p-8 opacity-5">
+                                                <BrainCircuit size={160} />
+                                            </div>
+                                            <div className="max-w-2xl relative z-10">
+                                                <h3 className="text-2xl font-serif font-medium flex items-center">
+                                                    <Sparkles size={24} className="mr-3 text-primary" />
+                                                    Bandeja de Inteligencia Artificial
+                                                </h3>
+                                                <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
+                                                    Estos correos han sido procesados por <strong>Alea Intelligence Core</strong>.
+                                                    Revisa la información estructurada que la IA ha extraído y apruébala para convertirla al instante en nuevas fichas operacionales dentro de la base de datos de Alea Signature.
+                                                </p>
+                                            </div>
+                                            <div className="flex flex-row md:flex-col items-center md:items-end justify-between w-full md:w-auto bg-background/50 backdrop-blur-md p-4 rounded-3xl border border-white/10 relative z-10 shadow-xl">
+                                                <p className="text-5xl font-serif font-medium text-primary">{iaiSuggestions.filter(s => s.status === 'pending').length}</p>
+                                                <p className="text-[10px] uppercase font-black tracking-[0.2em] text-muted-foreground mt-1">Pendientes</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 gap-6">
+                                            {iaiSuggestions.filter(s => s.status === 'pending').length === 0 ? (
+                                                <div className="p-16 text-center border-2 border-dashed border-border/50 rounded-[3rem] bg-muted/5 flex flex-col items-center justify-center">
+                                                    <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+                                                        <CheckCircle2 size={32} className="text-primary" />
+                                                    </div>
+                                                    <h3 className="text-xl font-serif font-medium text-foreground tracking-tight">Bandeja al Día</h3>
+                                                    <p className="text-sm text-muted-foreground mt-3 max-w-sm mx-auto">No hay nuevos correos pendientes de revisión. Envía correos a la dirección de inteligencia para verlos aquí.</p>
+                                                </div>
+                                            ) : (
+                                                iaiSuggestions.filter(s => s.status === 'pending').map((suggestion) => (
+                                                    <div key={suggestion.id} className="p-6 md:p-8 bg-card border border-border shadow-md rounded-[2.5rem] hover:border-primary/30 transition-all group flex flex-col md:flex-row gap-8">
+                                                        <div className="flex-1 space-y-6">
+                                                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                                                                <div>
+                                                                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                                                                        <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] flex items-center shadow-sm ${suggestion.suggestion_type === 'property' ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' :
+                                                                            suggestion.suggestion_type === 'investor' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
+                                                                                'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                                                                            }`}>
+                                                                            {suggestion.suggestion_type === 'property' && <Building size={12} className="mr-1.5" />}
+                                                                            {suggestion.suggestion_type === 'investor' && <Users size={12} className="mr-1.5" />}
+                                                                            Sugerencia: {suggestion.suggestion_type === 'property' ? 'Nuevo Activo' : suggestion.suggestion_type === 'investor' ? 'Nuevo Inversor' : 'Contacto'}
+                                                                        </span>
+                                                                        <span className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground flex items-center bg-muted/50 px-3 py-1.5 rounded-xl">
+                                                                            <Clock size={12} className="mr-1.5" />
+                                                                            {new Date(suggestion.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                                        </span>
+                                                                    </div>
+                                                                    <h4 className="text-xl font-serif font-medium text-foreground tracking-tight">{suggestion.original_email_subject}</h4>
+                                                                    <p className="text-xs font-medium text-muted-foreground flex items-center mt-2.5">
+                                                                        <Mail size={14} className="mr-2 text-primary/40" />
+                                                                        Origen: <span className="ml-1 text-foreground">{suggestion.sender_email}</span>
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="bg-muted/30 p-6 rounded-[2rem] border border-border/50 relative overflow-hidden">
+                                                                <div className="flex items-start">
+                                                                    <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center mr-3 shrink-0 mt-0.5">
+                                                                        <Sparkles size={12} className="text-primary" />
+                                                                    </div>
+                                                                    <p className="text-sm text-foreground/80 leading-relaxed font-medium">
+                                                                        <span className="font-bold text-foreground">Extracto IAI:</span> {suggestion.extracted_data.summary}
+                                                                    </p>
+                                                                </div>
+
+                                                                <div className="mt-6 pt-6 border-t border-border/50 grid grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
+                                                                    {suggestion.suggestion_type === 'property' ? (
+                                                                        <>
+                                                                            <div>
+                                                                                <p className="text-[9px] uppercase tracking-[0.2em] font-black text-muted-foreground mb-1.5">Título del Activo</p>
+                                                                                <p className="text-sm font-semibold text-foreground line-clamp-2">{suggestion.extracted_data.title}</p>
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="text-[9px] uppercase tracking-[0.2em] font-black text-muted-foreground mb-1.5">Precio Propuesto</p>
+                                                                                <p className="text-sm font-bold text-primary">{new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(suggestion.extracted_data.price || 0)}</p>
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="text-[9px] uppercase tracking-[0.2em] font-black text-muted-foreground mb-1.5">Ubicación</p>
+                                                                                <p className="text-sm font-semibold">{suggestion.extracted_data.location}</p>
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="text-[9px] uppercase tracking-[0.2em] font-black text-muted-foreground mb-1.5">Superficie</p>
+                                                                                <p className="text-sm font-semibold">{suggestion.extracted_data.surface} m²</p>
+                                                                            </div>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <div>
+                                                                                <p className="text-[9px] uppercase tracking-[0.2em] font-black text-muted-foreground mb-1.5">Nombre / Entidad</p>
+                                                                                <p className="text-sm font-semibold">{suggestion.extracted_data.full_name}</p>
+                                                                                <p className="text-[10px] text-muted-foreground">{suggestion.extracted_data.company_name}</p>
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="text-[9px] uppercase tracking-[0.2em] font-black text-muted-foreground mb-1.5">Ticket de Inversión</p>
+                                                                                <span className="px-2 py-1 bg-primary/10 text-primary font-bold text-[10px] rounded-lg border border-primary/20">
+                                                                                    {suggestion.extracted_data.ticket}
+                                                                                </span>
+                                                                            </div>
+                                                                            <div className="col-span-2">
+                                                                                <p className="text-[9px] uppercase tracking-[0.2em] font-black text-muted-foreground mb-1.5">Etiquetas Detectadas</p>
+                                                                                <div className="flex flex-wrap gap-2 mt-1.5">
+                                                                                    {(suggestion.extracted_data as any).labels?.map((label: string, i: number) => (
+                                                                                        <span key={i} className="px-2.5 py-1 bg-muted border border-border/50 text-foreground font-bold rounded-lg text-[9px] uppercase tracking-wider">{label}</span>
+                                                                                    ))}
+                                                                                </div>
+                                                                            </div>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex md:flex-col justify-end md:justify-center gap-3 md:w-56 shrink-0 md:pl-8 md:border-l border-t md:border-t-0 border-border pt-6 md:pt-0">
+                                                            <button
+                                                                onClick={() => handleApproveSuggestion(suggestion)}
+                                                                className="flex-1 md:flex-none w-full py-4 bg-foreground text-background rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:scale-[1.02] hover:shadow-xl transition-all flex items-center justify-center">
+                                                                <CheckCircle2 size={16} className="mr-2" />
+                                                                Aprobar Alta
+                                                            </button>
+                                                            <button className="hidden md:flex flex-1 md:flex-none w-full py-3 text-muted-foreground bg-muted/30 border border-border/50 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all items-center justify-center">
+                                                                <FileText size={14} className="mr-2" />
+                                                                Ver Email
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleRejectSuggestion(suggestion.id)}
+                                                                className="flex-1 md:flex-none w-full py-4 text-red-500/70 bg-red-500/5 hover:bg-red-500/10 hover:text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center border border-red-500/10">
+                                                                <Trash2 size={14} className="mr-2" />
+                                                                Descartar
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
                                     </div>
                                 )}
 
@@ -3105,6 +3461,134 @@ export default function AdminDashboard() {
                                     className="flex-1 px-6 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 shadow-xl shadow-primary/20 transition-all"
                                 >
                                     Guardar Cualificación
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+                {/* Add Property Suggestion Modal */}
+                {isReviewingPropertySuggestion && (
+                    <div key="add-property-suggestion-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            onClick={() => setIsReviewingPropertySuggestion(false)}
+                            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            className="relative bg-background border border-border w-full max-w-4xl rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh]"
+                        >
+                            <h2 className="font-serif text-3xl mb-2 flex items-center">
+                                <Sparkles size={28} className="mr-3 text-primary" />
+                                Revisar Alta de Activo - Alea Intelligence
+                            </h2>
+                            <p className="text-muted-foreground text-sm mb-8 font-light">
+                                Confirme o modifique la información extraída automáticamente antes de registrar el activo en el sistema.
+                            </p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                <div className="md:col-span-2">
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Título del Activo</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Ej: Hotel Boutique en Centro"
+                                        value={propertyForm.title}
+                                        onChange={(e) => setPropertyForm({ ...propertyForm, title: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Descripción / Resumen IAI</label>
+                                    <textarea
+                                        placeholder="Descripción extraída del email..."
+                                        value={propertyForm.description}
+                                        onChange={(e) => setPropertyForm({ ...propertyForm, description: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium min-h-[120px] resize-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Tipo de Activo</label>
+                                    <select
+                                        value={propertyForm.type}
+                                        onChange={(e) => setPropertyForm({ ...propertyForm, type: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium appearance-none"
+                                    >
+                                        <option value="">Selecciona Tipo</option>
+                                        <option value="Hotel">Hotel</option>
+                                        <option value="Edificio">Edificio Residencial</option>
+                                        <option value="Suelo">Suelo / Parcela</option>
+                                        <option value="Retail">Local Comercial / Retail</option>
+                                        <option value="Oficinas">Oficinas</option>
+                                        <option value="Logístico">Logística</option>
+                                        <option value="Otro">Otro</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Precio Propuesto (€)</label>
+                                    <input
+                                        type="number"
+                                        placeholder="Ej: 15000000"
+                                        value={propertyForm.price || ""}
+                                        onChange={(e) => setPropertyForm({ ...propertyForm, price: Number(e.target.value) })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Superficie Total (m²)</label>
+                                    <input
+                                        type="number"
+                                        placeholder="Ej: 2500"
+                                        value={propertyForm.meters || ""}
+                                        onChange={(e) => setPropertyForm({ ...propertyForm, meters: Number(e.target.value) })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ubicación</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Ej: Madrid, España"
+                                        value={propertyForm.address}
+                                        onChange={(e) => setPropertyForm({ ...propertyForm, address: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Vendedor / Referencia</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Nombre del Vendedor"
+                                        value={propertyForm.vendor_name}
+                                        onChange={(e) => setPropertyForm({ ...propertyForm, vendor_name: e.target.value })}
+                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex bg-primary/5 border border-primary/20 rounded-2xl p-6 items-center mb-8">
+                                <Upload size={24} className="text-primary mr-4" />
+                                <div className="flex-1">
+                                    <h4 className="text-sm font-bold text-foreground mb-1">Dossier / PDF del Activo</h4>
+                                    <p className="text-xs text-muted-foreground mt-1 font-medium">Sube ahora el PDF original del correo para procesarlo y guardarlo de forma segura.</p>
+                                </div>
+                                <input type="file" className="block w-full max-w-xs text-xs text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:uppercase file:tracking-widest file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer transition-all" />
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-6 border-t border-border">
+                                <button
+                                    onClick={() => setIsReviewingPropertySuggestion(false)}
+                                    className="px-6 py-3 text-muted-foreground hover:bg-muted rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleSubmitPropertySuggestion}
+                                    className="px-8 py-3 bg-foreground text-background hover:scale-[1.02] shadow-xl rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all flex items-center"
+                                >
+                                    <CheckCircle2 size={16} className="mr-2" />
+                                    Confirmar y Crear Ficha
                                 </button>
                             </div>
                         </motion.div>

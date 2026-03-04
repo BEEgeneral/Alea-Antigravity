@@ -14,9 +14,9 @@ serve(async (req) => {
     try {
         const SUPABASE_URL = Deno.env.get("SUPABASE_URL")
         const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
-        const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")
+        const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY")
 
-        if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !OPENAI_API_KEY) {
+        if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !GROQ_API_KEY) {
             console.error("Missing environment variables")
             return new Response(JSON.stringify({ error: "Missing environment variables" }), {
                 status: 500,
@@ -61,14 +61,14 @@ serve(async (req) => {
         ${text}
         `
 
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                'Authorization': `Bearer ${GROQ_API_KEY}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: 'gpt-4o',
+                model: 'llama-3.3-70b-versatile',
                 messages: [{ role: 'user', content: prompt }],
                 response_format: { type: 'json_object' },
                 temperature: 0.1
@@ -77,8 +77,8 @@ serve(async (req) => {
 
         if (!response.ok) {
             const errorData = await response.text()
-            console.error("OpenAI Error:", errorData)
-            throw new Error("Failed to call OpenAI API")
+            console.error("Groq API Error:", errorData)
+            throw new Error(`Detalle de Groq: ${errorData}`)
         }
 
         const aiResult = await response.json()

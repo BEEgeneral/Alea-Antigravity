@@ -116,43 +116,8 @@ export default function AdminDashboard() {
         description: ""
     });
 
-    // Mock Data for IAI Inbox Suggestions
-    const [iaiSuggestions, setIaiSuggestions] = useState([
-        {
-            id: 'iai-1',
-            created_at: new Date().toISOString(),
-            original_email_subject: 'Fwd: Oportunidad de Inversión - Hotel en Madrid',
-            sender_email: 'carlos.agente@aleasignature.com',
-            suggestion_type: 'property',
-            status: 'pending',
-            extracted_data: {
-                title: 'Hotel Boutique Centro Madrid',
-                type: 'Hotel',
-                price: 15000000,
-                location: 'Madrid, España',
-                surface: 2500,
-                summary: 'Activo hotelero off-market en el centro de Madrid, con 45 habitaciones y licencia en vigor. Mandato directo del propietario.',
-                vendor_name: 'Familia Propietaria Local'
-            }
-        },
-        {
-            id: 'iai-2',
-            created_at: new Date(Date.now() - 86400000).toISOString(),
-            original_email_subject: 'Fwd: Contacto Inversores Family Office',
-            sender_email: 'elena.agente@aleasignature.com',
-            suggestion_type: 'investor',
-            status: 'pending',
-            extracted_data: {
-                full_name: 'Guillermo Sartorius',
-                company_name: 'Sartorius Family Office',
-                ticket: '10M€ - 50M€',
-                type: 'Family Office',
-                email: 'g.sartorius@sartorius-fo.example.com',
-                phone: '+34 600 000 000',
-                summary: 'Family office buscando activos rentables tipo "Core Plus" en zonas prime de Madrid o Barcelona con tickets superiores a 10M€.'
-            }
-        }
-    ]);
+    // IAI Inbox Suggestions
+    const [iaiSuggestions, setIaiSuggestions] = useState<any[]>([]);
 
     const handleApproveSuggestion = (suggestion: any) => {
         setSelectedSuggestion(suggestion);
@@ -179,8 +144,17 @@ export default function AdminDashboard() {
                 labels: suggestion.extracted_data.labels || []
             });
             setIsAddingInvestor(true);
+        } else if (suggestion.suggestion_type === 'collaborator') {
+            setCollaboratorForm({
+                full_name: suggestion.extracted_data.full_name || "",
+                company_name: suggestion.extracted_data.company_name || "",
+                email: suggestion.extracted_data.email || "",
+                phone: suggestion.extracted_data.phone || "",
+                specialty: suggestion.extracted_data.type || ""
+            });
+            setIsAddingCollaborator(true);
         } else {
-            // Mandatario or Collaborator
+            // Mandatario
             setMandatarioForm({
                 full_name: suggestion.extracted_data.full_name || "",
                 company_name: suggestion.extracted_data.company_name || "",
@@ -193,10 +167,10 @@ export default function AdminDashboard() {
         }
     };
 
-    const handleRejectSuggestion = (id: string) => {
+    const handleRejectSuggestion = async (id: string) => {
         if (confirm("¿Estás seguro de que quieres descartar esta sugerencia de IA?")) {
-            setIaiSuggestions(prev => prev.map(s => s.id === id ? { ...s, status: 'rejected' } : s));
-            // In a real app this would call supabase to update the status
+            await supabase.from('iai_inbox_suggestions').update({ status: 'rejected' }).eq('id', id);
+            setIaiSuggestions(prev => prev.filter(s => s.id !== id));
             alert("Sugerencia descartada");
         }
     };
@@ -229,7 +203,8 @@ export default function AdminDashboard() {
 
             // Mark suggestion as approved
             if (selectedSuggestion) {
-                setIaiSuggestions(prev => prev.map(s => s.id === selectedSuggestion.id ? { ...s, status: 'approved' } : s));
+                await supabase.from('iai_inbox_suggestions').update({ status: 'approved' }).eq('id', selectedSuggestion.id);
+                setIaiSuggestions(prev => prev.filter(s => s.id !== selectedSuggestion.id));
             }
 
             setIsReviewingPropertySuggestion(false);
@@ -265,11 +240,15 @@ export default function AdminDashboard() {
             // Fetch Mandatarios
             const { data: mandatariosData } = await supabase.from('mandatarios').select('*').order('created_at', { ascending: false });
 
+            // Fetch IAI Suggestions
+            const { data: iaiSuggestionsData } = await supabase.from('iai_inbox_suggestions').select('*').eq('status', 'pending').order('created_at', { ascending: false });
+
             if (leadsData) setLeads(leadsData);
             if (propertiesData) setProperties(propertiesData);
             if (investorsData) setInvestors(investorsData);
             if (mandatariosData) setMandatarios(mandatariosData);
             if (collaboratorsData) setCollaborators(collaboratorsData);
+            if (iaiSuggestionsData) setIaiSuggestions(iaiSuggestionsData);
         } catch (error) {
             console.error("Error fetching data:", error);
         }
@@ -712,7 +691,8 @@ export default function AdminDashboard() {
                 setShowToast(true);
 
                 if (selectedSuggestion) {
-                    setIaiSuggestions(prev => prev.map(s => s.id === selectedSuggestion.id ? { ...s, status: 'approved' } : s));
+                    await supabase.from('iai_inbox_suggestions').update({ status: 'approved' }).eq('id', selectedSuggestion.id);
+                    setIaiSuggestions(prev => prev.filter(s => s.id !== selectedSuggestion.id));
                     setSelectedSuggestion(null);
                 }
 
@@ -750,7 +730,8 @@ export default function AdminDashboard() {
                 setShowToast(true);
 
                 if (selectedSuggestion) {
-                    setIaiSuggestions(prev => prev.map(s => s.id === selectedSuggestion.id ? { ...s, status: 'approved' } : s));
+                    await supabase.from('iai_inbox_suggestions').update({ status: 'approved' }).eq('id', selectedSuggestion.id);
+                    setIaiSuggestions(prev => prev.filter(s => s.id !== selectedSuggestion.id));
                     setSelectedSuggestion(null);
                 }
 
@@ -812,6 +793,13 @@ export default function AdminDashboard() {
 
             if (!error) {
                 if (data) setCollaborators(prev => [data[0], ...prev]);
+
+                if (selectedSuggestion) {
+                    await supabase.from('iai_inbox_suggestions').update({ status: 'approved' }).eq('id', selectedSuggestion.id);
+                    setIaiSuggestions(prev => prev.filter(s => s.id !== selectedSuggestion.id));
+                    setSelectedSuggestion(null);
+                }
+
                 setIsAddingCollaborator(false);
                 setCollaboratorForm({
                     full_name: "",

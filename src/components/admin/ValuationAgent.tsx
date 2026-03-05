@@ -1,14 +1,49 @@
 "use client";
 
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Sparkles, Calculator, Info, ShieldCheck, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Sparkles, Calculator, Info, ShieldCheck, ArrowRight, MapPin, Building2, Loader2 } from 'lucide-react';
 
 export default function ValuationAgent() {
     const [marketValue, setMarketValue] = useState<number>(0);
     const [meters, setMeters] = useState<number>(0);
     const [exclusivityScore, setExclusivityScore] = useState<number>(0.1); // E
     const [accessScore, setAccessScore] = useState<number>(0.1); // A
+
+    // Alea Intelligence: New AI states
+    const [location, setLocation] = useState('');
+    const [assetType, setAssetType] = useState('Oficinas');
+    const [isSuggesting, setIsSuggesting] = useState(false);
+    const [aiConfidence, setAiConfidence] = useState<number | null>(null);
+
+    const handleAISuggestion = async () => {
+        if (!location) {
+            alert("Por favor, introduce una localización.");
+            return;
+        }
+
+        setIsSuggesting(true);
+        try {
+            const response = await fetch('/api/valuation-suggest', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ location, assetType })
+            });
+
+            if (!response.ok) throw new Error("Error en la sugerencia IA");
+
+            const data = await response.json();
+            setMarketValue(data.suggested_pm);
+            setAiConfidence(data.confidence);
+
+            // Visual feedback could be added here
+        } catch (error) {
+            console.error(error);
+            alert("No se pudo obtener la sugerencia de IA.");
+        } finally {
+            setIsSuggesting(false);
+        }
+    };
 
     // Calculate Vp = (M^2 * Pm) * (1 + E + A)
     const baseValue = marketValue * meters;
@@ -37,27 +72,81 @@ export default function ValuationAgent() {
                 <div className="lg:col-span-1 space-y-6">
                     <div className="bg-card border border-border rounded-[2rem] p-6 shadow-sm">
                         <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-6 flex items-center gap-2">
-                            <Calculator className="w-4 h-4" />
-                            Core Market Data
+                            <Sparkles className="w-4 h-4 text-primary" />
+                            Alea Intelligence: Input
                         </h3>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-xs uppercase tracking-wider font-semibold mb-2">Precio de Mercado (Pm) / m²</label>
-                                <div className="relative">
-                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">€</span>
-                                    <input
-                                        type="number"
-                                        value={marketValue || ''}
-                                        onChange={(e) => setMarketValue(Number(e.target.value))}
-                                        className="w-full pl-10 pr-4 py-3 bg-muted/30 border border-border rounded-xl text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none"
-                                        placeholder="Ej. 12000"
-                                    />
-                                </div>
+                                <label className="block text-xs uppercase tracking-wider font-semibold mb-2 flex items-center gap-1">
+                                    <MapPin size={12} className="text-primary/60" /> Localización
+                                </label>
+                                <input
+                                    type="text"
+                                    value={location}
+                                    onChange={(e) => setLocation(e.target.value)}
+                                    className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none"
+                                    placeholder="Ej. Madrid, Barrio de Salamanca"
+                                />
                             </div>
 
                             <div>
-                                <label className="block text-xs uppercase tracking-wider font-semibold mb-2">Superficie Patrimonial (M²)</label>
+                                <label className="block text-xs uppercase tracking-wider font-semibold mb-2 flex items-center gap-1">
+                                    <Building2 size={12} className="text-primary/60" /> Tipo de Activo
+                                </label>
+                                <select
+                                    value={assetType}
+                                    onChange={(e) => setAssetType(e.target.value)}
+                                    className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none appearance-none"
+                                >
+                                    <option value="Oficinas">Oficinas Prime</option>
+                                    <option value="Hotel">Hotel / Hospitality</option>
+                                    <option value="Retail">Local Comercial / Retail</option>
+                                    <option value="Residencial">Edificio Residencial</option>
+                                    <option value="Logístico">Logística / Industrial</option>
+                                    <option value="Suelo">Suelo / Parcela</option>
+                                </select>
+                            </div>
+
+                            <div className="pt-2">
+                                <label className="block text-xs uppercase tracking-wider font-semibold mb-2">Precio de Mercado (Pm) / m²</label>
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-xs">€</span>
+                                        <input
+                                            type="number"
+                                            value={marketValue || ''}
+                                            onChange={(e) => setMarketValue(Number(e.target.value))}
+                                            className="w-full pl-8 pr-4 py-3 bg-muted/20 border border-border/60 rounded-xl text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none font-bold"
+                                            placeholder="Ej. 12000"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={handleAISuggestion}
+                                        disabled={isSuggesting}
+                                        className="px-4 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl border border-primary/20 transition-all flex items-center justify-center disabled:opacity-50"
+                                        title="Sugerir con IA"
+                                    >
+                                        {isSuggesting ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                                    </button>
+                                </div>
+                                {aiConfidence !== null && (
+                                    <div className="mt-2 flex items-center gap-1.5">
+                                        <div className="flex gap-0.5">
+                                            {[1, 2, 3, 4, 5].map((s) => (
+                                                <div
+                                                    key={s}
+                                                    className={`h-1 w-3 rounded-full ${s <= Math.round(aiConfidence * 5) ? 'bg-emerald-500' : 'bg-muted'}`}
+                                                />
+                                            ))}
+                                        </div>
+                                        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight">Confianza IA</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-xs uppercase tracking-wider font-semibold mb-2">Superficie Patrimonio (M²)</label>
                                 <div className="relative">
                                     <input
                                         type="number"

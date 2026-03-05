@@ -200,23 +200,38 @@ export default function AdminDashboard() {
                 }
             }
 
+            // Map type to database enum asset_class
+            const typeMapping: any = {
+                'Hotel': 'hotel',
+                'Edificio': 'building',
+                'Suelo': 'land',
+                'Retail': 'retail',
+                'Oficinas': 'office',
+                'Logístico': 'industrial',
+                'Otro': 'other'
+            };
+
             const newProperty = {
                 title: propertyForm.title,
                 description: propertyForm.description,
-                price: Number(propertyForm.price) || 0,
-                meters: Number(propertyForm.meters) || 0,
+                price_eur: Number(propertyForm.price) || 0,
+                m2_total: Number(propertyForm.meters) || 0,
                 status: 'Origen Privado',
-                asset_type: propertyForm.type || 'Activo Extraído',
-                address: propertyForm.address || null,
+                asset_type: typeMapping[propertyForm.type] || 'other',
+                location: propertyForm.address || 'Ubicación Proporionada',
                 is_off_market: true,
-                vendor_name: propertyForm.vendor_name || null,
-                comision_tercero: propertyForm.comision_tercero || 0,
-                comision_interna: propertyForm.comision_interna || 0,
-                extended_data: propertyForm.extended_data || {},
-                dossier_url: pdfUrl,
-                category: selectedSuggestion ?
-                    (selectedSuggestion.extracted_data?._iai_has_dossier === false ? ['IAI', 'Sin Dossier'] : ['IAI'])
-                    : []
+                thumbnail_url: null,
+                images: [],
+                extended_data: {
+                    ...propertyForm.extended_data,
+                    vendor_name: propertyForm.vendor_name || null,
+                    comision_tercero: propertyForm.comision_tercero || 0,
+                    comision_interna: propertyForm.comision_interna || 0,
+                    dossier_url: pdfUrl,
+                    category: selectedSuggestion ?
+                        (selectedSuggestion.extracted_data?._iai_has_dossier === false ? ['IAI', 'Sin Dossier'] : ['IAI'])
+                        : []
+                },
             };
 
             const { data: insertedData, error: insertError } = await supabase
@@ -245,7 +260,7 @@ export default function AdminDashboard() {
         } catch (err: any) {
             console.error("Error creating property from suggestion:", err);
             setIsUploadingIaiDossier(false);
-            alert("Error al dar de alta el activo.");
+            alert(`Error al dar de alta el activo: ${err.message || "Error desconocido"}`);
         }
     };
 
@@ -545,22 +560,35 @@ export default function AdminDashboard() {
 
             const { extracted_data } = await groqResponse.json();
 
+            const typeMapping: any = {
+                'Hotel': 'hotel',
+                'Edificio': 'building',
+                'Suelo': 'land',
+                'Retail': 'retail',
+                'Oficinas': 'office',
+                'Logístico': 'industrial',
+                'Otro': 'other'
+            };
+
             const newProperty = {
                 title: extracted_data?.title || file.name.replace('.pdf', ''),
                 description: extracted_data?.summary || fullText.substring(0, 800) + (fullText.length > 800 ? "..." : ""),
-                price: Number(extracted_data?.price) || 0,
-                meters: Number(extracted_data?.surface) || 0,
-                address: extracted_data?.location || null,
-                vendor_name: extracted_data?.vendor_name || null,
-                comision_tercero: Number(extracted_data?.comision_tercero) || 0,
-                comision_interna: Number(extracted_data?.comision_interna) || 0,
-                extended_data: extracted_data?.extended_data || {},
+                price_eur: Number(extracted_data?.price) || 0,
+                m2_total: Number(extracted_data?.surface) || 0,
+                location: extracted_data?.location || 'Ubicación Extraída',
                 thumbnail_url: extractedImages[0] || null,
-                images: extractedImages,
-                status: 'Origen Privado',
-                asset_type: extracted_data?.type || 'Activo Extraído',
+                // images: extractedImages, // Schema in migration doesn't have images array yet
+                asset_type: typeMapping[extracted_data?.type] || 'other',
                 is_off_market: true,
-                dossier_url: pdfUrl
+                is_published: false,
+                extended_data: {
+                    ...(extracted_data?.extended_data || {}),
+                    vendor_name: extracted_data?.vendor_name || null,
+                    comision_tercero: Number(extracted_data?.comision_tercero) || 0,
+                    comision_interna: Number(extracted_data?.comision_interna) || 0,
+                    dossier_url: pdfUrl,
+                    full_images: extractedImages
+                }
             };
 
             const { data: insertedData, error: insertError } = await supabase
@@ -580,7 +608,7 @@ export default function AdminDashboard() {
             alert(`Error al procesar el PDF: ${err?.message || 'Error desconocido'}`);
         } finally {
             setIsUploadingPdf(false);
-            e.target.value = '';
+            if (e.target) e.target.value = '';
         }
     };
 

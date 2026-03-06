@@ -91,6 +91,58 @@ serve(async (req) => {
         const aiResult = await response.json()
         const content = JSON.parse(aiResult.choices[0].message.content)
 
+        // ── Second LLM call: Generate executive interpretation ──
+        const interpretPrompt = `Eres un asistente ejecutivo experto en real estate institucional y capital markets.
+
+Analiza la siguiente conversación de email y genera una interpretación clara, profesional y directa en español.
+
+Tu objetivo es que un directivo pueda leer tu interpretación en 15 segundos y entender:
+1. ¿Quién escribe y desde qué posición/empresa?
+2. ¿Qué quiere exactamente? (intención principal)
+3. ¿Hay algún activo, inversión u oportunidad concreta mencionada? Si sí, resúmela.
+4. ¿Requiere acción inmediata? Si sí, cuál.
+5. Nivel de prioridad: 🔴 Alta / 🟡 Media / 🟢 Baja
+
+Formato de salida (usa exactamente este formato):
+---
+**Remitente:** [nombre y cargo/empresa si se detecta]  
+**Intención:** [1 frase directa]  
+**Resumen:** [2-3 frases máximo con los datos clave]  
+**Acción requerida:** [Sí/No + qué hacer]  
+**Prioridad:** [emoji + nivel]  
+---
+
+Email Subject: ${subject}
+Sender: ${from}
+
+Contenido del email:
+"""
+${text}
+"""`
+
+        let aiInterpretation = null
+        try {
+            const interpretResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${GROQ_API_KEY}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: 'llama-3.3-70b-versatile',
+                    messages: [{ role: 'user', content: interpretPrompt }],
+                    temperature: 0.2,
+                    max_tokens: 1000
+                })
+            })
+            if (interpretResponse.ok) {
+                const interpretResult = await interpretResponse.json()
+                aiInterpretation = interpretResult.choices[0]?.message?.content || null
+            }
+        } catch (interpretErr) {
+            console.warn("Could not generate interpretation (non-blocking):", interpretErr)
+        }
+
         const { data, error } = await supabase
             .from('iai_inbox_suggestions')
             .insert({
@@ -103,6 +155,7 @@ serve(async (req) => {
                     _iai_has_dossier: content.has_dossier ?? false,
                     _iai_summary: content.summary || ''
                 },
+                ai_interpretation: aiInterpretation,
                 status: 'pending'
             })
             .select()

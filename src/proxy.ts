@@ -1,40 +1,24 @@
-// ─────────────────────────────────────────────────────────
-// Next.js Middleware — Auth Guard (SSR)
-//
-// WHY: Without middleware, all route protection was client-side only,
-// meaning HTML+JS for protected pages was delivered to the browser
-// before any redirect happened. This middleware blocks access at the
-// edge before anything reaches the client.
-//
-// Protected routes:
-//   - /praetorium  → requires authenticated agent (is_approved)
-//   - /radar       → requires authenticated user (agent or investor)
-//   - /profile     → requires authenticated user
-// ─────────────────────────────────────────────────────────
-import { NextResponse, type NextRequest } from 'next/server';
-import { createSupabaseMiddlewareClient } from '@/lib/supabase-server';
+import { NextResponse, type NextRequest } from 'next/server'
+import { createSupabaseMiddlewareClient } from '@/lib/supabase-server'
 
-const PROTECTED_ROUTES = ['/praetorium', '/radar', '/profile'];
+const PROTECTED_ROUTES = ['/praetorium', '/radar', '/profile', '/admin'];
 
 export async function proxy(request: NextRequest) {
-    const response = NextResponse.next({ request });
+    let supabaseResponse = NextResponse.next({
+        request,
+    })
 
     const isProtected = PROTECTED_ROUTES.some(route =>
         request.nextUrl.pathname.startsWith(route)
     );
 
-    if (!isProtected) {
-        return response;
-    }
+    const supabase = createSupabaseMiddlewareClient(request, supabaseResponse);
 
-    try {
-        const supabase = createSupabaseMiddlewareClient(request, response);
+    // IMPORTANT: refreshes the auth token if needed
+    const { data: { user }, error } = await supabase.auth.getUser();
 
-        // Refresh the session (handles token rotation automatically)
-        const { data: { user }, error } = await supabase.auth.getUser();
-
+    if (isProtected) {
         if (error || !user) {
-            // Not authenticated → redirect to login
             const loginUrl = new URL('/login', request.url);
             loginUrl.searchParams.set('redirectTo', request.nextUrl.pathname);
             return NextResponse.redirect(loginUrl);
@@ -44,29 +28,26 @@ export async function proxy(request: NextRequest) {
         const userEmail = user.email;
         const isGodMode = userEmail === 'beenocode@gmail.com';
 
-        // /praetorium → only admin or approved agent (or God Mode)
-        if (request.nextUrl.pathname.startsWith('/praetorium')) {
+        // /praetorium or /admin → only admin or approved agent (or God Mode)
+        if (request.nextUrl.pathname.startsWith('/praetorium') || request.nextUrl.pathname.startsWith('/admin')) {
             if (!isGodMode && userRole !== 'admin' && userRole !== 'agent') {
                 return NextResponse.redirect(new URL('/', request.url));
             }
         }
-
-        // /radar → any authenticated user passes middleware;
-        // fine-grained role check (investor/collaborator by email) happens client-side
-        // because middleware can't efficiently query Supabase tables.
-
-        return response;
-    } catch {
-        // If Supabase is unreachable, redirect to login as a safety net
-        const loginUrl = new URL('/login', request.url);
-        return NextResponse.redirect(loginUrl);
     }
+
+    return supabaseResponse
 }
 
 export const config = {
     matcher: [
-        '/praetorium/:path*',
-        '/radar/:path*',
-        '/profile/:path*',
+        /*
+         * Match all request paths except for the ones starting with:
+         * - _next/static (static files)
+         * - _next/image (image optimization files)
+         * - favicon.ico (favicon file)
+         * - public files (svg, png, etc.)
+         */
+        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
     ],
-};
+}

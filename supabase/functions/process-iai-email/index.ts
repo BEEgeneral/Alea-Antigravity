@@ -68,30 +68,7 @@ serve(async (req) => {
         ${text}
         `
 
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${GROQ_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile',
-                messages: [{ role: 'user', content: prompt }],
-                response_format: { type: 'json_object' },
-                temperature: 0.1
-            })
-        })
-
-        if (!response.ok) {
-            const errorData = await response.text()
-            console.error("Groq API Error:", errorData)
-            throw new Error(`Detalle de Groq: ${errorData}`)
-        }
-
-        const aiResult = await response.json()
-        const content = JSON.parse(aiResult.choices[0].message.content)
-
-        // ── Second LLM call: Generate executive interpretation ──
+        // ── Parallel LLM calls: Extraction & Interpretation ──
         const interpretPrompt = `Eres un asistente ejecutivo experto en real estate institucional y capital markets.
 
 Analiza la siguiente conversación de email y genera una interpretación clara, profesional y directa en español.
@@ -120,9 +97,23 @@ Contenido del email:
 ${text}
 """`
 
-        let aiInterpretation = null
-        try {
-            const interpretResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        const [extractionRes, interpretationRes] = await Promise.all([
+            // Call 1: Extraction
+            fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${GROQ_API_KEY}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: 'llama-3.3-70b-versatile',
+                    messages: [{ role: 'user', content: prompt }],
+                    response_format: { type: 'json_object' },
+                    temperature: 0.1
+                })
+            }),
+            // Call 2: Interpretation
+            fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${GROQ_API_KEY}`,
@@ -135,14 +126,25 @@ ${text}
                     max_tokens: 1000
                 })
             })
-            if (interpretResponse.ok) {
-                const interpretResult = await interpretResponse.json()
-                aiInterpretation = interpretResult.choices[0]?.message?.content || null
-            }
-        } catch (interpretErr) {
-            console.warn("Could not generate interpretation (non-blocking):", interpretErr)
+        ])
+
+        if (!extractionRes.ok) {
+            const errorData = await extractionRes.text()
+            console.error("Groq Extraction Error:", errorData)
+            throw new Error(`Detalle de Groq (Extracción): ${errorData}`)
         }
 
+        const aiResult = await extractionRes.json()
+        const content = JSON.parse(aiResult.choices[0].message.content)
+
+        let aiInterpretation = null
+        if (interpretationRes.ok) {
+            const interpretResult = await interpretationRes.json()
+            aiInterpretation = interpretResult.choices[0]?.message?.content || null
+        } else {
+            const errorData = await interpretationRes.text()
+            console.warn("Could not generate interpretation (non-blocking):", errorData)
+        }
         const { data, error } = await supabase
             .from('iai_inbox_suggestions')
             .insert({

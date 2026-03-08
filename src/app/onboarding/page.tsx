@@ -4,10 +4,10 @@ import Link from "next/link";
 
 export default function OnboardingPage() {
     return (
-        <main className="min-h-screen bg-background flex flex-col selection:bg-primary/30">
+        <main className="min-h-screen bg-background flex flex-col selection:bg-primary/30 overflow-x-hidden">
 
             {/* Header Overlay */}
-            <header className="absolute top-0 w-full p-8 flex justify-between items-center z-50">
+            <header className="absolute top-0 w-full p-4 md:p-8 flex justify-between items-center z-50">
                 <Link href="/" className="group flex items-center space-x-3 text-foreground hover:opacity-80 transition-opacity">
                     <ArrowLeft size={16} className="text-muted-foreground group-hover:-translate-x-1 transition-transform" />
                     <span className="font-serif text-xl tracking-widest font-medium">Aleasignature.</span>

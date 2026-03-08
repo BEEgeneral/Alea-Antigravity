@@ -362,7 +362,7 @@ export function VoiceChatOnboarding() {
                                 <select
                                     value={countryCode}
                                     onChange={(e) => setCountryCode(e.target.value)}
-                                    className="bg-muted/50 border-none focus:outline-none focus:ring-0 px-3 py-4 rounded-l-xl font-sans text-sm text-foreground appearance-none cursor-pointer hover:bg-muted/80 transition-colors border-r border-border/50"
+                                    className="bg-muted/50 border-none focus:outline-none focus:ring-0 px-2 md:px-3 py-3 md:py-4 rounded-l-xl font-sans text-xs md:text-sm text-foreground appearance-none cursor-pointer hover:bg-muted/80 transition-colors border-r border-border/50"
                                 >
                                     <option value="+34">🇪🇸 +34</option>
                                     <option value="+1">🇺🇸 +1</option>
@@ -389,8 +389,8 @@ export function VoiceChatOnboarding() {
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
                             disabled={isAiSpeaking || isRecording}
-                            placeholder={isRecording ? "Escuchando..." : (currentStep.key === 'phone' ? "Nº de teléfono (ej: 600 000 000)" : "Escribe tu respuesta aquí...")}
-                            className={`flex-1 bg-transparent border-none focus:outline-none focus:ring-0 px-4 font-sans text-lg text-foreground placeholder:text-muted-foreground ${currentStep.key === 'phone' ? 'rounded-r-xl pl-2' : 'rounded-xl'}`}
+                            placeholder={isRecording ? "Escuchando..." : (currentStep.key === 'phone' ? "Nº de teléfono..." : "Escribe aquí...")}
+                            className={`flex-1 min-w-0 bg-transparent border-none focus:outline-none focus:ring-0 px-2 md:px-4 font-sans text-base md:text-lg text-foreground placeholder:text-muted-foreground ${currentStep.key === 'phone' ? 'rounded-r-xl pl-1' : 'rounded-xl'}`}
                             onKeyDown={(e) => e.key === 'Enter' && handleNext()}
                         />
 

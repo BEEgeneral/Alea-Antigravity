@@ -3,7 +3,7 @@ import { createSupabaseMiddlewareClient } from '@/lib/supabase-server'
 
 const PROTECTED_ROUTES = ['/praetorium', '/radar', '/profile', '/admin'];
 
-export async function proxy(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
     let supabaseResponse = NextResponse.next({
         request,
     })

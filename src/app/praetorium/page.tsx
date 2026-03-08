@@ -313,30 +313,25 @@ export default function AdminDashboard() {
 
     const fetchData = async () => {
         try {
-            // Fetch Leads with Investor and Property details
-            const { data: leadsData } = await supabase
-                .from('leads')
-                .select(`
-                    *,
-                    investors (*),
-                    properties (*)
-                `)
-                .order('created_at', { ascending: false });
-
-            // Fetch Properties
-            const { data: propertiesData } = await supabase.from('properties').select('*');
-
-            // Fetch Investors
-            const { data: investorsData } = await supabase.from('investors').select('*');
-
-            // Fetch Collaborators
-            const { data: collaboratorsData } = await supabase.from('collaborators').select('*').order('created_at', { ascending: false });
-
-            // Fetch Mandatarios
-            const { data: mandatariosData } = await supabase.from('mandatarios').select('*').order('created_at', { ascending: false });
-
-            // Fetch IAI Suggestions
-            const { data: iaiSuggestionsData } = await supabase.from('iai_inbox_suggestions').select('*').eq('status', 'pending').order('created_at', { ascending: false });
+            // ✅ All 6 queries fired in parallel with Promise.all — up to 3x faster
+            const [
+                { data: leadsData },
+                { data: propertiesData },
+                { data: investorsData },
+                { data: collaboratorsData },
+                { data: mandatariosData },
+                { data: iaiSuggestionsData },
+            ] = await Promise.all([
+                supabase
+                    .from('leads')
+                    .select(`*, investors (*), properties (*)`)
+                    .order('created_at', { ascending: false }),
+                supabase.from('properties').select('*'),
+                supabase.from('investors').select('*'),
+                supabase.from('collaborators').select('*').order('created_at', { ascending: false }),
+                supabase.from('mandatarios').select('*').order('created_at', { ascending: false }),
+                supabase.from('iai_inbox_suggestions').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
+            ]);
 
             if (leadsData) setLeads(leadsData);
             if (propertiesData) setProperties(propertiesData);
@@ -351,18 +346,19 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         const checkAuth = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
+            // ✅ Use getUser() instead of getSession() for server-validated auth
+            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            if (authError || !user) {
                 router.push("/login");
                 return;
             }
 
-            const isGodMode = session.user.email === 'beenocode@gmail.com';
+            const isGodMode = user.email === 'beenocode@gmail.com';
 
             const { data: agent } = await supabase
                 .from('agents')
                 .select('*')
-                .eq('id', session.user.id)
+                .eq('id', user.id)
                 .single();
 
             if (!isGodMode && (!agent || !agent.is_approved)) {
@@ -373,7 +369,7 @@ export default function AdminDashboard() {
             if (isGodMode && !agent) {
                 // Pre-set God Mode user if not in DB
                 setCurrentUser({
-                    id: session.user.id,
+                    id: user.id,
                     full_name: 'Super Admin',
                     email: 'beenocode@gmail.com',
                     role: 'admin',

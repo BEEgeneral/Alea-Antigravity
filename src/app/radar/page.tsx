@@ -11,7 +11,8 @@ import {
     TrendingUp,
     Lock,
     ChevronRight,
-    Search
+    Search,
+    AlertCircle
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -42,19 +43,20 @@ export default function InvestmentRadar() {
     });
     const [showContactSuccess, setShowContactSuccess] = useState(false);
     const [ndaRequired, setNdaRequired] = useState(false);
+    const [fetchError, setFetchError] = useState<string | null>(null);
 
-    // Auth & Permission guard
+    // Auth & Permission guard — uses getUser() for server-validated auth
     useEffect(() => {
         const checkAuth = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
+            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            if (authError || !user) {
                 router.push("/login");
                 return;
             }
 
-            const userId = session.user.id;
-            const userEmail = session.user.email;
-            const userRole = session.user.user_metadata?.role;
+            const userId = user.id;
+            const userEmail = user.email;
+            const userRole = user.user_metadata?.role;
 
             // God Mode check for Super Admin
             if (userEmail === 'beenocode@gmail.com') {
@@ -64,7 +66,6 @@ export default function InvestmentRadar() {
 
             // 1. Admin or agent by auth metadata → instant access
             if (userRole === 'admin' || userRole === 'agent') {
-                // But agents still need to be approved
                 if (userRole === 'agent') {
                     const { data: agent } = await supabase
                         .from('agents')
@@ -130,11 +131,16 @@ export default function InvestmentRadar() {
     useEffect(() => {
         if (!authChecked) return;
         const fetchRadarProperties = async () => {
-            const { data } = await supabase
+            const { data, error } = await supabase
                 .from('properties')
                 .select('id, title, address, price, status, is_off_market, asset_type, thumbnail_url');
 
-            if (data) setProperties(data as RadarProperty[]);
+            if (error) {
+                console.error('Error fetching properties:', error);
+                setFetchError('No se pudieron cargar los activos. Por favor, recarga la página.');
+            } else if (data) {
+                setProperties(data as RadarProperty[]);
+            }
             setLoading(false);
         };
         fetchRadarProperties();
@@ -256,7 +262,14 @@ export default function InvestmentRadar() {
                     </div>
 
                     {/* Radar Grid */}
-                    {loading ? (
+                    {fetchError ? (
+                        <div className="py-40 text-center">
+                            <AlertCircle size={48} className="mx-auto text-destructive/40 mb-6" />
+                            <h3 className="text-xl font-serif text-muted-foreground uppercase tracking-widest font-medium">Error al cargar activos</h3>
+                            <p className="text-muted-foreground/50 text-sm mt-2">{fetchError}</p>
+                            <button onClick={() => window.location.reload()} className="mt-6 text-sm text-primary underline underline-offset-4">Reintentar</button>
+                        </div>
+                    ) : loading ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                             {[1, 2, 3].map(i => (
                                 <div key={i} className="h-[600px] bg-muted/30 rounded-[2.5rem] animate-pulse border border-border" />

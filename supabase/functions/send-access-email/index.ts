@@ -1,23 +1,47 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7"
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
 
 serve(async (req) => {
   try {
     const { email, name, origin } = await req.json()
 
-    if (!RESEND_API_KEY) {
-      return new Response(JSON.stringify({ error: "Missing RESEND_API_KEY" }), {
+    if (!RESEND_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return new Response(JSON.stringify({ error: "Missing environment variables" }), {
         status: 500,
         headers: { "Content-Type": "application/json" }
       })
     }
 
-    // El enlace mágico se genera usando la API de Auth de Supabase
-    // En un entorno real, esto se dispararía desde la UI de Admin (Praetorium)
-    // llamando a esta función una vez el agente pulsa "Aprobar"
-    const magicLink = `${SUPABASE_URL}/auth/v1/verify?type=magiclink&email=${encodeURIComponent(email)}&redirectTo=${encodeURIComponent((origin || '') + '/radar')}`
+    if (!email) {
+      return new Response(JSON.stringify({ error: "Email is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      })
+    }
+
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+    // ✅ Generate a REAL Supabase Magic Link using the Admin API
+    // This creates a valid, signed link that works with the Auth system
+    const redirectUrl = `${origin || 'https://www.aleasignature.com'}/auth/callback?next=/radar`
+    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: email,
+      options: {
+        redirectTo: redirectUrl
+      }
+    })
+
+    if (linkError) {
+      console.error("Error generating magic link:", linkError)
+      throw linkError
+    }
+
+    const magicLink = linkData.properties.action_link
 
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -38,18 +62,18 @@ serve(async (req) => {
             <h2 style="font-weight: normal; margin-bottom: 24px; text-align: center;">Credenciales de Acceso</h2>
             
             <p style="line-height: 1.6; margin-bottom: 24px;">
-                Estimado/a ${name},<br/><br/>
-                Nos complace informarle que su perfil ha superado satisfactoriamente los protocolos de **calificación institucional**. 
+                Estimado/a ${name || 'Inversor'},<br/><br/>
+                Nos complace informarle que su perfil ha superado satisfactoriamente los protocolos de calificación institucional. 
             </p>
             
             <div style="background-color: #f9f9f9; padding: 32px; border-radius: 8px; margin-bottom: 32px; text-align: center; border: 1px solid #eee;">
-                <p style="font-size: 14px; color: #666; margin-bottom: 16px; text-transform: uppercase; tracking: 1px;">Enlace de acceso único y cifrado</p>
+                <p style="font-size: 14px; color: #666; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1px;">Enlace de acceso único y cifrado</p>
                 <a href="${magicLink}" style="display: inline-block; background-color: #1a1a1a; color: #ffffff; padding: 18px 32px; text-decoration: none; border-radius: 4px; font-weight: bold; letter-spacing: 1px; font-size: 14px;">ACCEDER AL RADAR DE ACTIVOS</a>
                 <p style="font-size: 11px; color: #999; margin-top: 16px;">Este enlace expirará en 24 horas por motivos de seguridad fiduciaria.</p>
             </div>
             
             <p style="line-height: 1.6; margin-bottom: 16px;">
-                A partir de este momento, tiene acceso restringido al **Radar de Originación Privada**, donde podrá analizar activos bajo mandato confidencial y contactar con agentes especializados para la recepción de Data Rooms completas.
+                A partir de este momento, tiene acceso restringido al Radar de Originación Privada, donde podrá analizar activos bajo mandato confidencial y contactar con agentes especializados para la recepción de Data Rooms completas.
             </p>
             
             <p style="line-height: 1.6; font-style: italic; color: #444; margin-bottom: 32px;">
@@ -93,8 +117,9 @@ serve(async (req) => {
       status: res.status,
       headers: { "Content-Type": "application/json" },
     })
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    return new Response(JSON.stringify({ error: message }), {
       status: 400,
       headers: { "Content-Type": "application/json" }
     })

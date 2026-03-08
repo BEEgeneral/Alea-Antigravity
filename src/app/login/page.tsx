@@ -20,12 +20,11 @@ function LoginForm() {
     const [success, setSuccess] = useState<string | null>(null);
     const [email, setEmail] = useState(prefillEmail);
 
-    // Handle initial auth state check
+    // Handle initial auth state check - uses getUser() for server-verified session
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }: { data: { session: any } }) => {
-            if (session?.user && !fromOnboarding) {
+        supabase.auth.getUser().then(({ data: { user } }: { data: { user: { id: string } | null } }) => {
+            if (user && !fromOnboarding) {
                 const redirectTo = searchParams.get("redirectTo");
-                // If already logged in and not coming from a specific flow, go to intended destination or Radar
                 router.push(redirectTo || "/radar");
             }
         });
@@ -37,11 +36,27 @@ function LoginForm() {
         setError(null);
         setSuccess(null);
 
-        const redirectTo = searchParams.get("redirectTo") || "/radar";
+        const trimmedEmail = email.trim().toLowerCase();
+        const redirectTo = searchParams.get("redirectTo") || "/praetorium";
 
         try {
+            // ✅ Security: Verify email is registered before sending OTP to prevent spam abuse
+            const [agentResult, investorResult, collaboratorResult] = await Promise.all([
+                supabase.from('agents').select('id').eq('email', trimmedEmail).eq('is_approved', true).maybeSingle(),
+                supabase.from('investors').select('id').eq('email', trimmedEmail).maybeSingle(),
+                supabase.from('collaborators').select('id').eq('email', trimmedEmail).maybeSingle(),
+            ]);
+
+            const isGodMode = trimmedEmail === 'beenocode@gmail.com';
+            const isRegistered = isGodMode || agentResult.data || investorResult.data || collaboratorResult.data;
+
+            if (!isRegistered) {
+                setError("Este correo no está registrado en el sistema. Contacta con tu agente de referencia.");
+                return;
+            }
+
             const { error: signInError } = await supabase.auth.signInWithOtp({
-                email: email.trim(),
+                email: trimmedEmail,
                 options: {
                     emailRedirectTo: `${window.location.origin}/auth/callback?next=${redirectTo}`,
                 },
@@ -49,10 +64,10 @@ function LoginForm() {
 
             if (signInError) throw signInError;
 
-            setSuccess("Enlace de acceso enviado. Revisa tu bandeja de entrada para entrar sin contraseña.");
-        } catch (err: any) {
+            setSuccess("Enlace de acceso enviado. Revisa tu bandeja de entrada o carpeta de spam.");
+        } catch (err: unknown) {
             console.error("Login Error Details:", err);
-            const errorMessage = err?.message || (typeof err === 'object' ? JSON.stringify(err) : "Error al solicitar el enlace de acceso");
+            const errorMessage = err instanceof Error ? err.message : "Error al solicitar el enlace de acceso";
             setError(errorMessage);
         } finally {
             setLoading(false);

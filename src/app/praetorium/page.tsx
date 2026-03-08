@@ -817,9 +817,11 @@ export default function AdminDashboard() {
                 setTimeout(() => setShowToast(false), 3000);
             } else {
                 console.error("Error creating investor:", error);
+                alert(`Error al crear inversor: ${error.message || "Permiso denegado por seguridad (RLS)"}`);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error creating investor:", error);
+            alert(`Error inesperado: ${error.message}`);
         }
     };
 
@@ -856,9 +858,11 @@ export default function AdminDashboard() {
                 setTimeout(() => setShowToast(false), 3000);
             } else {
                 console.error("Error creating mandatario:", error);
+                alert(`Error al crear mandatario: ${error.message || "Permiso denegado por seguridad (RLS)"}`);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error creating mandatario:", error);
+            alert(`Error inesperado: ${error.message}`);
         }
     };
 

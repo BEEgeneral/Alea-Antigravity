@@ -7,7 +7,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
 
 serve(async (req) => {
   try {
-    const { email, name } = await req.json()
+    const { email, name, origin } = await req.json()
 
     if (!RESEND_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return new Response(JSON.stringify({ error: "Missing environment variables" }), {
@@ -23,7 +23,7 @@ serve(async (req) => {
       type: 'signup',
       email: email,
       options: {
-        redirectTo: `${new URL(req.url).origin.replace('http://', 'https://')}/login?confirmed=true`
+        redirectTo: `${origin || new URL(req.url).origin.replace('http://', 'https://')}/login?confirmed=true`
       }
     })
 

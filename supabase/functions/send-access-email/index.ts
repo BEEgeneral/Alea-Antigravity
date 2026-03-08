@@ -4,32 +4,32 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")
 
 serve(async (req) => {
-    try {
-        const { email, name } = await req.json()
+  try {
+    const { email, name, origin } = await req.json()
 
-        if (!RESEND_API_KEY) {
-            return new Response(JSON.stringify({ error: "Missing RESEND_API_KEY" }), {
-                status: 500,
-                headers: { "Content-Type": "application/json" }
-            })
-        }
+    if (!RESEND_API_KEY) {
+      return new Response(JSON.stringify({ error: "Missing RESEND_API_KEY" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      })
+    }
 
-        // El enlace mágico se genera usando la API de Auth de Supabase
-        // En un entorno real, esto se dispararía desde la UI de Admin (Praetorium)
-        // llamando a esta función una vez el agente pulsa "Aprobar"
-        const magicLink = `${SUPABASE_URL}/auth/v1/verify?type=magiclink&email=${encodeURIComponent(email)}`
+    // El enlace mágico se genera usando la API de Auth de Supabase
+    // En un entorno real, esto se dispararía desde la UI de Admin (Praetorium)
+    // llamando a esta función una vez el agente pulsa "Aprobar"
+    const magicLink = `${SUPABASE_URL}/auth/v1/verify?type=magiclink&email=${encodeURIComponent(email)}&redirectTo=${encodeURIComponent((origin || '') + '/radar')}`
 
-        const res = await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${RESEND_API_KEY}`,
-            },
-            body: JSON.stringify({
-                from: "AleaSignature <radar@aleasignature.com>",
-                to: [email],
-                subject: "Acceso Concedido: Radar de Activos AleaSignature",
-                html: `
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: "AleaSignature <radar@aleasignature.com>",
+        to: [email],
+        subject: "Acceso Concedido: Radar de Activos AleaSignature",
+        html: `
           <div style="font-family: serif; max-width: 600px; margin: auto; padding: 40px; color: #1a1a1a; background-color: #ffffff; border: 1px solid #f0f0f0;">
             <div style="text-align: center; margin-bottom: 40px;">
                 <span style="font-size: 24px; letter-spacing: 4px; font-weight: bold; text-transform: uppercase;">Aleasignature.</span>
@@ -84,19 +84,19 @@ serve(async (req) => {
             </div>
           </div>
         `,
-            }),
-        })
+      }),
+    })
 
-        const data = await res.json()
+    const data = await res.json()
 
-        return new Response(JSON.stringify(data), {
-            status: res.status,
-            headers: { "Content-Type": "application/json" },
-        })
-    } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), {
-            status: 400,
-            headers: { "Content-Type": "application/json" }
-        })
-    }
+    return new Response(JSON.stringify(data), {
+      status: res.status,
+      headers: { "Content-Type": "application/json" },
+    })
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" }
+    })
+  }
 })

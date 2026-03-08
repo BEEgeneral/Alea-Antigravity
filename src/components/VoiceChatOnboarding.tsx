@@ -136,7 +136,8 @@ export function VoiceChatOnboarding() {
                             await supabase.functions.invoke('send-welcome-email', {
                                 body: {
                                     email: finalEmail,
-                                    name: userData.name || "Inversor"
+                                    name: userData.name || "Inversor",
+                                    origin: window.location.origin
                                 }
                             });
 
@@ -146,7 +147,8 @@ export function VoiceChatOnboarding() {
                             await supabase.functions.invoke('send-access-email', {
                                 body: {
                                     email: finalEmail,
-                                    name: userData.name || "Inversor"
+                                    name: userData.name || "Inversor",
+                                    origin: window.location.origin
                                 }
                             });
                         }

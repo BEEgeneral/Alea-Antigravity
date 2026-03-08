@@ -51,7 +51,9 @@ function LoginForm() {
 
             setSuccess("Enlace de acceso enviado. Revisa tu bandeja de entrada para entrar sin contraseña.");
         } catch (err: any) {
-            setError(err.message || "Error al solicitar el enlace de acceso");
+            console.error("Login Error Details:", err);
+            const errorMessage = err?.message || (typeof err === 'object' ? JSON.stringify(err) : "Error al solicitar el enlace de acceso");
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }

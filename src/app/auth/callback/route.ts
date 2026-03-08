@@ -1,32 +1,30 @@
+import { NextResponse } from 'next/server'
+// The client you created from the Server-Side Auth instructions
 import { createSupabaseServerClient } from '@/lib/supabase-server'
-import { NextResponse, type NextRequest } from 'next/server'
 
-export const dynamic = 'force-dynamic'
-
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
     const { searchParams, origin } = new URL(request.url)
     const code = searchParams.get('code')
-    const next = searchParams.get('next') ?? '/radar'
+    // if "next" is in search params, use it as the redirection URL after logging in
+    const next = searchParams.get('next') ?? '/'
 
     if (code) {
         const supabase = await createSupabaseServerClient()
-        const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-
-        if (!error && data?.user) {
-            const userEmail = data.user.email;
-
-            // For the Super Admin, always go to Praetorium
-            const finalDestination = userEmail === 'beenocode@gmail.com'
-                ? '/praetorium'
-                : next;
-
-            console.log(`Auth Success: Redirecting ${userEmail} to ${finalDestination}`);
-            return NextResponse.redirect(`${origin}${finalDestination}`)
-        } else {
-            console.error("Auth callback exchange error:", error)
+        const { error } = await supabase.auth.exchangeCodeForSession(code)
+        if (!error) {
+            const forwardedHost = request.headers.get('x-forwarded-host') // original host before load balancer
+            const isLocalEnv = process.env.NODE_ENV === 'development'
+            if (isLocalEnv) {
+                // we can be sure that there is no proxy correctly forwarding in dev
+                return NextResponse.redirect(`${origin}${next}`)
+            } else if (forwardedHost) {
+                return NextResponse.redirect(`https://${forwardedHost}${next}`)
+            } else {
+                return NextResponse.redirect(`${origin}${next}`)
+            }
         }
     }
 
-    // Return to origin if no code or error
-    return NextResponse.redirect(`${origin}/login?error=Invalid%20or%20expired%20magic%20link`)
+    // return the user to an error page with instructions
+    return NextResponse.redirect(`${origin}/login?error=auth-callback-failed`)
 }

@@ -40,34 +40,32 @@ function LoginForm() {
         const redirectTo = searchParams.get("redirectTo") || "/praetorium";
 
         try {
-            // ✅ Security: Verify email is registered before sending OTP to prevent spam abuse
-            const [agentResult, investorResult, collaboratorResult] = await Promise.all([
-                supabase.from('agents').select('id').eq('email', trimmedEmail).eq('is_approved', true).maybeSingle(),
-                supabase.from('investors').select('id').eq('email', trimmedEmail).maybeSingle(),
-                supabase.from('collaborators').select('id').eq('email', trimmedEmail).maybeSingle(),
-            ]);
-
-            const isGodMode = trimmedEmail === 'beenocode@gmail.com';
-            const isRegistered = isGodMode || agentResult.data || investorResult.data || collaboratorResult.data;
-
-            if (!isRegistered) {
-                setError("Este correo no está registrado en el sistema. Contacta con tu agente de referencia.");
-                return;
-            }
-
+            // ✅ shouldCreateUser: false — Supabase sólo envía el link si el usuario YA existe en Auth.
+            // Emails no registrados reciben un error nativo de Supabase sin exponer qué emails existen.
             const { error: signInError } = await supabase.auth.signInWithOtp({
                 email: trimmedEmail,
                 options: {
+                    shouldCreateUser: false,
                     emailRedirectTo: `${window.location.origin}/auth/callback?next=${redirectTo}`,
                 },
             });
 
-            if (signInError) throw signInError;
+            if (signInError) {
+                // Supabase returns a specific error when user doesn't exist
+                if (signInError.message.toLowerCase().includes('not found') ||
+                    signInError.message.toLowerCase().includes('user not found') ||
+                    signInError.status === 422) {
+                    setError("Este correo no está registrado. Contacta con tu agente de referencia.");
+                } else {
+                    setError(signInError.message || "Error al enviar el enlace. Inténtalo de nuevo.");
+                }
+                return;
+            }
 
             setSuccess("Enlace de acceso enviado. Revisa tu bandeja de entrada o carpeta de spam.");
         } catch (err: unknown) {
             console.error("Login Error Details:", err);
-            const errorMessage = err instanceof Error ? err.message : "Error al solicitar el enlace de acceso";
+            const errorMessage = err instanceof Error ? err.message : "Error de conexión. Inténtalo de nuevo.";
             setError(errorMessage);
         } finally {
             setLoading(false);

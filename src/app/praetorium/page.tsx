@@ -353,7 +353,8 @@ export default function AdminDashboard() {
                 return;
             }
 
-            const isGodMode = user.email === 'beenocode@gmail.com';
+            const normalizedEmail = user.email?.toLowerCase();
+            const isGodMode = normalizedEmail === 'beenocode@gmail.com' || normalizedEmail === 'albertogala@beenocode.com';
 
             const { data: agent } = await supabase
                 .from('agents')
@@ -371,7 +372,7 @@ export default function AdminDashboard() {
                 setCurrentUser({
                     id: user.id,
                     full_name: 'Super Admin',
-                    email: 'beenocode@gmail.com',
+                    email: user.email,
                     role: 'admin',
                     is_approved: true
                 });

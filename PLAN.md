@@ -18,6 +18,7 @@
 | Agent | Task | Status |
 |-------|------|--------|
 | Antigravity (Senior Product Engineer) | Mandatarios Tab & CRM Integration | Verified & Polished |
+| Antigravity | Agent Approval & Magic Link Fix (albertogala@beenocode.com) | Done |
 
 ## 💾 State Snapshot
 - **Database:** Tabla `mandatarios` definida y columnas de relación en `leads` añadidas para soporte de intermediación delegada.

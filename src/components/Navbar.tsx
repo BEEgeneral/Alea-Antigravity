@@ -22,7 +22,8 @@ export default function Navbar() {
     useEffect(() => {
         const fetchUserProfile = async (userId: string, email?: string) => {
             // God Mode check for Super Admin
-            if (email === 'beenocode@gmail.com') {
+            const normalizedEmail = email?.toLowerCase();
+            if (normalizedEmail === 'beenocode@gmail.com' || normalizedEmail === 'albertogala@beenocode.com') {
                 setUserRole('admin');
                 setIsVerified(true);
                 return;

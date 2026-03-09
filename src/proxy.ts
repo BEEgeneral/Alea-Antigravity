@@ -26,7 +26,8 @@ export default async function proxy(request: NextRequest) {
 
         const userRole = user.user_metadata?.role;
         const userEmail = user.email;
-        const isGodMode = userEmail === 'beenocode@gmail.com';
+        const normalizedEmail = userEmail?.toLowerCase();
+        const isGodMode = normalizedEmail === 'beenocode@gmail.com' || normalizedEmail === 'albertogala@beenocode.com';
 
         // /praetorium or /admin → only admin or approved agent (or God Mode)
         if (request.nextUrl.pathname.startsWith('/praetorium') || request.nextUrl.pathname.startsWith('/admin')) {

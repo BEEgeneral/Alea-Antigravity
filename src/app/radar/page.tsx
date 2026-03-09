@@ -59,7 +59,8 @@ export default function InvestmentRadar() {
             const userRole = user.user_metadata?.role;
 
             // God Mode check for Super Admin
-            if (userEmail === 'beenocode@gmail.com') {
+            const normalizedEmail = userEmail?.toLowerCase();
+            if (normalizedEmail === 'beenocode@gmail.com' || normalizedEmail === 'albertogala@beenocode.com') {
                 setAuthChecked(true);
                 return;
             }

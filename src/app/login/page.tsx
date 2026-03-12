@@ -40,16 +40,21 @@ function LoginForm() {
         setSuccess(null);
 
         const trimmedEmail = email.trim().toLowerCase();
+        // Default specifically to /praetorium for agents/admin
         const redirectTo = searchParams.get("redirectTo") || "/praetorium";
 
         try {
-            // ✅ shouldCreateUser: false — Supabase sólo envía el link si el usuario YA existe en Auth.
-            // Emails no registrados reciben un error nativo de Supabase sin exponer qué emails existen.
+            // Determine the base URL for the redirect
+            // If we are on aleasignature.com (production), we want to stay there
+            const origin = window.location.origin.includes('aleasignature.com') 
+                ? 'https://aleasignature.com' 
+                : window.location.origin;
+
             const { error: signInError } = await supabase.auth.signInWithOtp({
                 email: trimmedEmail,
                 options: {
                     shouldCreateUser: false,
-                    emailRedirectTo: `${window.location.origin}/auth/callback?next=${redirectTo}`,
+                    emailRedirectTo: `${origin}/auth/callback?next=${redirectTo}`,
                 },
             });
 

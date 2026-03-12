@@ -28,7 +28,7 @@ serve(async (req) => {
     // En lugar de enviar un email manualmente con Resend (que falla por falta de DNS verificados),
     // disparamos el Magic Link nativo de Supabase Auth.
     // Supabase se encargará de enviarlo desde su propio servidor seguro.
-    const redirectUrl = `${origin || 'https://www.aleasignature.com'}/auth/callback?next=/radar`
+    const redirectUrl = `${origin || 'https://aleasignature.com'}/auth/callback?next=/praetorium`
 
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.signInWithOtp({
       email: email.trim(),

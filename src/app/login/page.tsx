@@ -22,13 +22,24 @@ function LoginForm() {
 
     // Handle initial auth state check - uses getUser() for server-verified session
     useEffect(() => {
-        supabase.auth.getUser().then(({ data: { user } }: { data: { user: { id: string, email?: string } | null } }) => {
+        supabase.auth.getUser().then(({ data: { user } }) => {
             if (user && !fromOnboarding) {
-                const redirectTo = searchParams.get("redirectTo");
+                const userRole = user.user_metadata?.role;
                 const userEmail = user.email || "";
                 const normalizedEmail = userEmail.toLowerCase();
                 const isGodMode = normalizedEmail === 'beenocode@gmail.com' || normalizedEmail === 'albertogala@beenocode.com';
-                router.push(redirectTo || (isGodMode ? "/praetorium" : "/radar"));
+                const isAdminOrAgent = isGodMode || userRole === 'admin' || userRole === 'agent';
+
+                const redirectTo = searchParams.get("redirectTo");
+                const defaultHome = isAdminOrAgent ? "/praetorium" : "/radar";
+
+                // Final safety: if redirectTo is /praetorium but user is not admin/agent, go to /radar
+                let finalTarget = redirectTo || defaultHome;
+                if (finalTarget.startsWith('/praetorium') && !isAdminOrAgent) {
+                    finalTarget = "/radar";
+                }
+
+                router.push(finalTarget);
             }
         });
     }, [fromOnboarding, router, searchParams]);

@@ -32,7 +32,8 @@ export default async function proxy(request: NextRequest) {
         // /praetorium or /admin → only admin or approved agent (or God Mode)
         if (request.nextUrl.pathname.startsWith('/praetorium') || request.nextUrl.pathname.startsWith('/admin')) {
             if (!isGodMode && userRole !== 'admin' && userRole !== 'agent') {
-                return NextResponse.redirect(new URL('/', request.url));
+                // Rígido: inversores y otros a /radar
+                return NextResponse.redirect(new URL('/radar', request.url));
             }
         }
     }

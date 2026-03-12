@@ -12,15 +12,27 @@ export async function GET(request: Request) {
         const supabase = await createSupabaseServerClient()
         const { error } = await supabase.auth.exchangeCodeForSession(code)
         if (!error) {
+            const { data: { user } } = await supabase.auth.getUser()
+            const userRole = user?.user_metadata?.role
+            const userEmail = user?.email?.toLowerCase()
+            const isGodMode = userEmail === 'beenocode@gmail.com' || userEmail === 'albertogala@beenocode.com'
+
+            let finalNext = next
+            // If try to go to /praetorium but not authorized, force /radar
+            if (next.startsWith('/praetorium')) {
+                if (!isGodMode && userRole !== 'admin' && userRole !== 'agent') {
+                    finalNext = '/radar'
+                }
+            }
+
             const forwardedHost = request.headers.get('x-forwarded-host') // original host before load balancer
             const isLocalEnv = process.env.NODE_ENV === 'development'
             if (isLocalEnv) {
-                // we can be sure that there is no proxy correctly forwarding in dev
-                return NextResponse.redirect(`${origin}${next}`)
+                return NextResponse.redirect(`${origin}${finalNext}`)
             } else if (forwardedHost) {
-                return NextResponse.redirect(`https://${forwardedHost}${next}`)
+                return NextResponse.redirect(`https://${forwardedHost}${finalNext}`)
             } else {
-                return NextResponse.redirect(`${origin}${next}`)
+                return NextResponse.redirect(`${origin}${finalNext}`)
             }
         }
     }

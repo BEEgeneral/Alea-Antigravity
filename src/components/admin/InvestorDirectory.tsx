@@ -3,9 +3,12 @@
 import { motion } from "framer-motion";
 import { Mail, Building, Edit2, ArrowUpRight } from "lucide-react";
 import { Investor } from "@/types/admin";
+import { Skeleton } from "../Skeleton";
+
 
 interface InvestorDirectoryProps {
     investors: Investor[];
+    isLoading?: boolean;
     onAddInvestor: () => void;
     onEditInvestor: (investor: Investor) => void;
     onSelectInvestor: (investor: Investor) => void;
@@ -13,6 +16,7 @@ interface InvestorDirectoryProps {
 
 export default function InvestorDirectory({
     investors,
+    isLoading = false,
     onAddInvestor,
     onEditInvestor,
     onSelectInvestor,
@@ -33,7 +37,12 @@ export default function InvestorDirectory({
             </div>
             <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {investors.map((investor) => (
+                    {isLoading ? (
+                        Array.from({ length: 4 }).map((_, i) => (
+                            <InvestorCardSkeleton key={i} />
+                        ))
+                    ) : (
+                        investors.map((investor) => (
                         <motion.div
                             key={investor.id}
                             whileHover={{ y: -5 }}
@@ -102,12 +111,53 @@ export default function InvestorDirectory({
                                 </div>
                             </div>
                         </motion.div>
-                    ))}
-                    {investors.length === 0 && (
+                    ))
+                    )}
+                    {!isLoading && investors.length === 0 && (
                         <div className="col-span-full text-center py-20 opacity-40 uppercase tracking-widest text-xs font-black border-2 border-dashed border-border/40 rounded-[3rem]">
                             No hay inversores en la base de datos
                         </div>
                     )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+export function InvestorCardSkeleton() {
+    return (
+        <div className="bg-card/50 backdrop-blur-sm border border-border/60 rounded-[2rem] p-6 flex flex-col justify-between group relative overflow-hidden">
+            <div className="flex items-start justify-between mb-6 relative">
+                <div className="flex items-center space-x-4">
+                    <Skeleton className="w-14 h-14 rounded-2xl" />
+                    <div className="space-y-2">
+                        <Skeleton className="h-4 w-32" />
+                        <div className="flex items-center space-x-2">
+                            <Skeleton className="h-3 w-16 rounded-md" />
+                            <Skeleton className="h-3 w-20" />
+                        </div>
+                    </div>
+                </div>
+                <div className="flex space-x-1">
+                    <Skeleton className="w-9 h-9 rounded-xl" />
+                    <Skeleton className="w-9 h-9 rounded-xl" />
+                </div>
+            </div>
+
+            <div className="space-y-3 mb-6">
+                <Skeleton className="h-3 w-40" />
+                <Skeleton className="h-3 w-48" />
+            </div>
+
+            <div className="pt-4 border-t border-border/30 flex items-end justify-between">
+                <div className="space-y-2">
+                    <Skeleton className="h-2 w-24" />
+                    <Skeleton className="h-6 w-32" />
+                </div>
+                <div className="flex -space-x-2">
+                    <Skeleton className="w-6 h-6 rounded-full border-2 border-card" />
+                    <Skeleton className="w-6 h-6 rounded-full border-2 border-card" />
+                    <Skeleton className="w-6 h-6 rounded-full border-2 border-card" />
                 </div>
             </div>
         </div>

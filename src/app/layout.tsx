@@ -26,6 +26,13 @@ export const metadata: Metadata = {
     locale: "es_ES",
     type: "website",
   },
+  metadataBase: new URL("https://aleasignature.com"),
+  alternates: {
+    canonical: "/",
+  },
+  verification: {
+    google: "0_HQLBpaeYyAjOq9sQkIe7dxHBDp12_9Pb3pfp-shOw",
+  },
   twitter: {
     card: "summary_large_image",
     title: "Aleasignature | Originación Privada",

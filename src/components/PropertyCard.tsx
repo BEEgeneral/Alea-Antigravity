@@ -3,6 +3,8 @@
 import { Lock } from "lucide-react";
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { Skeleton } from "./Skeleton";
+
 
 export interface Property {
     id: string;
@@ -91,5 +93,36 @@ export function PropertyCard({ property, userStatus }: PropertyCardProps) {
                 </div>
             </div>
         </motion.div>
+    );
+}
+
+export function PropertyCardSkeleton() {
+    return (
+        <div className="group relative overflow-hidden rounded-2xl bg-card border border-border shadow-md">
+            {/* Image Container Skeleton */}
+            <div className="relative h-64 w-full bg-muted/40 animate-pulse overflow-hidden">
+                <Skeleton className="absolute inset-0 h-full w-full" />
+                <div className="absolute top-4 right-4 z-10 w-24 h-6 rounded-full bg-muted/60" />
+            </div>
+
+            {/* Content Skeleton */}
+            <div className="p-6 relative bg-card">
+                <div className="mb-4">
+                    <Skeleton className="h-3 w-32 mb-2" />
+                    <Skeleton className="h-8 w-64" />
+                </div>
+
+                <div className="flex items-end justify-between mt-6">
+                    <div className="space-y-2">
+                        <Skeleton className="h-3 w-20" />
+                        <Skeleton className="h-6 w-32" />
+                    </div>
+                    <div className="text-right space-y-2">
+                        <Skeleton className="h-3 w-16 ml-auto" />
+                        <Skeleton className="h-8 w-12 ml-auto" />
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }

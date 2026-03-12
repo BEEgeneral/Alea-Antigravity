@@ -92,4 +92,10 @@ body {
   .luxury-gradient {
     @apply bg-gradient-to-br from-[#c5a059] to-[#8f7440];
   }
+
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
 }

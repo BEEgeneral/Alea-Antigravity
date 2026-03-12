@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion, Variants, AnimatePresence } from "framer-motion";
 import Navbar from "@/components/Navbar";
+import Script from "next/script";
 
 const fadeInUp: Variants = {
   hidden: { opacity: 0, y: 40 },
@@ -41,6 +42,39 @@ export default function Home() {
   const [openCity, setOpenCity] = useState<(typeof CITIES)[0] | null>(null);
   return (
     <main className="min-h-screen bg-background text-foreground selection:bg-primary/30 font-sans overflow-x-hidden">
+      <Script
+        id="structured-data"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "RealEstateAgent",
+            "name": "Aleasignature",
+            "image": "https://aleasignature.com/logo.png",
+            "@id": "https://aleasignature.com",
+            "url": "https://aleasignature.com",
+            "telephone": "+34657174243",
+            "address": {
+              "@type": "PostalAddress",
+              "addressLocality": "Madrid",
+              "addressCountry": "ES"
+            },
+            "description": "Boutique de originación estratégica y defensa del capital en España y Portugal.",
+            "openingHoursSpecification": {
+              "@type": "OpeningHoursSpecification",
+              "dayOfWeek": [
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday"
+              ],
+              "opens": "09:00",
+              "closes": "18:00"
+            }
+          })
+        }}
+      />
       <Navbar />
 
       {/* Hero Section — Cinematic Video Background */}

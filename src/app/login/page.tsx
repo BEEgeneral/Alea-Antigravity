@@ -22,7 +22,7 @@ function LoginForm() {
 
     // Handle initial auth state check - uses getUser() for server-verified session
     useEffect(() => {
-        supabase.auth.getUser().then(({ data: { user } }) => {
+        supabase.auth.getUser().then(({ data: { user } }: { data: { user: any } }) => {
             if (user && !fromOnboarding) {
                 const userRole = user.user_metadata?.role;
                 const userEmail = user.email || "";

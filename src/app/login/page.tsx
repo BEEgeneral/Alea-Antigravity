@@ -55,17 +55,15 @@ function LoginForm() {
         const redirectTo = searchParams.get("redirectTo") || "/praetorium";
 
         try {
-            // Determine the base URL for the redirect
-            // If we are on aleasignature.com (production), we want to stay there
-            const origin = window.location.origin.includes('aleasignature.com') 
-                ? 'https://aleasignature.com' 
-                : window.location.origin;
+            const currentOrigin = window.location.origin;
+            const redirectUrl = `${currentOrigin}/auth/callback?next=${redirectTo}`;
+            console.log("Attempting Magic Link with redirect:", redirectUrl);
 
             const { error: signInError } = await supabase.auth.signInWithOtp({
                 email: trimmedEmail,
                 options: {
                     shouldCreateUser: false,
-                    emailRedirectTo: `${origin}/auth/callback?next=${redirectTo}`,
+                    emailRedirectTo: redirectUrl,
                 },
             });
 
@@ -84,7 +82,9 @@ function LoginForm() {
             setSuccess("Enlace de acceso enviado. Revisa tu bandeja de entrada o carpeta de spam.");
         } catch (err: unknown) {
             console.error("Login Error Details:", err);
-            const errorMessage = err instanceof Error ? err.message : "Error de conexión. Inténtalo de nuevo.";
+            const errorMessage = err instanceof Error 
+                ? err.message 
+                : (typeof err === 'object' && err !== null ? JSON.stringify(err) : "Error de conexión. Inténtalo de nuevo.");
             setError(errorMessage);
         } finally {
             setLoading(false);

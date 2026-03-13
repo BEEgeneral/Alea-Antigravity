@@ -53,6 +53,12 @@ export default function AdminDashboard() {
     const [properties, setProperties] = useState<any[]>([]);
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const [showToast, setShowToast] = useState(false);
+    const [toast, setToast] = useState({ message: '', type: 'success' });
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
+    const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
+    const [trackingNoteContent, setTrackingNoteContent] = useState("");
+    const [activeLeadForNote, setActiveLeadForNote] = useState<any>(null);
+    const [isSavingNote, setIsSavingNote] = useState(false);
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [allAgents, setAllAgents] = useState<any[]>([]);
     const [selectedProperty, setSelectedProperty] = useState<any>(null);
@@ -300,11 +306,15 @@ export default function AdminDashboard() {
             setSelectedSuggestion(null);
             setIaiDossierFile(null);
             setIsUploadingIaiDossier(false);
-            alert("Activo dado de alta exitosamente");
+            setToast({ message: "Activo dado de alta exitosamente", type: 'success' });
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
         } catch (err: any) {
             console.error("Error creating property from suggestion:", err);
             setIsUploadingIaiDossier(false);
-            alert(`Error al dar de alta el activo: ${err.message || "Error desconocido"}`);
+            setToast({ message: `Error al dar de alta el activo: ${err.message || "Error desconocido"}`, type: 'error' });
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 5000);
         }
     };
 
@@ -338,6 +348,8 @@ export default function AdminDashboard() {
             if (iaiSuggestionsData) setIaiSuggestions(iaiSuggestionsData);
         } catch (error) {
             console.error("Error fetching data:", error);
+        } finally {
+            setIsInitialLoading(false);
         }
     };
 
@@ -646,7 +658,9 @@ export default function AdminDashboard() {
 
         } catch (err: any) {
             console.error("Error processing PDF:", err?.message || err, err?.stack || "");
-            alert(`Error al procesar el PDF: ${err?.message || 'Error desconocido'}`);
+            setToast({ message: `Error al procesar el PDF: ${err?.message || 'Error desconocido'}`, type: 'error' });
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 5000);
         } finally {
             setIsUploadingPdf(false);
             if (e.target) e.target.value = '';
@@ -811,11 +825,15 @@ export default function AdminDashboard() {
                 setTimeout(() => setShowToast(false), 3000);
             } else {
                 console.error("Error creating investor:", error);
-                alert(`Error al crear inversor: ${error.message || "Permiso denegado por seguridad (RLS)"}`);
+                setToast({ message: `Error al crear inversor: ${error.message || "Permiso denegado por seguridad (RLS)"}`, type: 'error' });
+                setShowToast(true);
+                setTimeout(() => setShowToast(false), 5000);
             }
         } catch (error: any) {
             console.error("Error creating investor:", error);
-            alert(`Error inesperado: ${error.message}`);
+            setToast({ message: `Error inesperado: ${error.message}`, type: 'error' });
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 5000);
         }
     };
 
@@ -852,11 +870,15 @@ export default function AdminDashboard() {
                 setTimeout(() => setShowToast(false), 3000);
             } else {
                 console.error("Error creating mandatario:", error);
-                alert(`Error al crear mandatario: ${error.message || "Permiso denegado por seguridad (RLS)"}`);
+                setToast({ message: `Error al crear mandatario: ${error.message || "Permiso denegado por seguridad (RLS)"}`, type: 'error' });
+                setShowToast(true);
+                setTimeout(() => setShowToast(false), 5000);
             }
         } catch (error: any) {
             console.error("Error creating mandatario:", error);
-            alert(`Error inesperado: ${error.message}`);
+            setToast({ message: `Error inesperado: ${error.message}`, type: 'error' });
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 5000);
         }
     };
 
@@ -1032,16 +1054,39 @@ export default function AdminDashboard() {
     };
 
     const _handleAddInteraction = (leadId: string) => {
-        const content = prompt("Añadir nota de seguimiento:");
-        if (content) {
-            const newInteraction = {
-                id: `i${Date.now()}`,
-                leadId,
-                type: "note",
-                content,
-                date: "Just now"
-            };
-            setInteractions([newInteraction, ...interactions]);
+        setActiveLeadForNote(leadId);
+        setTrackingNoteContent("");
+        setIsTrackingModalOpen(true);
+    };
+
+    const handleSaveTrackingNote = async () => {
+        if (!activeLeadForNote || !trackingNoteContent.trim()) return;
+        
+        setIsSavingNote(true);
+        try {
+            const { error } = await supabase
+                .from('interactions')
+                .insert([{
+                    lead_id: activeLeadForNote,
+                    type: 'note',
+                    content: trackingNoteContent
+                }]);
+
+            if (error) throw error;
+            
+            setToast({ message: "Nota añadida correctamente", type: 'success' });
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+            setIsTrackingModalOpen(false);
+            setTrackingNoteContent("");
+            setActiveLeadForNote(null);
+            fetchData();
+        } catch (err: any) {
+            setToast({ message: `Error al añadir nota: ${err.message}`, type: 'error' });
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 5000);
+        } finally {
+            setIsSavingNote(false);
         }
     };
 
@@ -1501,14 +1546,19 @@ export default function AdminDashboard() {
                                 <div className="space-y-5">
                                     <div>
                                         <label className="text-[10px] text-muted-foreground uppercase tracking-widest font-black mb-2 block">Precio Base (€)</label>
-                                        <input
-                                            type="number"
-                                            value={priceForm.price || ""}
-                                            placeholder="0"
-                                            onFocus={(e) => e.target.select()}
-                                            onChange={(e) => setPriceForm(f => ({ ...f, price: Number(e.target.value) }))}
-                                            className="w-full bg-muted/50 border border-border rounded-2xl px-5 py-3 text-2xl font-serif font-medium focus:outline-none focus:border-primary/60 transition-all"
-                                        />
+                                            <input
+                                                type="number"
+                                                value={priceForm.price || ""}
+                                                placeholder="0"
+                                                onFocus={(e) => e.target.select()}
+                                                onChange={(e) => setPriceForm(f => ({ ...f, price: Number(e.target.value) }))}
+                                                className="w-full bg-muted/50 border border-border rounded-2xl px-5 py-3 text-2xl font-serif font-medium focus:outline-none focus:border-primary/60 transition-all"
+                                            />
+                                            {priceForm.price > 0 && (
+                                                <p className="text-[10px] text-primary font-bold mt-1.5 ml-1 animate-in fade-in slide-in-from-top-1">
+                                                    {priceForm.price.toLocaleString('es-ES')} €
+                                                </p>
+                                            )}
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -1562,7 +1612,7 @@ export default function AdminDashboard() {
                                 <>
                                     <div className="mb-10">
                                         <div className="text-4xl md:text-5xl font-serif font-medium text-foreground mb-1 uppercase tracking-tighter">
-                                            €{Number(property.price).toLocaleString()}
+                                            €{new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 }).format(property.price)}
                                         </div>
                                         <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Precio base</p>
                                     </div>
@@ -1571,7 +1621,7 @@ export default function AdminDashboard() {
                                         <div className="space-y-3">
                                             <div className="flex justify-between items-center text-sm font-medium">
                                                 <span className="text-muted-foreground">Precio base:</span>
-                                                <span className="text-foreground">€{Number(property.price).toLocaleString()}</span>
+                                                <span className="text-foreground">€{new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 }).format(property.price)}</span>
                                             </div>
                                             <div className="flex justify-between items-center text-sm font-medium">
                                                 <span className="text-muted-foreground">Comisión tercero ({Number(property.comision_tercero) || 2}%):</span>
@@ -2184,7 +2234,7 @@ export default function AdminDashboard() {
         <div className="flex h-screen bg-muted/10 selection:bg-primary/30">
 
             {/* Admin Sidebar */}
-            <aside className="w-64 bg-card border-r border-border flex flex-col hidden md:flex shrink-0 z-20 shadow-xl">
+            <aside className="w-64 bg-background/60 backdrop-blur-3xl border-r border-white/5 flex flex-col hidden md:flex shrink-0 z-20 shadow-xl">
                 <div className="p-6 border-b border-border">
                     <span className="font-serif text-2xl tracking-widest font-medium">Praetorium.</span>
                     <span className="block text-xs text-muted-foreground uppercase tracking-widest mt-1 font-semibold">Panel de Control</span>
@@ -2326,7 +2376,7 @@ export default function AdminDashboard() {
                             animate={{ x: 0 }}
                             exit={{ x: "-100%" }}
                             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                            className="fixed inset-y-0 left-0 w-72 bg-card z-[101] shadow-2xl flex flex-col md:hidden"
+                            className="fixed inset-y-0 left-0 w-72 bg-background/60 backdrop-blur-3xl z-[101] shadow-2xl flex flex-col md:hidden border-r border-white/10"
                         >
                             <div className="p-6 border-b border-border flex justify-between items-center">
                                 <div>
@@ -2395,7 +2445,7 @@ export default function AdminDashboard() {
             {/* Main Content Area */}
             <main className="flex-1 overflow-hidden flex flex-col relative">
 
-                <header className="px-4 py-6 md:p-8 md:pb-4 flex justify-between items-center bg-background/50 backdrop-blur-sm z-10 border-b border-border/50">
+                <header className="px-4 py-6 md:p-8 md:pb-4 flex justify-between items-center bg-background/40 backdrop-blur-md z-10 border-b border-white/5 sticky top-0">
                     <div className="flex items-center space-x-4">
                         <button
                             onClick={() => setIsMobileMenuOpen(true)}
@@ -2448,13 +2498,18 @@ export default function AdminDashboard() {
                     <AnimatePresence>
                         {showToast && (
                             <motion.div
-                                initial={{ opacity: 0, y: 50 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.9 }}
-                                className="fixed bottom-8 right-8 bg-foreground text-background px-6 py-3 rounded-2xl shadow-2xl z-50 flex items-center space-x-3 font-medium border border-white/10"
+                                initial={{ opacity: 0, y: 50, scale: 0.9, filter: 'blur(10px)' }}
+                                animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+                                exit={{ opacity: 0, scale: 0.9, y: 20, filter: 'blur(10px)' }}
+                                className={`fixed bottom-8 right-8 ${toast.type === 'error' ? 'bg-red-500/90 text-white' : 'bg-foreground/90 text-background'} backdrop-blur-xl px-6 py-4 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[100] flex items-center space-x-4 font-bold border border-white/10 min-w-[320px]`}
                             >
-                                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                                <span>Estado de operación actualizado en Supabase</span>
+                                <div className={`w-10 h-10 rounded-2xl ${toast.type === 'error' ? 'bg-white/20' : 'bg-primary/20'} flex items-center justify-center`}>
+                                    {toast.type === 'error' ? <ShieldAlert size={20} className="text-white" /> : <Sparkles size={20} className="text-primary" />}
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] uppercase tracking-widest opacity-60 font-black">{toast.type === 'error' ? 'Critical Alert' : 'System Intelligence'}</span>
+                                    <span className="text-sm tracking-tight">{toast.message || "Operación completada en Supabase"}</span>
+                                </div>
                             </motion.div>
                         )}
                     </AnimatePresence>
@@ -2463,9 +2518,43 @@ export default function AdminDashboard() {
                         renderInvestorProfile(selectedInvestor)
                     ) : (
                         <div className="h-full flex relative px-8 pt-6">
-                            <div className={`flex-1 overflow-x-auto pb-8 transition-all duration-500 ${selectedLead ? 'mr-96' : ''}`}>
+                            <div className={`flex-1 overflow-x-auto pb-8 transition-all duration-500 ${selectedLead ? 'mr-96' : ''} relative`}>
+                                {/* Subliminal Background Glows (Phase 1 Visuals) */}
+                                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] -z-10 pointer-events-none" />
+                                <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-emerald-500/5 rounded-full blur-[100px] -z-10 pointer-events-none" />
+
                                 {activeTab === "crm" && (
-                                    <div className="flex h-full space-x-6 min-w-max pb-8 relative">
+                                    <div className="flex flex-col space-y-8 animate-in fade-in duration-700">
+                                        {/* Bento Metrics Section */}
+                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 px-8 mt-2">
+                                            <div className="bg-card/40 backdrop-blur-sm border border-white/5 p-6 rounded-[2rem] shadow-sm flex flex-col justify-between group hover:border-primary/20 transition-all">
+                                                <span className="text-[10px] uppercase tracking-widest font-black text-muted-foreground">Pipeline Value</span>
+                                                <div className="mt-4">
+                                                    <h3 className="text-3xl font-serif font-bold">€12.4M</h3>
+                                                    <p className="text-[10px] text-emerald-500 font-bold mt-1">+14% vs last month</p>
+                                                </div>
+                                            </div>
+                                            <div className="bg-card/40 backdrop-blur-sm border border-white/5 p-6 rounded-[2rem] shadow-sm flex flex-col justify-between group hover:border-primary/20 transition-all">
+                                                <span className="text-[10px] uppercase tracking-widest font-black text-muted-foreground">Active Deals</span>
+                                                <div className="mt-4">
+                                                    <h3 className="text-3xl font-serif font-bold">24</h3>
+                                                    <div className="flex -space-x-2 mt-2">
+                                                        {[1, 2, 3, 4].map(i => <div key={i} className="w-6 h-6 rounded-full border-2 border-background bg-muted group-hover:scale-110 transition-transform" />)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="md:col-span-2 bg-primary/5 backdrop-blur-sm border border-primary/10 p-6 rounded-[2rem] shadow-sm relative overflow-hidden group">
+                                                <Sparkles className="absolute -top-4 -right-4 w-24 h-24 text-primary/10 group-hover:rotate-12 transition-transform duration-700" />
+                                                <span className="text-[10px] uppercase tracking-widest font-black text-primary/80">Alea Strategy</span>
+                                                <div className="mt-4 max-w-xs">
+                                                    <h3 className="text-xl font-serif font-bold text-foreground/90">AI Matching Active</h3>
+                                                    <p className="text-xs text-muted-foreground mt-2 font-medium">3 high-probability matches identified for current portfolio assets.</p>
+                                                </div>
+                                                <button className="absolute bottom-6 right-8 px-5 py-2.5 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:scale-105 transition-all shadow-lg shadow-primary/20">Review Intelligence</button>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex h-full space-x-6 min-w-max pb-8 relative px-8">
                                         {PIPELINE_STAGES.map((stage) => (
                                             <div
                                                 key={stage.id}
@@ -2485,9 +2574,27 @@ export default function AdminDashboard() {
                                                     </button>
                                                 </div>
 
-                                                <div className={`flex-1 bg-muted/20 rounded-[2rem] border border-dashed transition-all duration-300 ${draggingId ? 'border-primary/20 bg-primary/5' : 'border-border/40'} p-4 space-y-4 overflow-y-auto`}>
+                                                <div className={`flex-1 ${isInitialLoading ? 'bg-muted/5' : 'bg-muted/20'} rounded-[2rem] border border-dashed transition-all duration-300 ${draggingId ? 'border-primary/20 bg-primary/5' : 'border-border/40'} p-4 space-y-4 overflow-y-auto`}>
                                                     <AnimatePresence>
-                                                        {pipelineData[stage.id]?.map((lead) => (
+                                                        {isInitialLoading ? (
+                                                            /* Skeleton Screens */
+                                                            [1, 2, 3].map(i => (
+                                                                <div key={i} className="bg-card/40 backdrop-blur-sm border border-white/5 rounded-3xl p-6 space-y-4 animate-pulse">
+                                                                    <div className="flex justify-between items-center">
+                                                                        <div className="w-24 h-4 bg-muted rounded-full" />
+                                                                        <div className="w-8 h-8 rounded-xl bg-muted" />
+                                                                    </div>
+                                                                    <div className="space-y-2">
+                                                                        <div className="w-full h-3 bg-muted rounded-full opacity-50" />
+                                                                        <div className="w-2/3 h-3 bg-muted rounded-full opacity-30" />
+                                                                    </div>
+                                                                    <div className="pt-4 border-t border-border/10">
+                                                                        <div className="w-full h-2 bg-muted rounded-full" />
+                                                                    </div>
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            pipelineData[stage.id]?.map((lead) => (
                                                             <motion.div
                                                                 key={lead.id}
                                                                 layoutId={lead.id}
@@ -2559,7 +2666,8 @@ export default function AdminDashboard() {
                                                                     </div>
                                                                 </div>
                                                             </motion.div>
-                                                        ))}
+                                                            ))
+                                                        )}
                                                     </AnimatePresence>
                                                     {pipelineData[stage.id]?.length === 0 && (
                                                         <div className="h-40 flex flex-col items-center justify-center text-[10px] text-muted-foreground/30 uppercase tracking-[0.3em] font-bold border-2 border-dashed border-border/20 rounded-[2rem]">
@@ -2570,7 +2678,8 @@ export default function AdminDashboard() {
                                             </div>
                                         ))}
                                     </div>
-                                )}
+                                </div>
+                            )}
 
                                 {/* IAI INBOX TAB */}
                                 {activeTab === "iai_inbox" && currentUser?.role === 'admin' && (
@@ -2635,12 +2744,46 @@ export default function AdminDashboard() {
                                                             <div className="bg-muted/30 p-6 rounded-[2rem] border border-border/50 relative overflow-hidden">
                                                                 <div className="flex items-start">
                                                                     <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center mr-3 shrink-0 mt-0.5">
-                                                                        <Sparkles size={12} className="text-primary" />
+                                                                        <motion.div
+                                                                            animate={{ 
+                                                                                scale: [1, 1.2, 1],
+                                                                                opacity: [0.5, 1, 0.5]
+                                                                            }}
+                                                                            transition={{ 
+                                                                                duration: 3,
+                                                                                repeat: Infinity,
+                                                                                ease: "easeInOut"
+                                                                            }}
+                                                                        >
+                                                                            <Sparkles size={12} className="text-primary" />
+                                                                        </motion.div>
                                                                     </div>
                                                                     <div className="flex-1">
                                                                         <p className="text-sm text-foreground/80 leading-relaxed font-medium mb-2">
                                                                             <span className="font-bold text-foreground block mb-1">Extracto Inteligente:</span>
-                                                                            {suggestion.extracted_data?._iai_summary || suggestion.extracted_data?.summary || 'No hay resumen disponible.'}
+                                                                            <motion.span
+                                                                                initial="hidden"
+                                                                                animate="visible"
+                                                                                variants={{
+                                                                                    visible: {
+                                                                                        transition: {
+                                                                                            staggerChildren: 0.008
+                                                                                        }
+                                                                                    }
+                                                                                }}
+                                                                            >
+                                                                                {(suggestion.extracted_data?._iai_summary || suggestion.extracted_data?.summary || 'No hay resumen disponible.').split('').map((char: string, i: number) => (
+                                                                                    <motion.span
+                                                                                        key={i}
+                                                                                        variants={{
+                                                                                            hidden: { opacity: 0, y: 5 },
+                                                                                            visible: { opacity: 1, y: 0 }
+                                                                                        }}
+                                                                                    >
+                                                                                        {char}
+                                                                                    </motion.span>
+                                                                                ))}
+                                                                            </motion.span>
                                                                         </p>
                                                                         {suggestion.suggestion_type === 'property' && suggestion.extracted_data?._iai_has_dossier === false && (
                                                                             <span className="inline-block mt-1 px-3 py-1 bg-red-500/10 text-red-500 border border-red-500/20 text-[10px] font-bold uppercase tracking-wider rounded-lg">
@@ -2742,11 +2885,28 @@ export default function AdminDashboard() {
                                             </div>
                                             <div className="space-y-4">
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                    {investors.map((investor: any) => (
+                                                    {isInitialLoading ? (
+                                                        [1, 2, 4, 4].map(i => (
+                                                            <div key={i} className="bg-card/40 backdrop-blur-sm border border-white/5 rounded-[2.5rem] p-8 animate-pulse space-y-6">
+                                                                <div className="flex items-center space-x-4">
+                                                                    <div className="w-14 h-14 bg-muted rounded-2xl" />
+                                                                    <div className="space-y-2 flex-1">
+                                                                        <div className="w-1/2 h-4 bg-muted rounded-full" />
+                                                                        <div className="w-1/4 h-2 bg-muted rounded-full" />
+                                                                    </div>
+                                                                </div>
+                                                                <div className="space-y-3">
+                                                                    <div className="w-full h-2 bg-muted rounded-full opacity-50" />
+                                                                    <div className="w-full h-2 bg-muted rounded-full opacity-30" />
+                                                                </div>
+                                                            </div>
+                                                        ))
+                                                    ) : (
+                                                        investors.map((investor: any) => (
                                                         <motion.div
                                                             key={investor.id}
                                                             whileHover={{ y: -5 }}
-                                                            className="bg-card/50 backdrop-blur-sm border border-border/60 rounded-[2rem] p-6 flex flex-col justify-between hover:shadow-xl hover:border-primary/30 transition-all group relative overflow-hidden"
+                                                            className="bg-card/40 backdrop-blur-md border border-white/5 rounded-[2.5rem] p-6 flex flex-col justify-between hover:shadow-xl hover:border-primary/30 transition-all group relative overflow-hidden"
                                                         >
                                                             <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:bg-primary/10 transition-all" />
 
@@ -2831,9 +2991,9 @@ export default function AdminDashboard() {
                                                                         +3
                                                                     </div>
                                                                 </div>
-                                                            </div>
-                                                        </motion.div>
-                                                    ))}
+                                                            </motion.div>
+                                                        ))
+                                                    )}
                                                     {investors.length === 0 && (
                                                         <div className="col-span-full text-center py-20 opacity-40 uppercase tracking-widest text-xs font-black border-2 border-dashed border-border/40 rounded-[3rem]">
                                                             No hay inversores en la base de datos
@@ -3083,11 +3243,27 @@ export default function AdminDashboard() {
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                                {properties.map((asset: any) => (
+                                                {isInitialLoading ? (
+                                                    [1, 2, 3].map(i => (
+                                                        <div key={i} className="bg-card/40 backdrop-blur-sm border border-white/5 rounded-[2.5rem] overflow-hidden animate-pulse">
+                                                            <div className="aspect-[16/10] bg-muted" />
+                                                            <div className="p-8 space-y-6">
+                                                                <div className="space-y-2">
+                                                                    <div className="w-3/4 h-5 bg-muted rounded-full" />
+                                                                    <div className="w-1/4 h-3 bg-muted rounded-full opacity-50" />
+                                                                </div>
+                                                                <div className="pt-6 border-t border-border/10">
+                                                                    <div className="w-1/2 h-6 bg-muted rounded-full" />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    properties.map((asset: any) => (
                                                     <div
                                                         key={asset.id}
                                                         onClick={() => setSelectedProperty(asset)}
-                                                        className="bg-card border border-border/60 rounded-[2.5rem] overflow-hidden hover:shadow-2xl transition-all group flex flex-col h-full shadow-sm cursor-pointer"
+                                                        className="bg-card/40 backdrop-blur-md border border-white/10 rounded-[2.5rem] overflow-hidden hover:shadow-2xl transition-all group flex flex-col h-full shadow-sm cursor-pointer hover:border-primary/30"
                                                     >
                                                         <div className="relative aspect-[16/10] overflow-hidden">
                                                             <img
@@ -3131,7 +3307,7 @@ export default function AdminDashboard() {
                                                             <div className="space-y-4 mb-8 flex-1">
                                                                 <div className="flex items-baseline space-x-2">
                                                                     <span className="text-2xl font-serif font-bold text-primary">
-                                                                        €{Number(asset.price).toLocaleString()}
+                                                                        €{new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 }).format(asset.price)}
                                                                     </span>
                                                                     <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Base</span>
                                                                 </div>
@@ -3139,7 +3315,7 @@ export default function AdminDashboard() {
                                                                 <div className="grid grid-cols-3 gap-2 py-4 border-y border-border/30">
                                                                     <div className="flex flex-col items-center text-center">
                                                                         <Maximize2 size={14} className="text-primary/40 mb-1" />
-                                                                        <span className="text-[10px] font-bold text-foreground">{asset.meters || 0}m²</span>
+                                                                        <span className="text-[10px] font-bold text-foreground">{new Intl.NumberFormat("es-ES").format(asset.meters || 0)} m²</span>
                                                                         <span className="text-[7px] text-muted-foreground uppercase tracking-widest font-black">Sup</span>
                                                                     </div>
                                                                     <div className="flex flex-col items-center text-center">
@@ -3178,11 +3354,13 @@ export default function AdminDashboard() {
                                                                 </button>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                                        </div>
+                                                    )
+                                                )
+                                            )}
                                         </div>
-                                    )}
+                                    </div>
+                                )}
 
                                     {activeTab === "profile" && (
                                         <div className="max-w-4xl mx-auto w-full mt-10 pb-20">
@@ -3349,7 +3527,6 @@ export default function AdminDashboard() {
                                 </div>
                             </div>
                         </div>
-                    )}
                 </div>
             </main>
 
@@ -3580,6 +3757,11 @@ export default function AdminDashboard() {
                                         onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, budget_min: Number(e.target.value) })}
                                         className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
                                     />
+                                    {selectedInvestorToEdit.budget_min > 0 && (
+                                        <p className="text-[10px] text-primary font-bold mt-1.5 ml-1 animate-in fade-in slide-in-from-top-1">
+                                            {selectedInvestorToEdit.budget_min.toLocaleString('es-ES')} €
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ticket Máximo (EUR)</label>
@@ -3590,6 +3772,11 @@ export default function AdminDashboard() {
                                         onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, budget_max: Number(e.target.value) })}
                                         className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
                                     />
+                                    {selectedInvestorToEdit.budget_max > 0 && (
+                                        <p className="text-[10px] text-primary font-bold mt-1.5 ml-1 animate-in fade-in slide-in-from-top-1">
+                                            {selectedInvestorToEdit.budget_max.toLocaleString('es-ES')} €
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-3 px-1">Etiquetas de Inversores</label>
@@ -3714,6 +3901,11 @@ export default function AdminDashboard() {
                                         onChange={(e) => setPropertyForm({ ...propertyForm, price: Number(e.target.value) })}
                                         className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
                                     />
+                                    {propertyForm.price > 0 && (
+                                        <p className="text-[10px] text-primary font-bold mt-1.5 ml-1 animate-in fade-in slide-in-from-top-1">
+                                            {propertyForm.price.toLocaleString('es-ES')} €
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Superficie Total (m²)</label>
@@ -3869,6 +4061,11 @@ export default function AdminDashboard() {
                                         onChange={(e) => setInvestorForm({ ...investorForm, budget_min: Number(e.target.value) })}
                                         className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
                                     />
+                                    {investorForm.budget_min > 0 && (
+                                        <p className="text-[10px] text-primary font-bold mt-1.5 ml-1 animate-in fade-in slide-in-from-top-1">
+                                            {investorForm.budget_min.toLocaleString('es-ES')} €
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ticket Máximo (€)</label>
@@ -3879,6 +4076,11 @@ export default function AdminDashboard() {
                                         onChange={(e) => setInvestorForm({ ...investorForm, budget_max: Number(e.target.value) })}
                                         className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
                                     />
+                                    {investorForm.budget_max > 0 && (
+                                        <p className="text-[10px] text-primary font-bold mt-1.5 ml-1 animate-in fade-in slide-in-from-top-1">
+                                            {investorForm.budget_max.toLocaleString('es-ES')} €
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-3 px-1">Etiquetas</label>
@@ -4331,29 +4533,41 @@ export default function AdminDashboard() {
                             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200]"
                         />
                         <motion.div
-                            initial={{ x: '100%' }}
-                            animate={{ x: 0 }}
-                            exit={{ x: '100%' }}
-                            transition={{ type: 'spring', damping: 28, stiffness: 200 }}
-                            className="fixed inset-y-0 right-0 w-full max-w-xl bg-card/95 backdrop-blur-xl z-[201] shadow-2xl border-l border-border/50 flex flex-col overflow-hidden"
+                            layoutId={`email-modal-${activeEmailSuggestion?.id || 'default'}`}
+                            initial={{ x: '100%', opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            exit={{ x: '100%', opacity: 0 }}
+                            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                            className="fixed inset-y-0 right-0 w-full max-w-xl bg-card/90 backdrop-blur-2xl z-[201] shadow-2xl border-l border-border/50 flex flex-col overflow-hidden"
                         >
                             {/* Header */}
-                            <div className="p-6 md:p-8 border-b border-border/50 bg-gradient-to-r from-primary/5 to-transparent">
+                            <div className="p-6 md:p-8 border-b border-border/50 bg-gradient-to-r from-primary/10 to-transparent">
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center space-x-3">
-                                        <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
-                                            <BrainCircuit size={20} className="text-primary" />
-                                        </div>
+                                        <motion.div 
+                                            animate={{ 
+                                                scale: [1, 1.1, 1],
+                                                rotate: [0, 5, 0]
+                                            }}
+                                            transition={{ 
+                                                duration: 4,
+                                                repeat: Infinity,
+                                                ease: "easeInOut"
+                                            }}
+                                            className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center border border-primary/30 shadow-lg shadow-primary/10"
+                                        >
+                                            <BrainCircuit size={24} className="text-primary" />
+                                        </motion.div>
                                         <div>
-                                            <h3 className="font-serif text-lg font-medium tracking-tight">Interpretación AI</h3>
-                                            <p className="text-[10px] uppercase tracking-[0.2em] font-black text-muted-foreground">Alea Intelligence Core</p>
+                                            <h3 className="font-serif text-xl font-bold tracking-tight">Interpretación AI</h3>
+                                            <p className="text-[10px] uppercase tracking-[0.3em] font-black text-primary/60">Alea Intelligence Core</p>
                                         </div>
                                     </div>
                                     <button
                                         onClick={() => setShowEmailModal(false)}
-                                        className="p-2.5 bg-muted/50 rounded-xl hover:bg-muted transition-all text-muted-foreground hover:text-foreground"
+                                        className="p-3 bg-muted/50 rounded-2xl hover:bg-red-500/10 hover:text-red-500 transition-all text-muted-foreground group"
                                     >
-                                        <X size={18} />
+                                        <X size={20} className="group-hover:rotate-90 transition-transform" />
                                     </button>
                                 </div>
 
@@ -4435,8 +4649,58 @@ export default function AdminDashboard() {
                             </div>
                         </motion.div>
                     </>
+            </AnimatePresence>
+            {/* Tracking Note Modal */}
+            <AnimatePresence>
+                {isTrackingModalOpen && (
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setIsTrackingModalOpen(false)}
+                            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                            className="relative bg-card border border-border w-full max-w-lg rounded-[2.5rem] shadow-2xl p-10 overflow-hidden"
+                        >
+                            <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">
+                                <Plus size={120} />
+                            </div>
+                            
+                            <h2 className="font-serif text-2xl mb-2">Añadir Seguimiento</h2>
+                            <p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground mb-8">Lead: {activeLeadForNote && typeof activeLeadForNote === 'object' ? activeLeadForNote.investors?.full_name : 'Inversor'}</p>
+
+                            <textarea
+                                value={trackingNoteContent}
+                                onChange={(e) => setTrackingNoteContent(e.target.value)}
+                                placeholder="Escribe aquí los detalles del contacto..."
+                                className="w-full h-40 bg-muted/30 border border-border/60 rounded-[2rem] p-6 text-sm focus:outline-none focus:border-primary/50 transition-all resize-none mb-6"
+                                autoFocus
+                            />
+
+                            <div className="flex gap-4">
+                                <button
+                                    onClick={() => setIsTrackingModalOpen(false)}
+                                    className="flex-1 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-muted transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleSaveTrackingNote}
+                                    disabled={isSavingNote || !trackingNoteContent.trim()}
+                                    className="flex-1 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all shadow-xl shadow-primary/20 disabled:opacity-50"
+                                >
+                                    {isSavingNote ? <Loader2 size={16} className="animate-spin mx-auto" /> : 'Guardar Nota'}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
                 )}
             </AnimatePresence>
-        </div >
+        </div>
     );
 }

@@ -11,6 +11,7 @@
 - [x] **Milestone 8:** Implementación de Directorio de Mandatarios e integración en Arquitectura de Operación.
 - [x] **Milestone 9:** Final Sync & /audit de Quality Gate Visual/Funcional.
 - [x] **Milestone 10:** SEO Power-Up & Search Console Strategy.
+- [ ] **Milestone 11:** Production Deployment - Sync GitHub & Vercel.
 
 ## 📝 Current Trajectory
 **Fase de Optimización Técnica:** Implementación de protocolos SEO de alto nivel (Sitemaps, Robots, JSON-LD) para asegurar la máxima visibilidad en Google Search Console y optimizar la indexación de mandatos privados.
@@ -22,6 +23,7 @@
 | Antigravity | Agent Access & Magic Link Fix (aleasignature.com) | Verified & Polished |
 | Antigravity | Final Sync & /audit (Quality Gate) | Verified & Polished |
 | Antigravity | Technical SEO & Search Console Setup | Verified & Polished |
+| Antigravity | Production Sync (GitHub + Vercel) | Pending "publicar" |
 
 ## 💾 State Snapshot
 - **Database:** Tabla `mandatarios` definida y columnas de relación en `leads` añadidas para soporte de intermediación delegada.

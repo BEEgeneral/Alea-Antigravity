@@ -179,11 +179,8 @@ export default function AdminDashboard() {
     };
 
     const handleRejectSuggestion = async (id: string) => {
-        if (confirm("¿Estás seguro de que quieres descartar esta sugerencia de IA?")) {
-            await supabase.from('iai_inbox_suggestions').update({ status: 'rejected' }).eq('id', id);
-            setIaiSuggestions(prev => prev.filter(s => s.id !== id));
-            alert("Sugerencia descartada");
-        }
+        await supabase.from('iai_inbox_suggestions').update({ status: 'rejected' }).eq('id', id);
+        setIaiSuggestions(prev => prev.filter(s => s.id !== id));
     };
 
     const handleViewEmail = async (suggestion: any) => {

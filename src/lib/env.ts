@@ -34,6 +34,9 @@ export const env = {
   
   /** Groq API Key (Server side only) */
   GROQ_API_KEY: process.env.GROQ_API_KEY,
+  
+  /** Gemini API Key (Server side only) */
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
 
   // --- Helper Methods ---
 

@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import Groq from 'groq-sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
 export async function POST(req: Request) {
     try {
@@ -35,14 +34,12 @@ export async function POST(req: Request) {
         }
         `;
 
-        const completion = await groq.chat.completions.create({
-            messages: [{ role: "user", content: prompt }],
-            model: "llama-3.3-70b-versatile",
-            temperature: 0.1,
-            response_format: { type: "json_object" }
+        const completionResult = await model.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
         });
 
-        const content = completion.choices[0]?.message?.content;
+        const content = completionResult.response.text();
 
         if (!content) {
             throw new Error("No response from AI engine");

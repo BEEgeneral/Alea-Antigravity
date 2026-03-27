@@ -1,0 +1,339 @@
+'use client';
+
+import { useState, useRef, useEffect } from 'react';
+import { Send, Bot, User, Loader2, X, Plus, Building, Users, ShieldCheck, FileText, Brain, Sparkles, ChevronRight, Trash2 } from 'lucide-react';
+
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+  suggestedActions?: { type: string; data: any }[];
+  analysis?: {
+    type: 'property' | 'investor' | 'mandatario' | 'lead' | 'none';
+    extracted: any;
+    confidence: number;
+  };
+}
+
+interface AIChatProps {
+  isOpen: boolean;
+  onClose: () => void;
+  context?: {
+    leads?: any[];
+    properties?: any[];
+    investors?: any[];
+    mandatarios?: any[];
+    iaiSuggestions?: any[];
+  };
+  userInfo?: {
+    id: string;
+    email: string;
+    role: string;
+  };
+}
+
+export default function PelayoChat({ isOpen, onClose, context, userInfo }: AIChatProps) {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showAnalysis, setShowAnalysis] = useState(false);
+  const [pendingActions, setPendingActions] = useState<any[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpen && messages.length === 0) {
+      setMessages([{
+        id: '1',
+        role: 'assistant',
+        content: `¡Bienvenido a Alea Signature! 👋\n\nSoy **Pelayo**, tu asistente de inteligencia patrimonial. Estoy aquí para ayudarte a gestionar tus activos, inversores y oportunidades.\n\nPuedo mostrarte el estado actual de tu cartera, analizar conversaciones para detectar nuevas oportunidades, y ayudarte a mantener actualizado el CRM.\n\n¿En qué puedo ayudarte hoy?`,
+        timestamp: new Date(),
+        suggestedActions: [
+          { type: 'show_summary', data: {} },
+          { type: 'show_properties', data: {} },
+          { type: 'show_investors', data: {} }
+        ]
+      }]);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const sendMessage = async () => {
+    if (!input.trim() || isLoading) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: input.trim(),
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setIsLoading(true);
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      const response = await fetch('/api/pelayo-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          message: userMessage.content,
+          history: messages.slice(-8).map(m => ({ role: m.role, content: m.content })),
+          context: {
+            leads: context?.leads || [],
+            properties: context?.properties || [],
+            investors: context?.investors || [],
+            mandatarios: context?.mandatarios || []
+          },
+          user: userInfo
+        })
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.response) {
+        let responseContent = data.response;
+        
+        // If a record was created, add confirmation
+        if (data.createdRecord) {
+          const entityLabels: Record<string, string> = {
+            property: 'Propiedad',
+            investor: 'Inversor',
+            lead: 'Lead',
+            mandatario: 'Mandatario'
+          };
+          const label = entityLabels[data.createdRecord.table] || data.createdRecord.table;
+          responseContent += `\n\n✅ **${label} creado correctamente en el CRM.**`;
+        }
+
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: responseContent,
+          timestamp: new Date(),
+          suggestedActions: data.suggestedActions || [],
+          analysis: data.analysis
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+      } else if (data.error) {
+        setMessages(prev => [...prev, {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: `Error: ${data.error}`,
+          timestamp: new Date()
+        }]);
+      } else {
+        setMessages(prev => [...prev, {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: 'He recibido tu mensaje pero no tengo una respuesta en este momento. ¿Podrías reformular tu pregunta?',
+          timestamp: new Date()
+        }]);
+      }
+    } catch (error: any) {
+      console.error('Pelayo error:', error);
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: error.name === 'AbortError' 
+          ? 'Tiempo de espera agotado. Por favor, intenta de nuevo.'
+          : 'Lo siento, hubo un error al procesar tu mensaje. Por favor, inténtalo de nuevo.',
+        timestamp: new Date()
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-card w-full max-w-4xl h-[80vh] rounded-3xl shadow-2xl flex overflow-hidden border border-border">
+        
+        {/* Sidebar con análisis */}
+        <div className={`${showAnalysis ? 'w-80' : 'w-0'} transition-all overflow-hidden border-r border-border bg-muted/30`}>
+          <div className="p-4 h-full overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-medium flex items-center gap-2">
+                <Brain size={18} />
+                Análisis IA
+              </h3>
+              <button onClick={() => setShowAnalysis(false)} className="p-1 hover:bg-muted rounded">
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Resumen del contexto */}
+            <div>
+              <h4 className="text-xs font-bold uppercase text-muted-foreground mb-2">Resumen CRM</h4>
+              <div className="space-y-3">
+                <div className="bg-card p-3 rounded-xl">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Building size={14} className="text-emerald-500" />
+                    <span className="text-xs font-medium">Propiedades</span>
+                  </div>
+                  <p className="text-2xl font-bold">{context?.properties?.length || 0}</p>
+                </div>
+                <div className="bg-card p-3 rounded-xl">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Users size={14} className="text-blue-500" />
+                    <span className="text-xs font-medium">Inversores</span>
+                  </div>
+                  <p className="text-2xl font-bold">{context?.investors?.length || 0}</p>
+                </div>
+                <div className="bg-card p-3 rounded-xl">
+                  <div className="flex items-center gap-2 mb-1">
+                    <User size={14} className="text-amber-500" />
+                    <span className="text-xs font-medium">Leads</span>
+                  </div>
+                  <p className="text-2xl font-bold">{context?.leads?.length || 0}</p>
+                </div>
+                <div className="bg-card p-3 rounded-xl">
+                  <div className="flex items-center gap-2 mb-1">
+                    <ShieldCheck size={14} className="text-purple-500" />
+                    <span className="text-xs font-medium">Mandatarios</span>
+                  </div>
+                  <p className="text-2xl font-bold">{context?.mandatarios?.length || 0}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Chat principal */}
+        <div className="flex-1 flex flex-col">
+          {/* Header */}
+          <div className="p-4 border-b border-border flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-blue-600 rounded-full flex items-center justify-center">
+                <Bot className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-medium">Pelayo</h3>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Sparkles size={12} className="text-amber-500" />
+                  Asistente de Patrimonio
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setShowAnalysis(!showAnalysis)}
+                className={`p-2 rounded-lg transition-all ${showAnalysis ? 'bg-primary/20 text-primary' : 'hover:bg-muted'}`}
+              >
+                <Brain size={18} />
+              </button>
+              <button onClick={onClose} className="p-2 hover:bg-muted rounded-lg">
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {messages.map((message) => (
+              <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] rounded-2xl p-4 ${
+                  message.role === 'user' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-muted'
+                }`}>
+                  <div className="flex items-start gap-2">
+                    {message.role === 'assistant' && <Bot className="w-4 h-4 mt-1 text-emerald-500 flex-shrink-0" />}
+                    {message.role === 'user' && <User className="w-4 h-4 mt-1 flex-shrink-0" />}
+                    <div className="text-sm whitespace-pre-wrap flex-1">{message.content}</div>
+                  </div>
+                  
+                  {/* Suggested actions */}
+                  {message.suggestedActions && message.suggestedActions.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-border/20 flex flex-wrap gap-2">
+                      {message.suggestedActions.map((action: any, idx: number) => (
+                        <button
+                          key={idx}
+                          onClick={() => setInput(action.label || action.type)}
+                          className="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-full flex items-center gap-1 transition-all"
+                        >
+                          {action.type === 'show_summary' && <FileText size={12} />}
+                          {action.type === 'show_properties' && <Building size={12} />}
+                          {action.type === 'show_investors' && <Users size={12} />}
+                          {action.label || action.type}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Analysis badge */}
+                  {message.analysis && message.analysis.type && message.analysis.type !== 'none' && (
+                    <div className="mt-2 pt-2 border-t border-border/20">
+                      <span className={`text-[10px] px-2 py-1 rounded-full ${
+                        message.analysis.type === 'property' ? 'bg-emerald-500/20 text-emerald-400' :
+                        message.analysis.type === 'investor' ? 'bg-blue-500/20 text-blue-400' :
+                        message.analysis.type === 'mandatario' ? 'bg-purple-500/20 text-purple-400' :
+                        'bg-amber-500/20 text-amber-400'
+                      }`}>
+                        {message.analysis.type?.toUpperCase() || 'ENTITY'} detectado ({Math.round((message.analysis.confidence || 0) * 100)}%)
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-muted rounded-2xl p-4 flex items-center gap-2">
+                  <Bot className="w-4 h-4 text-emerald-500" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm text-muted-foreground">Pelayo está analizando...</span>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input */}
+          <div className="p-4 border-t border-border">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Pregunta a Pelayo..."
+                className="flex-1 bg-muted border-0 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary"
+                disabled={isLoading}
+              />
+              <button
+                onClick={sendMessage}
+                disabled={isLoading || !input.trim()}
+                className="px-4 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
+              >
+                <Send size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

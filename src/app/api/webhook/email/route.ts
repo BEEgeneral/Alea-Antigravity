@@ -49,11 +49,17 @@ export async function POST(req: Request) {
         const text = body.text || body.body || body.content || body.plain || body.email_text || '';
         const html = body.html || body.body_html || '';
         const attachments = body.attachments || [];
+        const attachmentText = body.attachment_text || ''; // Texto extraído de adjuntos por Make.com
 
         // Combine text and html if needed
         let fullText = text;
         if (!fullText && html) {
             fullText = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        // Si hay texto de adjuntos, añadirlo al análisis
+        if (attachmentText && attachmentText.length > 50) {
+            fullText += '\n\n--- CONTENIDO DE ADJUNTOS ---\n' + attachmentText.substring(0, 10000);
         }
 
         if (!fullText || fullText.length < 10) {

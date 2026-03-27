@@ -1,0 +1,133 @@
+{
+  "name": "AleaSignature - IAI Email Processor",
+  "flow": [
+    {
+      "id": 1,
+      "module": "email:WatchEmails",
+      "version": 6,
+      "parameters": {
+        "account": 5628520,
+        "folder": "INBOX",
+        "criteria": "UNSEEN",
+        "markSeen": true,
+        "maxResults": 5
+      },
+      "mapper": {
+        "from": "{{1.from}}",
+        "to": "{{1.to}}",
+        "subject": "{{1.subject}}",
+        "text": "{{1.text}}"
+      },
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "parameters": [
+          {
+            "name": "account",
+            "type": "account:imap",
+            "label": "Email Account (IMAP)",
+            "required": true
+          },
+          {
+            "name": "folder",
+            "type": "folder",
+            "label": "Folder",
+            "required": true
+          },
+          {
+            "name": "criteria",
+            "type": "select",
+            "label": "Criteria",
+            "validate": { "enum": ["ALL", "SEEN", "UNSEEN"] }
+          },
+          {
+            "name": "markSeen",
+            "type": "boolean",
+            "label": "Mark emails as read"
+          },
+          {
+            "name": "maxResults",
+            "type": "number",
+            "label": "Max results"
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "http:MakeRequest",
+      "version": 4,
+      "parameters": {
+        "url": "https://www.aleasignature.com/api/webhook/email",
+        "method": "POST",
+        "authenticationType": "noAuth"
+      },
+      "filter": {
+        "name": "Only process emails (no noreply)",
+        "conditions": [
+          [
+            {
+              "a": "{{1.from}}",
+              "b": "noreply",
+              "o": "text:notcontain"
+            },
+            {
+              "a": "{{1.from}}",
+              "b": "no-reply",
+              "o": "text:notcontain"
+            },
+            {
+              "a": "{{1.from}}",
+              "b": "newsletter",
+              "o": "text:notcontain"
+            },
+            {
+              "a": "{{1.from}}",
+              "b": "automatic",
+              "o": "text:notcontain"
+            }
+          ]
+        ]
+      },
+      "mapper": {
+        "headers": [
+          { "name": "Content-Type", "value": "application/json" }
+        ],
+        "contentType": "json",
+        "body": {
+          "from": "{{1.from}}",
+          "subject": "{{1.subject}}",
+          "text": "{{1.text}}"
+        }
+      },
+      "metadata": {
+        "designer": { "x": 300, "y": 0 },
+        "parameters": [
+          {
+            "name": "url",
+            "type": "url",
+            "label": "URL",
+            "required": true
+          },
+          {
+            "name": "method",
+            "type": "select",
+            "label": "Method",
+            "validate": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] }
+          },
+          {
+            "name": "authenticationType",
+            "type": "select",
+            "label": "Authentication"
+          }
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true
+    }
+  }
+}

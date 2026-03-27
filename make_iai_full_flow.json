@@ -1,0 +1,83 @@
+{
+  "name": "AleaSignature - IAI Email Processor COMPLETO",
+  "flow": [
+    {
+      "id": 1,
+      "module": "email:TriggerNewEmail",
+      "version": 7,
+      "parameters": {
+        "account": 5628520,
+        "folder": "INBOX",
+        "criteria": "UNSEEN",
+        "markSeen": false,
+        "maxResults": 5
+      },
+      "mapper": {
+        "id": "{{1.id}}",
+        "from": "{{1.from}}",
+        "to": "{{1.to}}",
+        "subject": "{{1.subject}}",
+        "text": "{{1.text}}"
+      },
+      "metadata": {
+        "designer": { "x": 0, "y": 0 }
+      }
+    },
+    {
+      "id": 2,
+      "module": "email:GetEmailContent",
+      "version": 2,
+      "parameters": {
+        "account": 5628520,
+        "emailId": "{{1.id}}",
+        "includeAttachments": true
+      },
+      "mapper": {
+        "attachments": "{{1.attachments}}"
+      },
+      "metadata": {
+        "designer": { "x": 150, "y": 0 }
+      }
+    },
+    {
+      "id": 3,
+      "module": "http:MakeRequest",
+      "version": 4,
+      "parameters": {
+        "url": "https://www.aleasignature.com/api/webhook/email",
+        "method": "POST",
+        "authenticationType": "noAuth"
+      },
+      "filter": {
+        "name": "Filtrar correos válidos",
+        "conditions": [
+          [
+            { "a": "{{1.from.address}}", "b": "noreply", "o": "text:notcontain" },
+            { "a": "{{1.from.address}}", "b": "no-reply", "o": "text:notcontain" },
+            { "a": "{{1.from.address}}", "b": "newsletter", "o": "text:notcontain" }
+          ]
+        ]
+      },
+      "mapper": {
+        "headers": [
+          { "name": "Content-Type", "value": "application/json" }
+        ],
+        "contentType": "json",
+        "inputMethod": "jsonString",
+        "jsonStringBodyContent": "{\"from\":\"{{1.from.address}}\",\"subject\":\"{{1.subject}}\",\"text\":\"{{1.text}}\",\"attachments\":[{{2.attachments}}]}"
+      },
+      "metadata": {
+        "designer": { "x": 300, "y": 0 }
+      }
+    }
+  ],
+  "metadata": {
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true
+    },
+    "zone": "eu1.make.com"
+  }
+}

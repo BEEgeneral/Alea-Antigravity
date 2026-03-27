@@ -7,13 +7,15 @@ import {
     Clock, MapPin, LayoutDashboard, Plus, MoreHorizontal, Share2,
     ChevronLeft, Maximize2, Bed, Bath, Sparkles, TrendingUp, Wind,
     Trees, ShoppingBag, Umbrella, Tag, Calendar, ShieldCheck, Star,
-    Trash2, Edit2, Upload, Loader2, User, LogOut, Settings, Menu, X, Inbox, BrainCircuit
+    Trash2, Edit2, Upload, Loader2, User, LogOut, Settings, Menu, X, Inbox, BrainCircuit, MessageCircle
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import AIChat from "@/components/admin/AIChat";
+import PelayoChat from "@/components/admin/PelayoChat";
 import ValuationAgent from "@/components/admin/ValuationAgent";
 
 // Defined Pipeline Stages
@@ -81,6 +83,7 @@ export default function AdminDashboard() {
     const [isSelectingInvestorForLead, setIsSelectingInvestorForLead] = useState(false);
     const [targetPropertyForLead, setTargetPropertyForLead] = useState<any>(null);
     const [agentForm, setAgentForm] = useState({ full_name: "", email: "", role: "agent" });
+    const [showAIChat, setShowAIChat] = useState(false);
     const [investorForm, setInvestorForm] = useState<any>({
         full_name: "",
         company_name: "",
@@ -370,9 +373,22 @@ export default function AdminDashboard() {
                 .select('*')
                 .eq('id', user.id)
                 .single();
+            
+            // Check if user is an investor
+            const { data: investor } = await supabase
+                .from('investors')
+                .select('*')
+                .eq('email', user.email)
+                .single();
 
             if (!isGodMode && (!agent || !agent.is_approved)) {
                 router.push("/login");
+                return;
+            }
+
+            // Redirect investors to radar
+            if (investor) {
+                router.push('/radar');
                 return;
             }
 
@@ -387,6 +403,12 @@ export default function AdminDashboard() {
                 });
             } else {
                 setCurrentUser(agent);
+                
+                // Redirect collaborators to radar
+                if (agent?.role === 'collaborator') {
+                    router.push('/radar');
+                    return;
+                }
             }
 
             await fetchData();
@@ -424,6 +446,10 @@ export default function AdminDashboard() {
     };
 
     const handleRejectAgent = async (id: string) => {
+        if (currentUser?.role !== 'admin') {
+            alert('Solo el administrador puede eliminar agentes.');
+            return;
+        }
         const { error } = await supabase
             .from('agents')
             .delete()
@@ -435,6 +461,10 @@ export default function AdminDashboard() {
     };
 
     const handleDeleteInvestor = async (id: string) => {
+        if (currentUser?.role !== 'admin') {
+            alert('Solo el administrador puede eliminar inversores.');
+            return;
+        }
         if (!confirm("¿Estás seguro de que quieres eliminar a este inversor? Esta acción es irreversible.")) return;
         const { error } = await supabase
             .from('investors')
@@ -452,6 +482,10 @@ export default function AdminDashboard() {
     };
 
     const handleDeleteLead = async (id: string) => {
+        if (currentUser?.role !== 'admin') {
+            alert('Solo el administrador puede eliminar leads.');
+            return;
+        }
         if (!confirm("¿Estás seguro de que quieres eliminar esta ficha de Operativa (Lead)? Esta acción es irreversible.")) return;
         const { error } = await supabase
             .from('leads')
@@ -469,6 +503,10 @@ export default function AdminDashboard() {
     };
 
     const handleDeleteProperty = async (id: string) => {
+        if (currentUser?.role !== 'admin') {
+            alert('Solo el administrador puede eliminar propiedades.');
+            return;
+        }
         if (!confirm("¿Estás seguro de que quieres dar de baja esta propiedad?")) return;
         const { error } = await supabase
             .from('properties')
@@ -905,6 +943,10 @@ export default function AdminDashboard() {
     };
 
     const handleDeleteMandatario = async (id: string) => {
+        if (currentUser?.role !== 'admin') {
+            alert('Solo el administrador puede eliminar mandatarios.');
+            return;
+        }
         const { error } = await supabase
             .from('mandatarios')
             .delete()
@@ -957,6 +999,10 @@ export default function AdminDashboard() {
     };
 
     const handleDeleteCollaborator = async (id: string) => {
+        if (currentUser?.role !== 'admin') {
+            alert('Solo el administrador puede eliminar colaboradores.');
+            return;
+        }
         if (!confirm("¿Estás seguro de que quieres eliminar a este colaborador?")) return;
         const { error } = await supabase
             .from('collaborators')
@@ -1061,7 +1107,7 @@ export default function AdminDashboard() {
 
     const handleSaveTrackingNote = async () => {
         if (!activeLeadForNote || !trackingNoteContent.trim()) return;
-        
+
         setIsSavingNote(true);
         try {
             const { error } = await supabase
@@ -1073,7 +1119,7 @@ export default function AdminDashboard() {
                 }]);
 
             if (error) throw error;
-            
+
             setToast({ message: "Nota añadida correctamente", type: 'success' });
             setShowToast(true);
             setTimeout(() => setShowToast(false), 3000);
@@ -1546,19 +1592,19 @@ export default function AdminDashboard() {
                                 <div className="space-y-5">
                                     <div>
                                         <label className="text-[10px] text-muted-foreground uppercase tracking-widest font-black mb-2 block">Precio Base (€)</label>
-                                            <input
-                                                type="number"
-                                                value={priceForm.price || ""}
-                                                placeholder="0"
-                                                onFocus={(e) => e.target.select()}
-                                                onChange={(e) => setPriceForm(f => ({ ...f, price: Number(e.target.value) }))}
-                                                className="w-full bg-muted/50 border border-border rounded-2xl px-5 py-3 text-2xl font-serif font-medium focus:outline-none focus:border-primary/60 transition-all"
-                                            />
-                                            {priceForm.price > 0 && (
-                                                <p className="text-[10px] text-primary font-bold mt-1.5 ml-1 animate-in fade-in slide-in-from-top-1">
-                                                    {priceForm.price.toLocaleString('es-ES')} €
-                                                </p>
-                                            )}
+                                        <input
+                                            type="number"
+                                            value={priceForm.price || ""}
+                                            placeholder="0"
+                                            onFocus={(e) => e.target.select()}
+                                            onChange={(e) => setPriceForm(f => ({ ...f, price: Number(e.target.value) }))}
+                                            className="w-full bg-muted/50 border border-border rounded-2xl px-5 py-3 text-2xl font-serif font-medium focus:outline-none focus:border-primary/60 transition-all"
+                                        />
+                                        {priceForm.price > 0 && (
+                                            <p className="text-[10px] text-primary font-bold mt-1.5 ml-1 animate-in fade-in slide-in-from-top-1">
+                                                {priceForm.price.toLocaleString('es-ES')} €
+                                            </p>
+                                        )}
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -2536,12 +2582,60 @@ export default function AdminDashboard() {
 
                                 {activeTab === "iai_inbox" && (
                                     <div className="flex flex-col space-y-8 animate-in fade-in duration-700 p-8">
-                                        <div className="bg-card/40 backdrop-blur-sm border border-white/5 p-12 rounded-[3rem] shadow-sm flex items-center justify-center min-h-[400px]">
-                                            <div className="text-center">
-                                                <h3 className="text-2xl font-serif font-bold text-foreground/80 mb-2">IAI Inbox</h3>
-                                                <p className="text-muted-foreground">Sugerencias de IA pendientes de revisión.</p>
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <h2 className="text-2xl font-serif font-bold">Bandeja IAI</h2>
+                                                <p className="text-muted-foreground text-sm">Emails analizados por Inteligencia Artificial</p>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <span className="text-xs text-muted-foreground">
+                                                    {iaiSuggestions.filter(s => s.status === 'pending').length} pendientes
+                                                </span>
                                             </div>
                                         </div>
+                                        
+                                        {iaiSuggestions.filter(s => s.status === 'pending').length === 0 ? (
+                                            <div className="bg-card/40 backdrop-blur-sm border border-white/5 p-12 rounded-[3rem] shadow-sm flex items-center justify-center min-h-[300px]">
+                                                <div className="text-center">
+                                                    <Inbox size={48} className="mx-auto text-muted-foreground mb-4" />
+                                                    <h3 className="text-xl font-serif font-bold text-foreground/80 mb-2">No hay emails pendientes</h3>
+                                                    <p className="text-muted-foreground">Los nuevos emails aparecerán aquí para revisión.</p>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="grid gap-4">
+                                                {iaiSuggestions.filter(s => s.status === 'pending').map((suggestion: any) => (
+                                                    <div 
+                                                        key={suggestion.id}
+                                                        className="bg-card border border-border rounded-2xl p-6 hover:border-primary/50 transition-all cursor-pointer"
+                                                        onClick={() => {
+                                                            setSelectedSuggestion(suggestion);
+                                                            handleViewEmail(suggestion);
+                                                        }}
+                                                    >
+                                                        <div className="flex justify-between items-start mb-4">
+                                                            <div>
+                                                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full ${
+                                                                    suggestion.suggestion_type === 'property' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                                    suggestion.suggestion_type === 'investor' ? 'bg-blue-500/20 text-blue-400' :
+                                                                    'bg-purple-500/20 text-purple-400'
+                                                                }`}>
+                                                                    {suggestion.suggestion_type}
+                                                                </span>
+                                                                <h4 className="font-medium mt-2">{suggestion.original_email_subject}</h4>
+                                                                <p className="text-sm text-muted-foreground">{suggestion.sender_email}</p>
+                                                            </div>
+                                                            <span className="text-xs text-muted-foreground">
+                                                                {new Date(suggestion.created_at).toLocaleDateString('es-ES')}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-sm text-muted-foreground line-clamp-2">
+                                                            {suggestion.extracted_data?._iai_summary || suggestion.ai_interpretation?.substring(0, 150)}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -2571,40 +2665,40 @@ export default function AdminDashboard() {
                                                         disabled={isUploadingPdf}
                                                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
                                                         title="Subir Dossier (PDF)"
-                                                        />
-                                                        <button
-                                                            disabled={isUploadingPdf}
-                                                            className="px-6 py-2 bg-muted/60 text-foreground border border-border/60 hover:border-foreground/20 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center shadow-sm disabled:opacity-50"
-                                                        >
-                                                            {isUploadingPdf ? (
-                                                                <Loader2 size={16} className="mr-2 animate-spin" />
-                                                            ) : (
-                                                                <Upload size={16} className="mr-2" />
-                                                            )}
-                                                            Procesar PDF
-                                                        </button>
-                                                    </div>
-                                                    <button className="px-6 py-2 bg-primary text-white rounded-xl text-xs font-bold uppercase tracking-widest hidden md:block">Publicar Activo</button>
+                                                    />
+                                                    <button
+                                                        disabled={isUploadingPdf}
+                                                        className="px-6 py-2 bg-muted/60 text-foreground border border-border/60 hover:border-foreground/20 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center shadow-sm disabled:opacity-50"
+                                                    >
+                                                        {isUploadingPdf ? (
+                                                            <Loader2 size={16} className="mr-2 animate-spin" />
+                                                        ) : (
+                                                            <Upload size={16} className="mr-2" />
+                                                        )}
+                                                        Procesar PDF
+                                                    </button>
                                                 </div>
+                                                <button className="px-6 py-2 bg-primary text-white rounded-xl text-xs font-bold uppercase tracking-widest hidden md:block">Publicar Activo</button>
                                             </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                                {isInitialLoading ? (
-                                                    [1, 2, 3].map(i => (
-                                                        <div key={i} className="bg-card/40 backdrop-blur-sm border border-white/5 rounded-[2.5rem] overflow-hidden animate-pulse">
-                                                            <div className="aspect-[16/10] bg-muted" />
-                                                            <div className="p-8 space-y-6">
-                                                                <div className="space-y-2">
-                                                                    <div className="w-3/4 h-5 bg-muted rounded-full" />
-                                                                    <div className="w-1/4 h-3 bg-muted rounded-full opacity-50" />
-                                                                </div>
-                                                                <div className="pt-6 border-t border-border/10">
-                                                                    <div className="w-1/2 h-6 bg-muted rounded-full" />
-                                                                </div>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                            {isInitialLoading ? (
+                                                [1, 2, 3].map(i => (
+                                                    <div key={i} className="bg-card/40 backdrop-blur-sm border border-white/5 rounded-[2.5rem] overflow-hidden animate-pulse">
+                                                        <div className="aspect-[16/10] bg-muted" />
+                                                        <div className="p-8 space-y-6">
+                                                            <div className="space-y-2">
+                                                                <div className="w-3/4 h-5 bg-muted rounded-full" />
+                                                                <div className="w-1/4 h-3 bg-muted rounded-full opacity-50" />
+                                                            </div>
+                                                            <div className="pt-6 border-t border-border/10">
+                                                                <div className="w-1/2 h-6 bg-muted rounded-full" />
                                                             </div>
                                                         </div>
-                                                    ))
-                                                ) : (
-                                                    properties.map((asset: any) => (
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                properties.map((asset: any) => (
                                                     <div
                                                         key={asset.id}
                                                         onClick={() => setSelectedProperty(asset)}
@@ -2682,1343 +2776,1371 @@ export default function AdminDashboard() {
                                         </div>
                                     </div>
                                 )}
-                                    {activeTab === "profile" && (
-                                        <div className="max-w-4xl mx-auto w-full mt-10 pb-20">
-                                            <div className="bg-card border border-border rounded-[3rem] shadow-xl overflow-hidden">
-                                                <div className="relative h-32 bg-gradient-to-r from-primary/20 to-primary/5">
-                                                    <div className="absolute -bottom-12 left-10">
-                                                        <div className="w-24 h-24 rounded-[2rem] bg-card border-4 border-background flex items-center justify-center text-4xl font-serif text-primary shadow-xl">
-                                                            {currentUser?.full_name?.charAt(0) || 'U'}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="pt-16 p-10">
-                                                    <div className="flex justify-between items-start mb-10">
-                                                        <div>
-                                                            <h2 className="text-3xl font-serif font-medium">{currentUser?.full_name}</h2>
-                                                            <p className="text-muted-foreground uppercase tracking-[0.2em] text-[10px] font-black mt-2">{currentUser?.role || 'Agent'}</p>
-                                                        </div>
-                                                        <button className="px-6 py-2 bg-muted/50 hover:bg-muted rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Editar Perfil</button>
-                                                    </div>
-
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                                        <div className="space-y-6">
-                                                            <div className="p-6 bg-muted/10 border border-border/50 rounded-3xl">
-                                                                <h3 className="text-[10px] font-black uppercase tracking-widest text-primary mb-4 flex items-center">
-                                                                    <Mail size={14} className="mr-2" /> Información de ContactO
-                                                                </h3>
-                                                                <div className="space-y-4">
-                                                                    <div>
-                                                                        <label className="text-[8px] uppercase tracking-widest text-muted-foreground font-bold">Email Corporativo</label>
-                                                                        <p className="text-sm font-medium mt-1">{currentUser?.email}</p>
-                                                                    </div>
-                                                                    <div>
-                                                                        <label className="text-[8px] uppercase tracking-widest text-muted-foreground font-bold">Fecha de Ingreso</label>
-                                                                        <p className="text-sm font-medium mt-1">{currentUser?.created_at ? new Date(currentUser.created_at).toLocaleDateString() : 'N/A'}</p>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="space-y-6">
-                                                            <div className="p-6 bg-muted/10 border border-border/50 rounded-3xl">
-                                                                <h3 className="text-[10px] font-black uppercase tracking-widest text-primary mb-4 flex items-center">
-                                                                    <ShieldCheck size={14} className="mr-2" /> Seguridad y Acceso
-                                                                </h3>
-                                                                <div className="space-y-4">
-                                                                    <div>
-                                                                        <label className="text-[8px] uppercase tracking-widest text-muted-foreground font-bold">Estado de Cuenta</label>
-                                                                        <div className="flex items-center mt-1 text-emerald-500">
-                                                                            <CheckCircle2 size={14} className="mr-2" />
-                                                                            <span className="text-sm font-bold uppercase tracking-widest text-[10px]">Verificado y Activo</span>
-                                                                        </div>
-                                                                    </div>
-                                                                    <button className="w-full py-3 border border-border/50 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-muted/50 transition-all flex items-center justify-center">
-                                                                        Cambiar Contraseña
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        </div>
+                                {activeTab === "profile" && (
+                                    <div className="max-w-4xl mx-auto w-full mt-10 pb-20">
+                                        <div className="bg-card border border-border rounded-[3rem] shadow-xl overflow-hidden">
+                                            <div className="relative h-32 bg-gradient-to-r from-primary/20 to-primary/5">
+                                                <div className="absolute -bottom-12 left-10">
+                                                    <div className="w-24 h-24 rounded-[2rem] bg-card border-4 border-background flex items-center justify-center text-4xl font-serif text-primary shadow-xl">
+                                                        {currentUser?.full_name?.charAt(0) || 'U'}
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    )}
-
-                                    {activeTab === "intelligence" && (
-                                        <ValuationAgent />
-                                    )}
-
-                                    {activeTab === "audit" && (
-                                        <div className="max-w-4xl mx-auto w-full space-y-6 mt-10">
-                                            <div className="bg-card border border-border rounded-[2.5rem] shadow-sm p-10">
-                                                <h2 className="font-serif text-xl font-medium mb-8">System Audit Trail</h2>
-                                                <div className="space-y-6">
-                                                    {MOCK_ACTIVITY.map((log: any) => (
-                                                        <div key={log.id} className="flex space-x-6 items-start">
-                                                            <div className="mt-1 p-2 bg-primary/5 rounded-xl text-primary">
-                                                                <CheckCircle2 size={16} />
-                                                            </div>
-                                                            <div>
-                                                                <p className="text-sm font-bold leading-tight">{log.detail}</p>
-                                                                <p className="text-xs text-muted-foreground mt-2 font-medium">{log.time} — Operativa Validada</p>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {activeTab === "agents" && (
-                                        <div className="max-w-4xl mx-auto w-full space-y-6 mt-10 pb-20">
-                                            <div className="bg-card border border-border rounded-[2.5rem] shadow-sm p-10">
-                                                <div className="flex justify-between items-center mb-8">
+                                            <div className="pt-16 p-10">
+                                                <div className="flex justify-between items-start mb-10">
                                                     <div>
-                                                        <h2 className="font-serif text-xl font-medium">Control de Agentes</h2>
-                                                        <p className="text-xs text-muted-foreground mt-1">Gestión de accesos y roles del equipo.</p>
+                                                        <h2 className="text-3xl font-serif font-medium">{currentUser?.full_name}</h2>
+                                                        <p className="text-muted-foreground uppercase tracking-[0.2em] text-[10px] font-black mt-2">{currentUser?.role || 'Agent'}</p>
                                                     </div>
-                                                    <div className="flex items-center space-x-4">
-                                                        <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-full uppercase tracking-widest">
-                                                            {allAgents.filter(a => !a.is_approved).length} Pendientes
-                                                        </span>
-                                                        <button
-                                                            onClick={() => setIsAddingAgent(true)}
-                                                            className="flex items-center space-x-2 px-4 py-2 bg-primary text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:opacity-90 transition-all"
-                                                        >
-                                                            <Plus size={14} />
-                                                            <span>Dar de Alta</span>
-                                                        </button>
-                                                    </div>
+                                                    <button className="px-6 py-2 bg-muted/50 hover:bg-muted rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Editar Perfil</button>
                                                 </div>
 
-                                                <div className="space-y-4">
-                                                    {allAgents.map(agent => (
-                                                        <div key={agent.id} className="p-6 border border-border rounded-3xl flex items-center justify-between hover:bg-muted/30 transition-all group">
-                                                            <div className="flex items-center space-x-4">
-                                                                <div className="w-12 h-12 bg-primary/5 rounded-2xl flex items-center justify-center text-primary font-serif border border-primary/10">
-                                                                    {agent.full_name?.charAt(0) || 'A'}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                    <div className="space-y-6">
+                                                        <div className="p-6 bg-muted/10 border border-border/50 rounded-3xl">
+                                                            <h3 className="text-[10px] font-black uppercase tracking-widest text-primary mb-4 flex items-center">
+                                                                <Mail size={14} className="mr-2" /> Información de ContactO
+                                                            </h3>
+                                                            <div className="space-y-4">
+                                                                <div>
+                                                                    <label className="text-[8px] uppercase tracking-widest text-muted-foreground font-bold">Email Corporativo</label>
+                                                                    <p className="text-sm font-medium mt-1">{currentUser?.email}</p>
                                                                 </div>
                                                                 <div>
-                                                                    <div className="flex items-center space-x-2">
-                                                                        <p className="text-sm font-bold">{agent.full_name}</p>
-                                                                        <span className={`text-[8px] ${agent.role === 'admin' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'} px-2 py-0.5 rounded-md font-bold uppercase tracking-widest`}>
-                                                                            {agent.role}
-                                                                        </span>
-                                                                    </div>
-                                                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{agent.email}</p>
+                                                                    <label className="text-[8px] uppercase tracking-widest text-muted-foreground font-bold">Fecha de Ingreso</label>
+                                                                    <p className="text-sm font-medium mt-1">{currentUser?.created_at ? new Date(currentUser.created_at).toLocaleDateString() : 'N/A'}</p>
                                                                 </div>
                                                             </div>
-                                                            <div className="flex items-center space-x-3">
-                                                                <button
-                                                                    onClick={() => setSelectedAgentToEdit(agent)}
-                                                                    className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
-                                                                >
-                                                                    <Edit2 size={16} />
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-6">
+                                                        <div className="p-6 bg-muted/10 border border-border/50 rounded-3xl">
+                                                            <h3 className="text-[10px] font-black uppercase tracking-widest text-primary mb-4 flex items-center">
+                                                                <ShieldCheck size={14} className="mr-2" /> Seguridad y Acceso
+                                                            </h3>
+                                                            <div className="space-y-4">
+                                                                <div>
+                                                                    <label className="text-[8px] uppercase tracking-widest text-muted-foreground font-bold">Estado de Cuenta</label>
+                                                                    <div className="flex items-center mt-1 text-emerald-500">
+                                                                        <CheckCircle2 size={14} className="mr-2" />
+                                                                        <span className="text-sm font-bold uppercase tracking-widest text-[10px]">Verificado y Activo</span>
+                                                                    </div>
+                                                                </div>
+                                                                <button className="w-full py-3 border border-border/50 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-muted/50 transition-all flex items-center justify-center">
+                                                                    Cambiar Contraseña
                                                                 </button>
-                                                                {agent.is_approved ? (
-                                                                    <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest px-4">Activo</span>
-                                                                ) : (
-                                                                    <>
-                                                                        <button
-                                                                            onClick={() => handleRejectAgent(agent.id)}
-                                                                            className="px-4 py-2 border border-border rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-500/10 hover:text-red-500 transition-all"
-                                                                        >
-                                                                            Rechazar
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => handleApproveAgent(agent.id)}
-                                                                            className="px-4 py-2 bg-primary text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-primary/90 transition-all font-bold"
-                                                                        >
-                                                                            Aprobar
-                                                                        </button>
-                                                                    </>
-                                                                )}
                                                             </div>
                                                         </div>
-                                                    ))}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
+
+                                {activeTab === "intelligence" && (
+                                    <ValuationAgent />
+                                )}
+
+                                {activeTab === "audit" && (
+                                    <div className="max-w-4xl mx-auto w-full space-y-6 mt-10">
+                                        <div className="bg-card border border-border rounded-[2.5rem] shadow-sm p-10">
+                                            <h2 className="font-serif text-xl font-medium mb-8">System Audit Trail</h2>
+                                            <div className="space-y-6">
+                                                {MOCK_ACTIVITY.map((log: any) => (
+                                                    <div key={log.id} className="flex space-x-6 items-start">
+                                                        <div className="mt-1 p-2 bg-primary/5 rounded-xl text-primary">
+                                                            <CheckCircle2 size={16} />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-bold leading-tight">{log.detail}</p>
+                                                            <p className="text-xs text-muted-foreground mt-2 font-medium">{log.time} — Operativa Validada</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === "agents" && (
+                                    <div className="max-w-4xl mx-auto w-full space-y-6 mt-10 pb-20">
+                                        <div className="bg-card border border-border rounded-[2.5rem] shadow-sm p-10">
+                                            <div className="flex justify-between items-center mb-8">
+                                                <div>
+                                                    <h2 className="font-serif text-xl font-medium">Control de Agentes</h2>
+                                                    <p className="text-xs text-muted-foreground mt-1">Gestión de accesos y roles del equipo.</p>
+                                                </div>
+                                                <div className="flex items-center space-x-4">
+                                                    <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-full uppercase tracking-widest">
+                                                        {allAgents.filter(a => !a.is_approved).length} Pendientes
+                                                    </span>
+                                                    <button
+                                                        onClick={() => setIsAddingAgent(true)}
+                                                        className="flex items-center space-x-2 px-4 py-2 bg-primary text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:opacity-90 transition-all"
+                                                    >
+                                                        <Plus size={14} />
+                                                        <span>Dar de Alta</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                {allAgents.map(agent => (
+                                                    <div key={agent.id} className="p-6 border border-border rounded-3xl flex items-center justify-between hover:bg-muted/30 transition-all group">
+                                                        <div className="flex items-center space-x-4">
+                                                            <div className="w-12 h-12 bg-primary/5 rounded-2xl flex items-center justify-center text-primary font-serif border border-primary/10">
+                                                                {agent.full_name?.charAt(0) || 'A'}
+                                                            </div>
+                                                            <div>
+                                                                <div className="flex items-center space-x-2">
+                                                                    <p className="text-sm font-bold">{agent.full_name}</p>
+                                                                    <span className={`text-[8px] ${agent.role === 'admin' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'} px-2 py-0.5 rounded-md font-bold uppercase tracking-widest`}>
+                                                                        {agent.role}
+                                                                    </span>
+                                                                </div>
+                                                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{agent.email}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center space-x-3">
+                                                            <button
+                                                                onClick={() => setSelectedAgentToEdit(agent)}
+                                                                className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+                                                            >
+                                                                <Edit2 size={16} />
+                                                            </button>
+                                                            {agent.is_approved ? (
+                                                                <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest px-4">Activo</span>
+                                                            ) : (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => handleRejectAgent(agent.id)}
+                                                                        className="px-4 py-2 border border-border rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-500/10 hover:text-red-500 transition-all"
+                                                                    >
+                                                                        Rechazar
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleApproveAgent(agent.id)}
+                                                                        className="px-4 py-2 bg-primary text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-primary/90 transition-all font-bold"
+                                                                    >
+                                                                        Aprobar
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
+                </div>
 
-            <AnimatePresence>
-                {selectedLead && renderLeadWorkplace(selectedLead)}
-                {selectedProperty && (
-                    <div key="property-modal" className="fixed inset-0 z-[60] bg-background overscroll-none overflow-y-auto">
-                        {renderPropertyDetail(selectedProperty)}
-                    </div>
-                )}
+                <AnimatePresence>
+                    {selectedLead && renderLeadWorkplace(selectedLead)}
+                    {selectedProperty && (
+                        <div key="property-modal" className="fixed inset-0 z-[60] bg-background overscroll-none overflow-y-auto">
+                            {renderPropertyDetail(selectedProperty)}
+                        </div>
+                    )}
 
-                {/* Edit Agent Modal */}
-                {selectedAgentToEdit && (
-                    <div key="edit-agent-modal" className="fixed inset-0 z-[80] flex items-center justify-center p-6">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={() => setSelectedAgentToEdit(null)}
-                            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                            className="relative bg-card border border-border w-full max-w-lg rounded-[2.5rem] shadow-2xl p-10"
-                        >
-                            <h2 className="font-serif text-2xl mb-2">Editar Agente</h2>
-                            <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-8 italic">Modificando perfil de {selectedAgentToEdit.full_name}</p>
+                    {/* Edit Agent Modal */}
+                    {selectedAgentToEdit && (
+                        <div key="edit-agent-modal" className="fixed inset-0 z-[80] flex items-center justify-center p-6">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={() => setSelectedAgentToEdit(null)}
+                                className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                            />
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                className="relative bg-card border border-border w-full max-w-lg rounded-[2.5rem] shadow-2xl p-10"
+                            >
+                                <h2 className="font-serif text-2xl mb-2">Editar Agente</h2>
+                                <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-8 italic">Modificando perfil de {selectedAgentToEdit.full_name}</p>
 
-                            <div className="space-y-6">
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Nombre Completo</label>
-                                    <input
-                                        type="text"
-                                        value={selectedAgentToEdit.full_name || ""}
-                                        onChange={(e) => setSelectedAgentToEdit({ ...selectedAgentToEdit, full_name: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Rol en el Sistema</label>
-                                    <select
-                                        value={selectedAgentToEdit.role || "agent"}
-                                        onChange={(e) => setSelectedAgentToEdit({ ...selectedAgentToEdit, role: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all appearance-none"
-                                    >
-                                        <option value="agent">Agente</option>
-                                        <option value="admin">Administrador</option>
-                                    </select>
-                                </div>
-                                <div className="flex items-center space-x-3 p-2">
-                                    <input
-                                        type="checkbox"
-                                        id="edit-approved"
-                                        checked={selectedAgentToEdit.is_approved}
-                                        onChange={(e) => setSelectedAgentToEdit({ ...selectedAgentToEdit, is_approved: e.target.checked })}
-                                        className="accent-primary"
-                                    />
-                                    <label htmlFor="edit-approved" className="text-xs font-bold uppercase tracking-wider cursor-pointer">Estado de Acceso: {selectedAgentToEdit.is_approved ? 'Aprobado' : 'Pendiente'}</label>
-                                </div>
-                            </div>
-
-                            <div className="flex gap-4 mt-10">
-                                <button
-                                    onClick={() => setSelectedAgentToEdit(null)}
-                                    className="flex-1 px-6 py-3 border border-border rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-muted transition-all"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={() => handleUpdateAgent(selectedAgentToEdit)}
-                                    className="flex-1 px-6 py-3 bg-primary text-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:opacity-90 shadow-lg shadow-primary/20 transition-all"
-                                >
-                                    Guardar Cambios
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-
-                {/* Add Agent Modal */}
-                {isAddingAgent && (
-                    <div key="add-agent-modal" className="fixed inset-0 z-[80] flex items-center justify-center p-6">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={() => setIsAddingAgent(false)}
-                            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                            className="relative bg-card border border-border w-full max-w-lg rounded-[2.5rem] shadow-2xl p-10"
-                        >
-                            <h2 className="font-serif text-2xl mb-2">Dar de Alta Agente</h2>
-                            <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-8 italic">Registro manual de nuevo miembro del equipo</p>
-
-                            <div className="space-y-6">
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Nombre Completo</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Ej: Alberto Gala"
-                                        value={agentForm.full_name}
-                                        onChange={(e) => setAgentForm({ ...agentForm, full_name: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Email Profesional</label>
-                                    <input
-                                        type="email"
-                                        placeholder="correo@aleasignature.com"
-                                        value={agentForm.email}
-                                        onChange={(e) => setAgentForm({ ...agentForm, email: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Rol Asignado</label>
-                                    <select
-                                        value={agentForm.role}
-                                        onChange={(e) => setAgentForm({ ...agentForm, role: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all appearance-none"
-                                    >
-                                        <option value="agent">Agente</option>
-                                        <option value="admin">Administrador</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="flex gap-4 mt-10">
-                                <button
-                                    onClick={() => setIsAddingAgent(false)}
-                                    className="flex-1 px-6 py-3 border border-border rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-muted transition-all"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={handleCreateAgent}
-                                    className="flex-1 px-6 py-3 bg-primary text-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:opacity-90 shadow-lg shadow-primary/20 transition-all"
-                                >
-                                    Confirmar Alta
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-
-                {/* Edit Investor Modal */}
-                {selectedInvestorToEdit && (
-                    <div key="edit-investor-modal" className="fixed inset-0 z-[80] flex items-center justify-center p-6">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={() => setSelectedInvestorToEdit(null)}
-                            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                            className="relative bg-card border border-border w-full max-w-2xl rounded-[2.5rem] shadow-2xl p-10 overflow-y-auto max-h-[90vh]"
-                        >
-                            <h2 className="font-serif text-2xl mb-2">Editar Perfil de Inversor</h2>
-                            <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-8 italic">Modificando cualificación de {selectedInvestorToEdit.full_name}</p>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Nombre Completo</label>
-                                    <input
-                                        type="text"
-                                        value={selectedInvestorToEdit.full_name || ""}
-                                        onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, full_name: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Compañía / Family Office</label>
-                                    <input
-                                        type="text"
-                                        value={selectedInvestorToEdit.company_name || ""}
-                                        onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, company_name: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Email de Contacto</label>
-                                    <input
-                                        type="email"
-                                        value={selectedInvestorToEdit.email || ""}
-                                        onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, email: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Tipo de Inversor</label>
-                                    <select
-                                        value={selectedInvestorToEdit.investor_type || ""}
-                                        onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, investor_type: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium appearance-none"
-                                    >
-                                        <option value="HNWI">HNWI</option>
-                                        <option value="Family Office">Family Office</option>
-                                        <option value="Institutional">Institutional</option>
-                                        <option value="Private Equity">Private Equity</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Teléfono</label>
-                                    <input
-                                        type="text"
-                                        value={selectedInvestorToEdit.phone || ""}
-                                        onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, phone: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ticket Mínimo (EUR)</label>
-                                    <input
-                                        type="number"
-                                        value={selectedInvestorToEdit.budget_min}
-                                        onFocus={(e) => e.target.select()}
-                                        onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, budget_min: Number(e.target.value) })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                    {selectedInvestorToEdit.budget_min > 0 && (
-                                        <p className="text-[10px] text-primary font-bold mt-1.5 ml-1 animate-in fade-in slide-in-from-top-1">
-                                            {selectedInvestorToEdit.budget_min.toLocaleString('es-ES')} €
-                                        </p>
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ticket Máximo (EUR)</label>
-                                    <input
-                                        type="number"
-                                        value={selectedInvestorToEdit.budget_max}
-                                        onFocus={(e) => e.target.select()}
-                                        onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, budget_max: Number(e.target.value) })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                    {selectedInvestorToEdit.budget_max > 0 && (
-                                        <p className="text-[10px] text-primary font-bold mt-1.5 ml-1 animate-in fade-in slide-in-from-top-1">
-                                            {selectedInvestorToEdit.budget_max.toLocaleString('es-ES')} €
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-3 px-1">Etiquetas de Inversores</label>
-                                    <div className="flex flex-wrap gap-4 p-4 bg-muted/20 border border-border/40 rounded-2xl">
-                                        {["Comprador", "Vendedor"].map((label) => (
-                                            <label key={label} className="flex items-center space-x-3 cursor-pointer group">
-                                                <div className="relative flex items-center">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={(selectedInvestorToEdit.labels || []).includes(label)}
-                                                        onChange={(e) => {
-                                                            const currentLabels = selectedInvestorToEdit.labels || [];
-                                                            const newLabels = e.target.checked
-                                                                ? [...currentLabels, label]
-                                                                : currentLabels.filter((l: string) => l !== label);
-                                                            setSelectedInvestorToEdit({ ...selectedInvestorToEdit, labels: newLabels });
-                                                        }}
-                                                        className="w-5 h-5 accent-primary rounded-lg border-border"
-                                                    />
-                                                </div>
-                                                <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/70 group-hover:text-primary transition-colors">{label}</span>
-                                            </label>
-                                        ))}
+                                <div className="space-y-6">
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Nombre Completo</label>
+                                        <input
+                                            type="text"
+                                            value={selectedAgentToEdit.full_name || ""}
+                                            onChange={(e) => setSelectedAgentToEdit({ ...selectedAgentToEdit, full_name: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all"
+                                        />
                                     </div>
-                                </div>
-                                <div className="md:col-span-2">
-                                    <div className="flex items-center space-x-3 p-2 bg-primary/5 rounded-2xl border border-primary/10">
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Rol en el Sistema</label>
+                                        <select
+                                            value={selectedAgentToEdit.role || "agent"}
+                                            onChange={(e) => setSelectedAgentToEdit({ ...selectedAgentToEdit, role: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all appearance-none"
+                                        >
+                                            <option value="agent">Agente</option>
+                                            <option value="admin">Administrador</option>
+                                            <option value="collaborator">Colaborador</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex items-center space-x-3 p-2">
                                         <input
                                             type="checkbox"
-                                            id="investor-verified"
-                                            checked={selectedInvestorToEdit.is_verified}
-                                            onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, is_verified: e.target.checked })}
-                                            className="accent-primary w-4 h-4"
+                                            id="edit-approved"
+                                            checked={selectedAgentToEdit.is_approved}
+                                            onChange={(e) => setSelectedAgentToEdit({ ...selectedAgentToEdit, is_approved: e.target.checked })}
+                                            className="accent-primary"
                                         />
-                                        <label htmlFor="investor-verified" className="text-xs font-bold uppercase tracking-widest cursor-pointer text-primary">Estado KYC: {selectedInvestorToEdit.is_verified ? 'VERIFICADO' : 'PENDIENTE'}</label>
+                                        <label htmlFor="edit-approved" className="text-xs font-bold uppercase tracking-wider cursor-pointer">Estado de Acceso: {selectedAgentToEdit.is_approved ? 'Aprobado' : 'Pendiente'}</label>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="flex gap-4 mt-10">
-                                <button
-                                    onClick={() => setSelectedInvestorToEdit(null)}
-                                    className="flex-1 px-6 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={() => handleUpdateInvestor(selectedInvestorToEdit)}
-                                    className="flex-1 px-6 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 shadow-xl shadow-primary/20 transition-all"
-                                >
-                                    Guardar Cualificación
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-                {/* Add Property Suggestion Modal */}
-                {isReviewingPropertySuggestion && (
-                    <div key="add-property-suggestion-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            onClick={() => setIsReviewingPropertySuggestion(false)}
-                            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            className="relative bg-background border border-border w-full max-w-4xl rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh]"
-                        >
-                            <h2 className="font-serif text-3xl mb-2 flex items-center">
-                                <Sparkles size={28} className="mr-3 text-primary" />
-                                Revisar Alta de Activo - Alea Intelligence
-                            </h2>
-                            <p className="text-muted-foreground text-sm mb-8 font-light">
-                                Confirme o modifique la información extraída automáticamente antes de registrar el activo en el sistema.
-                            </p>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                                <div className="md:col-span-2">
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Título del Activo</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Ej: Hotel Boutique en Centro"
-                                        value={propertyForm.title}
-                                        onChange={(e) => setPropertyForm({ ...propertyForm, title: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Descripción / Resumen IAI</label>
-                                    <textarea
-                                        placeholder="Descripción extraída del email..."
-                                        value={propertyForm.description}
-                                        onChange={(e) => setPropertyForm({ ...propertyForm, description: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium min-h-[120px] resize-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Tipo de Activo</label>
-                                    <select
-                                        value={propertyForm.type}
-                                        onChange={(e) => setPropertyForm({ ...propertyForm, type: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium appearance-none"
+                                <div className="flex gap-4 mt-10">
+                                    <button
+                                        onClick={() => setSelectedAgentToEdit(null)}
+                                        className="flex-1 px-6 py-3 border border-border rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-muted transition-all"
                                     >
-                                        <option value="">Selecciona Tipo</option>
-                                        <option value="Hotel">Hotel</option>
-                                        <option value="Edificio">Edificio Residencial</option>
-                                        <option value="Suelo">Suelo / Parcela</option>
-                                        <option value="Retail">Local Comercial / Retail</option>
-                                        <option value="Oficinas">Oficinas</option>
-                                        <option value="Logístico">Logística</option>
-                                        <option value="Otro">Otro</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Precio Propuesto (€)</label>
-                                    <input
-                                        type="number"
-                                        placeholder="Ej: 15000000"
-                                        value={propertyForm.price || ""}
-                                        onChange={(e) => setPropertyForm({ ...propertyForm, price: Number(e.target.value) })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                    {propertyForm.price > 0 && (
-                                        <p className="text-[10px] text-primary font-bold mt-1.5 ml-1 animate-in fade-in slide-in-from-top-1">
-                                            {propertyForm.price.toLocaleString('es-ES')} €
-                                        </p>
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Superficie Total (m²)</label>
-                                    <input
-                                        type="number"
-                                        placeholder="Ej: 2500"
-                                        value={propertyForm.meters || ""}
-                                        onChange={(e) => setPropertyForm({ ...propertyForm, meters: Number(e.target.value) })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ubicación</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Ej: Madrid, España"
-                                        value={propertyForm.address}
-                                        onChange={(e) => setPropertyForm({ ...propertyForm, address: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Vendedor / Referencia</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Nombre del Vendedor"
-                                        value={propertyForm.vendor_name}
-                                        onChange={(e) => setPropertyForm({ ...propertyForm, vendor_name: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex bg-primary/5 border border-primary/20 rounded-2xl p-6 items-center mb-8">
-                                <Upload size={24} className="text-primary mr-4" />
-                                <div className="flex-1">
-                                    <h4 className="text-sm font-bold text-foreground mb-1">Dossier / PDF del Activo</h4>
-                                    <p className="text-xs text-muted-foreground mt-1 font-medium">Sube ahora el PDF original del correo para procesarlo y guardarlo de forma segura.</p>
-                                </div>
-                                <input
-                                    type="file"
-                                    onChange={(e) => setIaiDossierFile(e.target.files?.[0] || null)}
-                                    className="block w-full max-w-xs text-xs text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:uppercase file:tracking-widest file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer transition-all"
-                                />
-                            </div>
-
-                            <div className="flex justify-end gap-3 pt-6 border-t border-border">
-                                <button
-                                    onClick={() => setIsReviewingPropertySuggestion(false)}
-                                    className="px-6 py-3 text-muted-foreground hover:bg-muted rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={handleSubmitPropertySuggestion}
-                                    disabled={isUploadingIaiDossier}
-                                    className="px-8 py-3 bg-foreground text-background hover:scale-[1.02] shadow-xl rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all flex items-center disabled:opacity-50"
-                                >
-                                    {isUploadingIaiDossier ? (
-                                        <span className="flex items-center">
-                                            <Loader2 className="animate-spin mr-2" size={16} />
-                                            Procesando...
-                                        </span>
-                                    ) : (
-                                        <span className="flex items-center">
-                                            <CheckCircle2 size={16} className="mr-2" />
-                                            Confirmar y Crear Ficha
-                                        </span>
-                                    )}
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-                {/* Add Investor Modal */}
-                {isAddingInvestor && (
-                    <div key="add-investor-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            onClick={() => setIsAddingInvestor(false)}
-                            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            className="relative bg-background border border-border w-full max-w-2xl rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh]"
-                        >
-                            <h2 className="font-serif text-3xl mb-2">Alta de Nuevo Inversor</h2>
-                            <p className="text-muted-foreground text-sm mb-8 font-light">Complete los datos para añadir al directorio confidencial.</p>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="md:col-span-2">
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Nombre Completo</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Ej: Eduardo Santacruz"
-                                        value={investorForm.full_name}
-                                        onChange={(e) => setInvestorForm({ ...investorForm, full_name: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Email Profesional</label>
-                                    <input
-                                        type="email"
-                                        placeholder="eduardo@familyoffice.com"
-                                        value={investorForm.email}
-                                        onChange={(e) => setInvestorForm({ ...investorForm, email: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Compañía / Entidad</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Family Office ES"
-                                        value={investorForm.company_name}
-                                        onChange={(e) => setInvestorForm({ ...investorForm, company_name: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Perfil Inversor</label>
-                                    <select
-                                        value={investorForm.investor_type}
-                                        onChange={(e) => setInvestorForm({ ...investorForm, investor_type: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium appearance-none"
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={() => handleUpdateAgent(selectedAgentToEdit)}
+                                        className="flex-1 px-6 py-3 bg-primary text-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:opacity-90 shadow-lg shadow-primary/20 transition-all"
                                     >
-                                        <option value="">Seleccionar Perfil</option>
-                                        <option value="HNWI">HNWI</option>
-                                        <option value="Family Office">Family Office</option>
-                                        <option value="Institutional">Institutional</option>
-                                        <option value="Private Equity">Private Equity</option>
-                                    </select>
+                                        Guardar Cambios
+                                    </button>
                                 </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Teléfono</label>
+                            </motion.div>
+                        </div>
+                    )}
+
+                    {/* Add Agent Modal */}
+                    {isAddingAgent && (
+                        <div key="add-agent-modal" className="fixed inset-0 z-[80] flex items-center justify-center p-6">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={() => setIsAddingAgent(false)}
+                                className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                            />
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                className="relative bg-card border border-border w-full max-w-lg rounded-[2.5rem] shadow-2xl p-10"
+                            >
+                                <h2 className="font-serif text-2xl mb-2">Dar de Alta Agente</h2>
+                                <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-8 italic">Registro manual de nuevo miembro del equipo</p>
+
+                                <div className="space-y-6">
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Nombre Completo</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Ej: Alberto Gala"
+                                            value={agentForm.full_name}
+                                            onChange={(e) => setAgentForm({ ...agentForm, full_name: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Email Profesional</label>
+                                        <input
+                                            type="email"
+                                            placeholder="correo@aleasignature.com"
+                                            value={agentForm.email}
+                                            onChange={(e) => setAgentForm({ ...agentForm, email: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Rol Asignado</label>
+                                        <select
+                                            value={agentForm.role}
+                                            onChange={(e) => setAgentForm({ ...agentForm, role: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all appearance-none"
+                                        >
+                                            <option value="agent">Agente</option>
+                                            <option value="admin">Administrador</option>
+                                            <option value="collaborator">Colaborador</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4 mt-10">
+                                    <button
+                                        onClick={() => setIsAddingAgent(false)}
+                                        className="flex-1 px-6 py-3 border border-border rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-muted transition-all"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={handleCreateAgent}
+                                        className="flex-1 px-6 py-3 bg-primary text-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:opacity-90 shadow-lg shadow-primary/20 transition-all"
+                                    >
+                                        Confirmar Alta
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+
+                    {/* Edit Investor Modal */}
+                    {selectedInvestorToEdit && (
+                        <div key="edit-investor-modal" className="fixed inset-0 z-[80] flex items-center justify-center p-6">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={() => setSelectedInvestorToEdit(null)}
+                                className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                            />
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                className="relative bg-card border border-border w-full max-w-2xl rounded-[2.5rem] shadow-2xl p-10 overflow-y-auto max-h-[90vh]"
+                            >
+                                <h2 className="font-serif text-2xl mb-2">Editar Perfil de Inversor</h2>
+                                <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-8 italic">Modificando cualificación de {selectedInvestorToEdit.full_name}</p>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Nombre Completo</label>
+                                        <input
+                                            type="text"
+                                            value={selectedInvestorToEdit.full_name || ""}
+                                            onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, full_name: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Compañía / Family Office</label>
+                                        <input
+                                            type="text"
+                                            value={selectedInvestorToEdit.company_name || ""}
+                                            onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, company_name: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Email de Contacto</label>
+                                        <input
+                                            type="email"
+                                            value={selectedInvestorToEdit.email || ""}
+                                            onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, email: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Tipo de Inversor</label>
+                                        <select
+                                            value={selectedInvestorToEdit.investor_type || ""}
+                                            onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, investor_type: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium appearance-none"
+                                        >
+                                            <option value="HNWI">HNWI</option>
+                                            <option value="Family Office">Family Office</option>
+                                            <option value="Institutional">Institutional</option>
+                                            <option value="Private Equity">Private Equity</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Teléfono</label>
+                                        <input
+                                            type="text"
+                                            value={selectedInvestorToEdit.phone || ""}
+                                            onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, phone: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ticket Mínimo (EUR)</label>
+                                        <input
+                                            type="number"
+                                            value={selectedInvestorToEdit.budget_min}
+                                            onFocus={(e) => e.target.select()}
+                                            onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, budget_min: Number(e.target.value) })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                        {selectedInvestorToEdit.budget_min > 0 && (
+                                            <p className="text-[10px] text-primary font-bold mt-1.5 ml-1 animate-in fade-in slide-in-from-top-1">
+                                                {selectedInvestorToEdit.budget_min.toLocaleString('es-ES')} €
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ticket Máximo (EUR)</label>
+                                        <input
+                                            type="number"
+                                            value={selectedInvestorToEdit.budget_max}
+                                            onFocus={(e) => e.target.select()}
+                                            onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, budget_max: Number(e.target.value) })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                        {selectedInvestorToEdit.budget_max > 0 && (
+                                            <p className="text-[10px] text-primary font-bold mt-1.5 ml-1 animate-in fade-in slide-in-from-top-1">
+                                                {selectedInvestorToEdit.budget_max.toLocaleString('es-ES')} €
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-3 px-1">Etiquetas de Inversores</label>
+                                        <div className="flex flex-wrap gap-4 p-4 bg-muted/20 border border-border/40 rounded-2xl">
+                                            {["Comprador", "Vendedor"].map((label) => (
+                                                <label key={label} className="flex items-center space-x-3 cursor-pointer group">
+                                                    <div className="relative flex items-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={(selectedInvestorToEdit.labels || []).includes(label)}
+                                                            onChange={(e) => {
+                                                                const currentLabels = selectedInvestorToEdit.labels || [];
+                                                                const newLabels = e.target.checked
+                                                                    ? [...currentLabels, label]
+                                                                    : currentLabels.filter((l: string) => l !== label);
+                                                                setSelectedInvestorToEdit({ ...selectedInvestorToEdit, labels: newLabels });
+                                                            }}
+                                                            className="w-5 h-5 accent-primary rounded-lg border-border"
+                                                        />
+                                                    </div>
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/70 group-hover:text-primary transition-colors">{label}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <div className="flex items-center space-x-3 p-2 bg-primary/5 rounded-2xl border border-primary/10">
+                                            <input
+                                                type="checkbox"
+                                                id="investor-verified"
+                                                checked={selectedInvestorToEdit.is_verified}
+                                                onChange={(e) => setSelectedInvestorToEdit({ ...selectedInvestorToEdit, is_verified: e.target.checked })}
+                                                className="accent-primary w-4 h-4"
+                                            />
+                                            <label htmlFor="investor-verified" className="text-xs font-bold uppercase tracking-widest cursor-pointer text-primary">Estado KYC: {selectedInvestorToEdit.is_verified ? 'VERIFICADO' : 'PENDIENTE'}</label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4 mt-10">
+                                    <button
+                                        onClick={() => setSelectedInvestorToEdit(null)}
+                                        className="flex-1 px-6 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={() => handleUpdateInvestor(selectedInvestorToEdit)}
+                                        className="flex-1 px-6 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 shadow-xl shadow-primary/20 transition-all"
+                                    >
+                                        Guardar Cualificación
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+                    {/* Add Property Suggestion Modal */}
+                    {isReviewingPropertySuggestion && (
+                        <div key="add-property-suggestion-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                onClick={() => setIsReviewingPropertySuggestion(false)}
+                                className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                            />
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                className="relative bg-background border border-border w-full max-w-4xl rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh]"
+                            >
+                                <h2 className="font-serif text-3xl mb-2 flex items-center">
+                                    <Sparkles size={28} className="mr-3 text-primary" />
+                                    Revisar Alta de Activo - Alea Intelligence
+                                </h2>
+                                <p className="text-muted-foreground text-sm mb-8 font-light">
+                                    Confirme o modifique la información extraída automáticamente antes de registrar el activo en el sistema.
+                                </p>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                    <div className="md:col-span-2">
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Título del Activo</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Ej: Hotel Boutique en Centro"
+                                            value={propertyForm.title}
+                                            onChange={(e) => setPropertyForm({ ...propertyForm, title: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Descripción / Resumen IAI</label>
+                                        <textarea
+                                            placeholder="Descripción extraída del email..."
+                                            value={propertyForm.description}
+                                            onChange={(e) => setPropertyForm({ ...propertyForm, description: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium min-h-[120px] resize-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Tipo de Activo</label>
+                                        <select
+                                            value={propertyForm.type}
+                                            onChange={(e) => setPropertyForm({ ...propertyForm, type: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium appearance-none"
+                                        >
+                                            <option value="">Selecciona Tipo</option>
+                                            <option value="Hotel">Hotel</option>
+                                            <option value="Edificio">Edificio Residencial</option>
+                                            <option value="Suelo">Suelo / Parcela</option>
+                                            <option value="Retail">Local Comercial / Retail</option>
+                                            <option value="Oficinas">Oficinas</option>
+                                            <option value="Logístico">Logística</option>
+                                            <option value="Otro">Otro</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Precio Propuesto (€)</label>
+                                        <input
+                                            type="number"
+                                            placeholder="Ej: 15000000"
+                                            value={propertyForm.price || ""}
+                                            onChange={(e) => setPropertyForm({ ...propertyForm, price: Number(e.target.value) })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                        {propertyForm.price > 0 && (
+                                            <p className="text-[10px] text-primary font-bold mt-1.5 ml-1 animate-in fade-in slide-in-from-top-1">
+                                                {propertyForm.price.toLocaleString('es-ES')} €
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Superficie Total (m²)</label>
+                                        <input
+                                            type="number"
+                                            placeholder="Ej: 2500"
+                                            value={propertyForm.meters || ""}
+                                            onChange={(e) => setPropertyForm({ ...propertyForm, meters: Number(e.target.value) })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ubicación</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Ej: Madrid, España"
+                                            value={propertyForm.address}
+                                            onChange={(e) => setPropertyForm({ ...propertyForm, address: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Vendedor / Referencia</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Nombre del Vendedor"
+                                            value={propertyForm.vendor_name}
+                                            onChange={(e) => setPropertyForm({ ...propertyForm, vendor_name: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex bg-primary/5 border border-primary/20 rounded-2xl p-6 items-center mb-8">
+                                    <Upload size={24} className="text-primary mr-4" />
+                                    <div className="flex-1">
+                                        <h4 className="text-sm font-bold text-foreground mb-1">Dossier / PDF del Activo</h4>
+                                        <p className="text-xs text-muted-foreground mt-1 font-medium">Sube ahora el PDF original del correo para procesarlo y guardarlo de forma segura.</p>
+                                    </div>
+                                    <input
+                                        type="file"
+                                        onChange={(e) => setIaiDossierFile(e.target.files?.[0] || null)}
+                                        className="block w-full max-w-xs text-xs text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:uppercase file:tracking-widest file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer transition-all"
+                                    />
+                                </div>
+
+                                <div className="flex justify-end gap-3 pt-6 border-t border-border">
+                                    <button
+                                        onClick={() => setIsReviewingPropertySuggestion(false)}
+                                        className="px-6 py-3 text-muted-foreground hover:bg-muted rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={handleSubmitPropertySuggestion}
+                                        disabled={isUploadingIaiDossier}
+                                        className="px-8 py-3 bg-foreground text-background hover:scale-[1.02] shadow-xl rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all flex items-center disabled:opacity-50"
+                                    >
+                                        {isUploadingIaiDossier ? (
+                                            <span className="flex items-center">
+                                                <Loader2 className="animate-spin mr-2" size={16} />
+                                                Procesando...
+                                            </span>
+                                        ) : (
+                                            <span className="flex items-center">
+                                                <CheckCircle2 size={16} className="mr-2" />
+                                                Confirmar y Crear Ficha
+                                            </span>
+                                        )}
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+                    {/* Add Investor Modal */}
+                    {isAddingInvestor && (
+                        <div key="add-investor-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                onClick={() => setIsAddingInvestor(false)}
+                                className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                            />
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                className="relative bg-background border border-border w-full max-w-2xl rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh]"
+                            >
+                                <h2 className="font-serif text-3xl mb-2">Alta de Nuevo Inversor</h2>
+                                <p className="text-muted-foreground text-sm mb-8 font-light">Complete los datos para añadir al directorio confidencial.</p>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="md:col-span-2">
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Nombre Completo</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Ej: Eduardo Santacruz"
+                                            value={investorForm.full_name}
+                                            onChange={(e) => setInvestorForm({ ...investorForm, full_name: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Email Profesional</label>
+                                        <input
+                                            type="email"
+                                            placeholder="eduardo@familyoffice.com"
+                                            value={investorForm.email}
+                                            onChange={(e) => setInvestorForm({ ...investorForm, email: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Compañía / Entidad</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Family Office ES"
+                                            value={investorForm.company_name}
+                                            onChange={(e) => setInvestorForm({ ...investorForm, company_name: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Perfil Inversor</label>
+                                        <select
+                                            value={investorForm.investor_type}
+                                            onChange={(e) => setInvestorForm({ ...investorForm, investor_type: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium appearance-none"
+                                        >
+                                            <option value="">Seleccionar Perfil</option>
+                                            <option value="HNWI">HNWI</option>
+                                            <option value="Family Office">Family Office</option>
+                                            <option value="Institutional">Institutional</option>
+                                            <option value="Private Equity">Private Equity</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Teléfono</label>
+                                        <input
+                                            type="text"
+                                            placeholder="+34 600 000 000"
+                                            value={investorForm.phone}
+                                            onChange={(e) => setInvestorForm({ ...investorForm, phone: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ticket Mínimo (€)</label>
+                                        <input
+                                            type="number"
+                                            value={investorForm.budget_min}
+                                            onFocus={(e) => e.target.select()}
+                                            onChange={(e) => setInvestorForm({ ...investorForm, budget_min: Number(e.target.value) })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                        {investorForm.budget_min > 0 && (
+                                            <p className="text-[10px] text-primary font-bold mt-1.5 ml-1 animate-in fade-in slide-in-from-top-1">
+                                                {investorForm.budget_min.toLocaleString('es-ES')} €
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ticket Máximo (€)</label>
+                                        <input
+                                            type="number"
+                                            value={investorForm.budget_max}
+                                            onFocus={(e) => e.target.select()}
+                                            onChange={(e) => setInvestorForm({ ...investorForm, budget_max: Number(e.target.value) })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                        {investorForm.budget_max > 0 && (
+                                            <p className="text-[10px] text-primary font-bold mt-1.5 ml-1 animate-in fade-in slide-in-from-top-1">
+                                                {investorForm.budget_max.toLocaleString('es-ES')} €
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-3 px-1">Etiquetas</label>
+                                        <div className="flex flex-wrap gap-4 p-4 bg-muted/20 border border-border/40 rounded-2xl">
+                                            {["Comprador", "Vendedor"].map((label) => (
+                                                <label key={label} className="flex items-center space-x-3 cursor-pointer group">
+                                                    <div className="relative flex items-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={(investorForm.labels || []).includes(label)}
+                                                            onChange={(e) => {
+                                                                const currentLabels = investorForm.labels || [];
+                                                                const newLabels = e.target.checked
+                                                                    ? [...currentLabels, label]
+                                                                    : currentLabels.filter((l: string) => l !== label);
+                                                                setInvestorForm({ ...investorForm, labels: newLabels });
+                                                            }}
+                                                            className="w-5 h-5 accent-primary rounded-lg border-border"
+                                                        />
+                                                    </div>
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/70 group-hover:text-primary transition-colors">{label}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4 mt-10">
+                                    <button
+                                        onClick={() => setIsAddingInvestor(false)}
+                                        className="flex-1 px-6 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={handleCreateInvestor}
+                                        className="flex-1 px-6 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 shadow-xl shadow-primary/20 transition-all"
+                                    >
+                                        Dar de Alta
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+
+                    {/* Add/Edit Mandatario Modal */}
+                    {(isAddingMandatario || selectedMandatarioToEdit) && (
+                        <div key="add-mandatario-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                onClick={() => { setIsAddingMandatario(false); setSelectedMandatarioToEdit(null); setMandatarioForm({ full_name: '', company_name: '', email: '', phone: '', mandatario_type: '', labels: [] }); }}
+                                className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                            />
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                className="relative bg-background border border-border w-full max-w-xl rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh]"
+                            >
+                                <h2 className="font-serif text-3xl mb-2">{selectedMandatarioToEdit ? 'Editar Mandatario' : 'Nuevo Mandatario'}</h2>
+                                <p className="text-muted-foreground text-sm mb-8 font-light">{selectedMandatarioToEdit ? 'Modifica los datos del mandatario.' : 'Representantes y agentes de confianza.'}</p>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="md:col-span-2">
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Nombre Completo</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Ej: Marc Planas"
+                                            value={mandatarioForm.full_name}
+                                            onChange={(e) => setMandatarioForm({ ...mandatarioForm, full_name: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Tipo de Mandatario</label>
+                                        <select
+                                            value={mandatarioForm.mandatario_type}
+                                            onChange={(e) => setMandatarioForm({ ...mandatarioForm, mandatario_type: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        >
+                                            <option value="">Seleccionar Tipo</option>
+                                            <option value="Fiduciario">Fiduciario</option>
+                                            <option value="Agente de Representación">Agente de Representación</option>
+                                            <option value="Legal Representative">Legal Representative</option>
+                                            <option value="Asesor Directo">Asesor Directo</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Email</label>
+                                        <input
+                                            type="email"
+                                            placeholder="marc@office.com"
+                                            value={mandatarioForm.email}
+                                            onChange={(e) => setMandatarioForm({ ...mandatarioForm, email: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Compañía</label>
+                                        <input
+                                            type="text"
+                                            placeholder="MP Associates"
+                                            value={mandatarioForm.company_name}
+                                            onChange={(e) => setMandatarioForm({ ...mandatarioForm, company_name: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Teléfono</label>
+                                        <input
+                                            type="text"
+                                            placeholder="+34 ..."
+                                            value={mandatarioForm.phone}
+                                            onChange={(e) => setMandatarioForm({ ...mandatarioForm, phone: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4 mt-10">
+                                    <button
+                                        onClick={() => { setIsAddingMandatario(false); setSelectedMandatarioToEdit(null); setMandatarioForm({ full_name: '', company_name: '', email: '', phone: '', mandatario_type: '', labels: [] }); }}
+                                        className="flex-1 px-6 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (selectedMandatarioToEdit) {
+                                                handleUpdateMandatario({ ...mandatarioForm, id: selectedMandatarioToEdit.id });
+                                            } else {
+                                                handleCreateMandatario();
+                                            }
+                                        }}
+                                        className="flex-1 px-6 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 shadow-xl shadow-primary/20 transition-all"
+                                    >
+                                        {selectedMandatarioToEdit ? 'Guardar Cambios' : 'Guardar Mandatario'}
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+
+                    {/* Add/Edit Collaborator Modal */}
+                    {(isAddingCollaborator || editingCollaborator) && (
+                        <div key="edit-mandatario-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                onClick={() => { setIsAddingCollaborator(false); setEditingCollaborator(null); setCollaboratorForm({ full_name: '', company_name: '', email: '', phone: '', specialty: '' }); }}
+                                className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                            />
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                className="relative bg-background border border-border w-full max-w-xl rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh]"
+                            >
+                                <h2 className="font-serif text-3xl mb-2">{editingCollaborator ? 'Editar Colaborador' : 'Nuevo Colaborador'}</h2>
+                                <p className="text-muted-foreground text-sm mb-8 font-light">{editingCollaborator ? 'Modifica los datos del colaborador.' : 'Intermediarios, arquitectos o asesores legales externos.'}</p>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="md:col-span-2">
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Nombre Completo</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Ej: Marc Planas"
+                                            value={collaboratorForm.full_name}
+                                            onChange={(e) => setCollaboratorForm({ ...collaboratorForm, full_name: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Especialidad</label>
+                                        <select
+                                            value={collaboratorForm.specialty}
+                                            onChange={(e) => setCollaboratorForm({ ...collaboratorForm, specialty: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        >
+                                            <option value="">Seleccionar Tipo</option>
+                                            <option value="Broker Inmobiliario">Broker Inmobiliario</option>
+                                            <option value="Arquitecto">Arquitecto</option>
+                                            <option value="Asesor Legal">Asesor Legal</option>
+                                            <option value="Project Manager">Project Manager</option>
+                                            <option value="Mandatario">Mandatario</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Compañía</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Luxury Group Barcelona"
+                                            value={collaboratorForm.company_name}
+                                            onChange={(e) => setCollaboratorForm({ ...collaboratorForm, company_name: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Email</label>
+                                        <input
+                                            type="email"
+                                            placeholder="marc@luxurygroup.com"
+                                            value={collaboratorForm.email}
+                                            onChange={(e) => setCollaboratorForm({ ...collaboratorForm, email: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Teléfono</label>
+                                        <input
+                                            type="text"
+                                            placeholder="+34 670 000 000"
+                                            value={collaboratorForm.phone}
+                                            onChange={(e) => setCollaboratorForm({ ...collaboratorForm, phone: e.target.value })}
+                                            className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4 mt-10">
+                                    <button
+                                        onClick={() => { setIsAddingCollaborator(false); setEditingCollaborator(null); setCollaboratorForm({ full_name: '', company_name: '', email: '', phone: '', specialty: '' }); }}
+                                        className="flex-1 px-6 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={editingCollaborator ? handleUpdateCollaborator : handleCreateCollaborator}
+                                        className="flex-1 px-6 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 shadow-xl shadow-primary/20 transition-all"
+                                    >
+                                        {editingCollaborator ? 'Guardar Cambios' : 'Registrar'}
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+
+                    {/* Select Investor for Opportunity Modal */}
+                    {isSelectingInvestorForLead && (
+                        <div key="add-collab-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                onClick={() => setIsSelectingInvestorForLead(false)}
+                                className="absolute inset-0 bg-black/80 backdrop-blur-md"
+                            />
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                className="relative bg-background border border-border w-full max-w-xl rounded-[2.5rem] p-10 shadow-2xl overflow-hidden"
+                            >
+                                <h2 className="font-serif text-2xl mb-2">Asignar Inversor</h2>
+                                <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold mb-6">Vincular propiedad a un potencial comprador</p>
+
+                                {/* Search Bar */}
+                                <div className="relative mb-6">
+                                    <div className="absolute inset-y-0 left-4 flex items-center text-muted-foreground pointer-events-none">
+                                        <Search size={16} />
+                                    </div>
                                     <input
                                         type="text"
-                                        placeholder="+34 600 000 000"
-                                        value={investorForm.phone}
-                                        onChange={(e) => setInvestorForm({ ...investorForm, phone: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                        placeholder="Buscar por nombre o empresa..."
+                                        value={investorAssignSearch}
+                                        onChange={(e) => setInvestorAssignSearch(e.target.value)}
+                                        className="w-full bg-muted/40 border border-border/60 rounded-xl py-3 pl-12 pr-4 text-xs focus:outline-none focus:border-primary/50 transition-all font-medium"
                                     />
                                 </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ticket Mínimo (€)</label>
-                                    <input
-                                        type="number"
-                                        value={investorForm.budget_min}
-                                        onFocus={(e) => e.target.select()}
-                                        onChange={(e) => setInvestorForm({ ...investorForm, budget_min: Number(e.target.value) })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                    {investorForm.budget_min > 0 && (
-                                        <p className="text-[10px] text-primary font-bold mt-1.5 ml-1 animate-in fade-in slide-in-from-top-1">
-                                            {investorForm.budget_min.toLocaleString('es-ES')} €
-                                        </p>
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Ticket Máximo (€)</label>
-                                    <input
-                                        type="number"
-                                        value={investorForm.budget_max}
-                                        onFocus={(e) => e.target.select()}
-                                        onChange={(e) => setInvestorForm({ ...investorForm, budget_max: Number(e.target.value) })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                    {investorForm.budget_max > 0 && (
-                                        <p className="text-[10px] text-primary font-bold mt-1.5 ml-1 animate-in fade-in slide-in-from-top-1">
-                                            {investorForm.budget_max.toLocaleString('es-ES')} €
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-3 px-1">Etiquetas</label>
-                                    <div className="flex flex-wrap gap-4 p-4 bg-muted/20 border border-border/40 rounded-2xl">
-                                        {["Comprador", "Vendedor"].map((label) => (
-                                            <label key={label} className="flex items-center space-x-3 cursor-pointer group">
-                                                <div className="relative flex items-center">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={(investorForm.labels || []).includes(label)}
-                                                        onChange={(e) => {
-                                                            const currentLabels = investorForm.labels || [];
-                                                            const newLabels = e.target.checked
-                                                                ? [...currentLabels, label]
-                                                                : currentLabels.filter((l: string) => l !== label);
-                                                            setInvestorForm({ ...investorForm, labels: newLabels });
-                                                        }}
-                                                        className="w-5 h-5 accent-primary rounded-lg border-border"
-                                                    />
+
+                                <div className="space-y-4 max-h-[350px] overflow-y-auto pr-4 custom-scrollbar">
+                                    {investors
+                                        .filter((inv: any) =>
+                                            inv.full_name?.toLowerCase().includes(investorAssignSearch.toLowerCase()) ||
+                                            inv.company_name?.toLowerCase().includes(investorAssignSearch.toLowerCase())
+                                        )
+                                        .map((inv: any) => (
+                                            <button
+                                                key={inv.id}
+                                                onClick={() => {
+                                                    handleCreateLead(inv.id, targetPropertyForLead?.id);
+                                                    setInvestorAssignSearch(""); // Reset search on select
+                                                }}
+                                                className="w-full text-left p-4 rounded-2xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group flex items-center justify-between"
+                                            >
+                                                <div>
+                                                    <p className="font-bold text-sm group-hover:text-primary transition-colors">{inv.full_name}</p>
+                                                    <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">{inv.company_name || 'Individual'}</p>
                                                 </div>
-                                                <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/70 group-hover:text-primary transition-colors">{label}</span>
-                                            </label>
+                                                <ArrowUpRight size={16} className="text-muted-foreground group-hover:text-primary transition-all" />
+                                            </button>
                                         ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex gap-4 mt-10">
-                                <button
-                                    onClick={() => setIsAddingInvestor(false)}
-                                    className="flex-1 px-6 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={handleCreateInvestor}
-                                    className="flex-1 px-6 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 shadow-xl shadow-primary/20 transition-all"
-                                >
-                                    Dar de Alta
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-
-                {/* Add/Edit Mandatario Modal */}
-                {(isAddingMandatario || selectedMandatarioToEdit) && (
-                    <div key="add-mandatario-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            onClick={() => { setIsAddingMandatario(false); setSelectedMandatarioToEdit(null); setMandatarioForm({ full_name: '', company_name: '', email: '', phone: '', mandatario_type: '', labels: [] }); }}
-                            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            className="relative bg-background border border-border w-full max-w-xl rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh]"
-                        >
-                            <h2 className="font-serif text-3xl mb-2">{selectedMandatarioToEdit ? 'Editar Mandatario' : 'Nuevo Mandatario'}</h2>
-                            <p className="text-muted-foreground text-sm mb-8 font-light">{selectedMandatarioToEdit ? 'Modifica los datos del mandatario.' : 'Representantes y agentes de confianza.'}</p>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="md:col-span-2">
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Nombre Completo</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Ej: Marc Planas"
-                                        value={mandatarioForm.full_name}
-                                        onChange={(e) => setMandatarioForm({ ...mandatarioForm, full_name: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Tipo de Mandatario</label>
-                                    <select
-                                        value={mandatarioForm.mandatario_type}
-                                        onChange={(e) => setMandatarioForm({ ...mandatarioForm, mandatario_type: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    >
-                                        <option value="">Seleccionar Tipo</option>
-                                        <option value="Fiduciario">Fiduciario</option>
-                                        <option value="Agente de Representación">Agente de Representación</option>
-                                        <option value="Legal Representative">Legal Representative</option>
-                                        <option value="Asesor Directo">Asesor Directo</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Email</label>
-                                    <input
-                                        type="email"
-                                        placeholder="marc@office.com"
-                                        value={mandatarioForm.email}
-                                        onChange={(e) => setMandatarioForm({ ...mandatarioForm, email: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Compañía</label>
-                                    <input
-                                        type="text"
-                                        placeholder="MP Associates"
-                                        value={mandatarioForm.company_name}
-                                        onChange={(e) => setMandatarioForm({ ...mandatarioForm, company_name: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Teléfono</label>
-                                    <input
-                                        type="text"
-                                        placeholder="+34 ..."
-                                        value={mandatarioForm.phone}
-                                        onChange={(e) => setMandatarioForm({ ...mandatarioForm, phone: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex gap-4 mt-10">
-                                <button
-                                    onClick={() => { setIsAddingMandatario(false); setSelectedMandatarioToEdit(null); setMandatarioForm({ full_name: '', company_name: '', email: '', phone: '', mandatario_type: '', labels: [] }); }}
-                                    className="flex-1 px-6 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        if (selectedMandatarioToEdit) {
-                                            handleUpdateMandatario({ ...mandatarioForm, id: selectedMandatarioToEdit.id });
-                                        } else {
-                                            handleCreateMandatario();
-                                        }
-                                    }}
-                                    className="flex-1 px-6 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 shadow-xl shadow-primary/20 transition-all"
-                                >
-                                    {selectedMandatarioToEdit ? 'Guardar Cambios' : 'Guardar Mandatario'}
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-
-                {/* Add/Edit Collaborator Modal */}
-                {(isAddingCollaborator || editingCollaborator) && (
-                    <div key="edit-mandatario-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            onClick={() => { setIsAddingCollaborator(false); setEditingCollaborator(null); setCollaboratorForm({ full_name: '', company_name: '', email: '', phone: '', specialty: '' }); }}
-                            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            className="relative bg-background border border-border w-full max-w-xl rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh]"
-                        >
-                            <h2 className="font-serif text-3xl mb-2">{editingCollaborator ? 'Editar Colaborador' : 'Nuevo Colaborador'}</h2>
-                            <p className="text-muted-foreground text-sm mb-8 font-light">{editingCollaborator ? 'Modifica los datos del colaborador.' : 'Intermediarios, arquitectos o asesores legales externos.'}</p>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="md:col-span-2">
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Nombre Completo</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Ej: Marc Planas"
-                                        value={collaboratorForm.full_name}
-                                        onChange={(e) => setCollaboratorForm({ ...collaboratorForm, full_name: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Especialidad</label>
-                                    <select
-                                        value={collaboratorForm.specialty}
-                                        onChange={(e) => setCollaboratorForm({ ...collaboratorForm, specialty: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    >
-                                        <option value="">Seleccionar Tipo</option>
-                                        <option value="Broker Inmobiliario">Broker Inmobiliario</option>
-                                        <option value="Arquitecto">Arquitecto</option>
-                                        <option value="Asesor Legal">Asesor Legal</option>
-                                        <option value="Project Manager">Project Manager</option>
-                                        <option value="Mandatario">Mandatario</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Compañía</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Luxury Group Barcelona"
-                                        value={collaboratorForm.company_name}
-                                        onChange={(e) => setCollaboratorForm({ ...collaboratorForm, company_name: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Email</label>
-                                    <input
-                                        type="email"
-                                        placeholder="marc@luxurygroup.com"
-                                        value={collaboratorForm.email}
-                                        onChange={(e) => setCollaboratorForm({ ...collaboratorForm, email: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground block mb-2 px-1">Teléfono</label>
-                                    <input
-                                        type="text"
-                                        placeholder="+34 670 000 000"
-                                        value={collaboratorForm.phone}
-                                        onChange={(e) => setCollaboratorForm({ ...collaboratorForm, phone: e.target.value })}
-                                        className="w-full bg-muted/30 border border-border/60 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex gap-4 mt-10">
-                                <button
-                                    onClick={() => { setIsAddingCollaborator(false); setEditingCollaborator(null); setCollaboratorForm({ full_name: '', company_name: '', email: '', phone: '', specialty: '' }); }}
-                                    className="flex-1 px-6 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={editingCollaborator ? handleUpdateCollaborator : handleCreateCollaborator}
-                                    className="flex-1 px-6 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 shadow-xl shadow-primary/20 transition-all"
-                                >
-                                    {editingCollaborator ? 'Guardar Cambios' : 'Registrar'}
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-
-                {/* Select Investor for Opportunity Modal */}
-                {isSelectingInvestorForLead && (
-                    <div key="add-collab-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            onClick={() => setIsSelectingInvestorForLead(false)}
-                            className="absolute inset-0 bg-black/80 backdrop-blur-md"
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            className="relative bg-background border border-border w-full max-w-xl rounded-[2.5rem] p-10 shadow-2xl overflow-hidden"
-                        >
-                            <h2 className="font-serif text-2xl mb-2">Asignar Inversor</h2>
-                            <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold mb-6">Vincular propiedad a un potencial comprador</p>
-
-                            {/* Search Bar */}
-                            <div className="relative mb-6">
-                                <div className="absolute inset-y-0 left-4 flex items-center text-muted-foreground pointer-events-none">
-                                    <Search size={16} />
-                                </div>
-                                <input
-                                    type="text"
-                                    placeholder="Buscar por nombre o empresa..."
-                                    value={investorAssignSearch}
-                                    onChange={(e) => setInvestorAssignSearch(e.target.value)}
-                                    className="w-full bg-muted/40 border border-border/60 rounded-xl py-3 pl-12 pr-4 text-xs focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                />
-                            </div>
-
-                            <div className="space-y-4 max-h-[350px] overflow-y-auto pr-4 custom-scrollbar">
-                                {investors
-                                    .filter((inv: any) =>
+                                    {investors.length > 0 && investors.filter((inv: any) =>
                                         inv.full_name?.toLowerCase().includes(investorAssignSearch.toLowerCase()) ||
                                         inv.company_name?.toLowerCase().includes(investorAssignSearch.toLowerCase())
-                                    )
-                                    .map((inv: any) => (
-                                        <button
-                                            key={inv.id}
-                                            onClick={() => {
-                                                handleCreateLead(inv.id, targetPropertyForLead?.id);
-                                                setInvestorAssignSearch(""); // Reset search on select
-                                            }}
-                                            className="w-full text-left p-4 rounded-2xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group flex items-center justify-between"
-                                        >
-                                            <div>
-                                                <p className="font-bold text-sm group-hover:text-primary transition-colors">{inv.full_name}</p>
-                                                <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">{inv.company_name || 'Individual'}</p>
-                                            </div>
-                                            <ArrowUpRight size={16} className="text-muted-foreground group-hover:text-primary transition-all" />
-                                        </button>
-                                    ))}
-                                {investors.length > 0 && investors.filter((inv: any) =>
-                                    inv.full_name?.toLowerCase().includes(investorAssignSearch.toLowerCase()) ||
-                                    inv.company_name?.toLowerCase().includes(investorAssignSearch.toLowerCase())
-                                ).length === 0 && (
-                                        <div className="text-center py-12 text-muted-foreground text-xs uppercase tracking-widest">No hay resultados para esta búsqueda</div>
+                                    ).length === 0 && (
+                                            <div className="text-center py-12 text-muted-foreground text-xs uppercase tracking-widest">No hay resultados para esta búsqueda</div>
+                                        )}
+                                    {investors.length === 0 && (
+                                        <div className="text-center py-12 text-muted-foreground text-xs uppercase tracking-widest">No hay inversores registrados</div>
                                     )}
-                                {investors.length === 0 && (
-                                    <div className="text-center py-12 text-muted-foreground text-xs uppercase tracking-widest">No hay inversores registrados</div>
-                                )}
-                            </div>
+                                </div>
 
-                            <button
-                                onClick={() => setIsSelectingInvestorForLead(false)}
-                                className="w-full mt-8 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
-                            >
-                                Cancelar
-                            </button>
-                        </motion.div>
-                    </div>
-                )}
-                {/* Global Opportunity Creation Modal */}
-                {isCreatingGlobalLead && (
-                    <div key="edit-collab-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            onClick={() => {
-                                setIsCreatingGlobalLead(false);
-                                setAssetSearch("");
-                                setInvestorAssignSearch("");
-                            }}
-                            className="absolute inset-0 bg-black/80 backdrop-blur-md"
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            className="relative bg-background border border-border w-full max-w-xl rounded-[2.5rem] p-10 shadow-2xl overflow-hidden"
-                        >
-                            <div className="flex items-center justify-between mb-2">
-                                <h2 className="font-serif text-2xl">Generar Nueva Oportunidad</h2>
-                                <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest rounded-full">
-                                    Paso {stepInGlobalLead} de 2
-                                </span>
-                            </div>
-                            <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold mb-8">
-                                {stepInGlobalLead === 1 ? "Selecciona el activo para la operación" : "Selecciona el inversor interesado"}
-                            </p>
-
-                            {stepInGlobalLead === 1 ? (
-                                <>
-                                    <div className="relative mb-6">
-                                        <div className="absolute inset-y-0 left-4 flex items-center text-muted-foreground pointer-events-none">
-                                            <Search size={16} />
-                                        </div>
-                                        <input
-                                            type="text"
-                                            placeholder="Buscar activo por título o dirección..."
-                                            value={assetSearch}
-                                            onChange={(e) => setAssetSearch(e.target.value)}
-                                            className="w-full bg-muted/40 border border-border/60 rounded-xl py-3 pl-12 pr-4 text-xs focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                        />
-                                    </div>
-                                    <div className="space-y-3 max-h-[350px] overflow-y-auto pr-4 custom-scrollbar">
-                                        {properties
-                                            .filter(p => !assetSearch ||
-                                                p.title?.toLowerCase().includes(assetSearch.toLowerCase()) ||
-                                                p.address?.toLowerCase().includes(assetSearch.toLowerCase())
-                                            )
-                                            .map((p: any) => (
-                                                <button
-                                                    key={p.id}
-                                                    onClick={() => {
-                                                        setTargetPropertyForLead(p);
-                                                        setStepInGlobalLead(2);
-                                                    }}
-                                                    className="w-full text-left p-4 rounded-2xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group flex items-start space-x-4"
-                                                >
-                                                    <div className="w-12 h-12 rounded-lg bg-muted overflow-hidden shrink-0">
-                                                        <img src={p.images?.[0] || "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80"} className="w-full h-full object-cover" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-bold text-sm group-hover:text-primary transition-colors line-clamp-1">{p.title}</p>
-                                                        <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">{p.address}</p>
-                                                    </div>
-                                                </button>
-                                            ))}
-                                    </div>
-                                </>
-                            ) : (
-                                <>
-                                    <div className="relative mb-6">
-                                        <div className="absolute inset-y-0 left-4 flex items-center text-muted-foreground pointer-events-none">
-                                            <Search size={16} />
-                                        </div>
-                                        <input
-                                            type="text"
-                                            placeholder="Buscar inversor..."
-                                            value={investorAssignSearch}
-                                            onChange={(e) => setInvestorAssignSearch(e.target.value)}
-                                            className="w-full bg-muted/40 border border-border/60 rounded-xl py-3 pl-12 pr-4 text-xs focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                        />
-                                    </div>
-                                    <div className="space-y-3 max-h-[350px] overflow-y-auto pr-4 custom-scrollbar">
-                                        {investors
-                                            .filter(inv => !investorAssignSearch ||
-                                                inv.full_name?.toLowerCase().includes(investorAssignSearch.toLowerCase()) ||
-                                                inv.company_name?.toLowerCase().includes(investorAssignSearch.toLowerCase())
-                                            )
-                                            .map((inv: any) => (
-                                                <button
-                                                    key={inv.id}
-                                                    onClick={() => {
-                                                        handleCreateLead(inv.id, targetPropertyForLead?.id);
-                                                        setIsCreatingGlobalLead(false);
-                                                        setAssetSearch("");
-                                                        setInvestorAssignSearch("");
-                                                    }}
-                                                    className="w-full text-left p-4 rounded-2xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group flex items-center justify-between"
-                                                >
-                                                    <div>
-                                                        <p className="font-bold text-sm group-hover:text-primary transition-colors">{inv.full_name}</p>
-                                                        <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">{inv.company_name || 'Individual'}</p>
-                                                    </div>
-                                                    <ArrowUpRight size={16} className="text-muted-foreground group-hover:text-primary transition-all" />
-                                                </button>
-                                            ))}
-                                    </div>
-                                    <button
-                                        onClick={() => setStepInGlobalLead(1)}
-                                        className="mt-4 text-[10px] font-black uppercase tracking-widest text-primary hover:underline"
-                                    >
-                                        ← Volver a seleccionar activo
-                                    </button>
-                                </>
-                            )}
-
-                            <button
+                                <button
+                                    onClick={() => setIsSelectingInvestorForLead(false)}
+                                    className="w-full mt-8 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                            </motion.div>
+                        </div>
+                    )}
+                    {/* Global Opportunity Creation Modal */}
+                    {isCreatingGlobalLead && (
+                        <div key="edit-collab-modal" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
                                 onClick={() => {
                                     setIsCreatingGlobalLead(false);
                                     setAssetSearch("");
                                     setInvestorAssignSearch("");
                                 }}
-                                className="w-full mt-8 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
-                            >
-                                Cancelar
-                            </button>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-
-            {/* AI Email Interpretation Modal */}
-            <AnimatePresence>
-                {showEmailModal && (
-                    <>
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={() => setShowEmailModal(false)}
-                            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200]"
-                        />
-                        <motion.div
-                            layoutId={`email-modal-${activeEmailSuggestion?.id || 'default'}`}
-                            initial={{ x: '100%', opacity: 0 }}
-                            animate={{ x: 0, opacity: 1 }}
-                            exit={{ x: '100%', opacity: 0 }}
-                            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                            className="fixed inset-y-0 right-0 w-full max-w-xl bg-card/90 backdrop-blur-2xl z-[201] shadow-2xl border-l border-border/50 flex flex-col overflow-hidden"
-                        >
-                            {/* Header */}
-                            <div className="p-6 md:p-8 border-b border-border/50 bg-gradient-to-r from-primary/10 to-transparent">
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="flex items-center space-x-3">
-                                        <motion.div 
-                                            animate={{ 
-                                                scale: [1, 1.1, 1],
-                                                rotate: [0, 5, 0]
-                                            }}
-                                            transition={{ 
-                                                duration: 4,
-                                                repeat: Infinity,
-                                                ease: "easeInOut"
-                                            }}
-                                            className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center border border-primary/30 shadow-lg shadow-primary/10"
-                                        >
-                                            <BrainCircuit size={24} className="text-primary" />
-                                        </motion.div>
-                                        <div>
-                                            <h3 className="font-serif text-xl font-bold tracking-tight">Interpretación AI</h3>
-                                            <p className="text-[10px] uppercase tracking-[0.3em] font-black text-primary/60">Alea Intelligence Core</p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={() => setShowEmailModal(false)}
-                                        className="p-3 bg-muted/50 rounded-2xl hover:bg-red-500/10 hover:text-red-500 transition-all text-muted-foreground group"
-                                    >
-                                        <X size={20} className="group-hover:rotate-90 transition-transform" />
-                                    </button>
-                                </div>
-
-                                {activeEmailSuggestion && (
-                                    <div className="space-y-2 mt-4">
-                                        <p className="text-sm font-semibold text-foreground leading-snug">{activeEmailSuggestion.original_email_subject}</p>
-                                        <p className="text-[11px] text-muted-foreground flex items-center">
-                                            <Mail size={12} className="mr-2 text-primary/40" />
-                                            {activeEmailSuggestion.sender_email}
-                                        </p>
-                                        <p className="text-[10px] text-muted-foreground flex items-center">
-                                            <Clock size={12} className="mr-2 text-primary/40" />
-                                            {new Date(activeEmailSuggestion.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Body */}
-                            <div className="flex-1 overflow-y-auto p-6 md:p-8">
-                                {isLoadingInterpretation ? (
-                                    <div className="space-y-6 animate-pulse">
-                                        <div className="flex items-center space-x-3 mb-6">
-                                            <Loader2 size={20} className="animate-spin text-primary" />
-                                            <p className="text-sm font-medium text-primary">Alea Intelligence está interpretando el email...</p>
-                                        </div>
-                                        <div className="space-y-4">
-                                            <div className="h-4 bg-muted/60 rounded-xl w-3/4" />
-                                            <div className="h-4 bg-muted/60 rounded-xl w-full" />
-                                            <div className="h-4 bg-muted/60 rounded-xl w-5/6" />
-                                            <div className="h-8 bg-muted/30 rounded-xl w-full mt-4" />
-                                            <div className="h-4 bg-muted/60 rounded-xl w-2/3" />
-                                            <div className="h-4 bg-muted/60 rounded-xl w-4/5" />
-                                        </div>
-                                    </div>
-                                ) : emailInterpretation ? (
-                                    <div className="space-y-4">
-                                        <div className="p-6 bg-gradient-to-br from-primary/[0.04] to-transparent border border-primary/10 rounded-[2rem] relative overflow-hidden">
-                                            <div className="absolute top-0 right-0 p-4 opacity-[0.03]">
-                                                <BrainCircuit size={120} />
-                                            </div>
-                                            <div className="relative z-10 prose prose-sm max-w-none">
-                                                {emailInterpretation.split('\n').map((line, i) => {
-                                                    const trimmed = line.trim();
-                                                    if (!trimmed) return <div key={i} className="h-2" />;
-                                                    if (trimmed === '---') return <hr key={i} className="border-border/30 my-4" />;
-                                                    if (trimmed.startsWith('**') && trimmed.includes(':**')) {
-                                                        const parts = trimmed.match(/\*\*(.+?):\*\*\s*(.*)/);
-                                                        if (parts) {
-                                                            return (
-                                                                <div key={i} className="flex items-start gap-2 py-2">
-                                                                    <span className="text-[10px] font-black uppercase tracking-[0.15em] text-primary min-w-[120px] pt-0.5">{parts[1]}:</span>
-                                                                    <span className="text-sm text-foreground/90 font-medium leading-relaxed">{parts[2]}</span>
-                                                                </div>
-                                                            );
-                                                        }
-                                                    }
-                                                    return <p key={i} className="text-sm text-foreground/80 leading-relaxed">{trimmed}</p>;
-                                                })}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground/40">
-                                        <BrainCircuit size={48} className="mb-4" />
-                                        <p className="text-xs uppercase tracking-[0.2em] font-black">Sin interpretación</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Footer */}
-                            <div className="p-6 border-t border-border/50 bg-muted/5">
-                                <button
-                                    onClick={() => setShowEmailModal(false)}
-                                    className="w-full py-3.5 bg-foreground text-background rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 transition-all shadow-lg"
-                                >
-                                    Cerrar Panel
-                                </button>
-                            </div>
-                        </motion.div>
-                    </>
-                )}
-            </AnimatePresence>
-            {/* Tracking Note Modal */}
-            <AnimatePresence>
-                {isTrackingModalOpen && (
-                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={() => setIsTrackingModalOpen(false)}
-                            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                            className="relative bg-card border border-border w-full max-w-lg rounded-[2.5rem] shadow-2xl p-10 overflow-hidden"
-                        >
-                            <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">
-                                <Plus size={120} />
-                            </div>
-                            
-                            <h2 className="font-serif text-2xl mb-2">Añadir Seguimiento</h2>
-                            <p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground mb-8">Lead: {activeLeadForNote && typeof activeLeadForNote === 'object' ? activeLeadForNote.investors?.full_name : 'Inversor'}</p>
-
-                            <textarea
-                                value={trackingNoteContent}
-                                onChange={(e) => setTrackingNoteContent(e.target.value)}
-                                placeholder="Escribe aquí los detalles del contacto..."
-                                className="w-full h-40 bg-muted/30 border border-border/60 rounded-[2rem] p-6 text-sm focus:outline-none focus:border-primary/50 transition-all resize-none mb-6"
-                                autoFocus
+                                className="absolute inset-0 bg-black/80 backdrop-blur-md"
                             />
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                className="relative bg-background border border-border w-full max-w-xl rounded-[2.5rem] p-10 shadow-2xl overflow-hidden"
+                            >
+                                <div className="flex items-center justify-between mb-2">
+                                    <h2 className="font-serif text-2xl">Generar Nueva Oportunidad</h2>
+                                    <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest rounded-full">
+                                        Paso {stepInGlobalLead} de 2
+                                    </span>
+                                </div>
+                                <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold mb-8">
+                                    {stepInGlobalLead === 1 ? "Selecciona el activo para la operación" : "Selecciona el inversor interesado"}
+                                </p>
 
-                            <div className="flex gap-4">
+                                {stepInGlobalLead === 1 ? (
+                                    <>
+                                        <div className="relative mb-6">
+                                            <div className="absolute inset-y-0 left-4 flex items-center text-muted-foreground pointer-events-none">
+                                                <Search size={16} />
+                                            </div>
+                                            <input
+                                                type="text"
+                                                placeholder="Buscar activo por título o dirección..."
+                                                value={assetSearch}
+                                                onChange={(e) => setAssetSearch(e.target.value)}
+                                                className="w-full bg-muted/40 border border-border/60 rounded-xl py-3 pl-12 pr-4 text-xs focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                            />
+                                        </div>
+                                        <div className="space-y-3 max-h-[350px] overflow-y-auto pr-4 custom-scrollbar">
+                                            {properties
+                                                .filter(p => !assetSearch ||
+                                                    p.title?.toLowerCase().includes(assetSearch.toLowerCase()) ||
+                                                    p.address?.toLowerCase().includes(assetSearch.toLowerCase())
+                                                )
+                                                .map((p: any) => (
+                                                    <button
+                                                        key={p.id}
+                                                        onClick={() => {
+                                                            setTargetPropertyForLead(p);
+                                                            setStepInGlobalLead(2);
+                                                        }}
+                                                        className="w-full text-left p-4 rounded-2xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group flex items-start space-x-4"
+                                                    >
+                                                        <div className="w-12 h-12 rounded-lg bg-muted overflow-hidden shrink-0">
+                                                            <img src={p.images?.[0] || "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80"} className="w-full h-full object-cover" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-bold text-sm group-hover:text-primary transition-colors line-clamp-1">{p.title}</p>
+                                                            <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">{p.address}</p>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="relative mb-6">
+                                            <div className="absolute inset-y-0 left-4 flex items-center text-muted-foreground pointer-events-none">
+                                                <Search size={16} />
+                                            </div>
+                                            <input
+                                                type="text"
+                                                placeholder="Buscar inversor..."
+                                                value={investorAssignSearch}
+                                                onChange={(e) => setInvestorAssignSearch(e.target.value)}
+                                                className="w-full bg-muted/40 border border-border/60 rounded-xl py-3 pl-12 pr-4 text-xs focus:outline-none focus:border-primary/50 transition-all font-medium"
+                                            />
+                                        </div>
+                                        <div className="space-y-3 max-h-[350px] overflow-y-auto pr-4 custom-scrollbar">
+                                            {investors
+                                                .filter(inv => !investorAssignSearch ||
+                                                    inv.full_name?.toLowerCase().includes(investorAssignSearch.toLowerCase()) ||
+                                                    inv.company_name?.toLowerCase().includes(investorAssignSearch.toLowerCase())
+                                                )
+                                                .map((inv: any) => (
+                                                    <button
+                                                        key={inv.id}
+                                                        onClick={() => {
+                                                            handleCreateLead(inv.id, targetPropertyForLead?.id);
+                                                            setIsCreatingGlobalLead(false);
+                                                            setAssetSearch("");
+                                                            setInvestorAssignSearch("");
+                                                        }}
+                                                        className="w-full text-left p-4 rounded-2xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group flex items-center justify-between"
+                                                    >
+                                                        <div>
+                                                            <p className="font-bold text-sm group-hover:text-primary transition-colors">{inv.full_name}</p>
+                                                            <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">{inv.company_name || 'Individual'}</p>
+                                                        </div>
+                                                        <ArrowUpRight size={16} className="text-muted-foreground group-hover:text-primary transition-all" />
+                                                    </button>
+                                                ))}
+                                        </div>
+                                        <button
+                                            onClick={() => setStepInGlobalLead(1)}
+                                            className="mt-4 text-[10px] font-black uppercase tracking-widest text-primary hover:underline"
+                                        >
+                                            ← Volver a seleccionar activo
+                                        </button>
+                                    </>
+                                )}
+
                                 <button
-                                    onClick={() => setIsTrackingModalOpen(false)}
-                                    className="flex-1 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-muted transition-all"
+                                    onClick={() => {
+                                        setIsCreatingGlobalLead(false);
+                                        setAssetSearch("");
+                                        setInvestorAssignSearch("");
+                                    }}
+                                    className="w-full mt-8 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-muted transition-all"
                                 >
                                     Cancelar
                                 </button>
-                                <button
-                                    onClick={handleSaveTrackingNote}
-                                    disabled={isSavingNote || !trackingNoteContent.trim()}
-                                    className="flex-1 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all shadow-xl shadow-primary/20 disabled:opacity-50"
-                                >
-                                    {isSavingNote ? <Loader2 size={16} className="animate-spin mx-auto" /> : 'Guardar Nota'}
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-        </main>
-    </div>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
+
+                {/* AI Email Interpretation Modal */}
+                <AnimatePresence>
+                    {showEmailModal && (
+                        <>
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={() => setShowEmailModal(false)}
+                                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200]"
+                            />
+                            <motion.div
+                                layoutId={`email-modal-${activeEmailSuggestion?.id || 'default'}`}
+                                initial={{ x: '100%', opacity: 0 }}
+                                animate={{ x: 0, opacity: 1 }}
+                                exit={{ x: '100%', opacity: 0 }}
+                                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                                className="fixed inset-y-0 right-0 w-full max-w-xl bg-card/90 backdrop-blur-2xl z-[201] shadow-2xl border-l border-border/50 flex flex-col overflow-hidden"
+                            >
+                                {/* Header */}
+                                <div className="p-6 md:p-8 border-b border-border/50 bg-gradient-to-r from-primary/10 to-transparent">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center space-x-3">
+                                            <motion.div
+                                                animate={{
+                                                    scale: [1, 1.1, 1],
+                                                    rotate: [0, 5, 0]
+                                                }}
+                                                transition={{
+                                                    duration: 4,
+                                                    repeat: Infinity,
+                                                    ease: "easeInOut"
+                                                }}
+                                                className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center border border-primary/30 shadow-lg shadow-primary/10"
+                                            >
+                                                <BrainCircuit size={24} className="text-primary" />
+                                            </motion.div>
+                                            <div>
+                                                <h3 className="font-serif text-xl font-bold tracking-tight">Interpretación AI</h3>
+                                                <p className="text-[10px] uppercase tracking-[0.3em] font-black text-primary/60">Alea Intelligence Core</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => setShowEmailModal(false)}
+                                            className="p-3 bg-muted/50 rounded-2xl hover:bg-red-500/10 hover:text-red-500 transition-all text-muted-foreground group"
+                                        >
+                                            <X size={20} className="group-hover:rotate-90 transition-transform" />
+                                        </button>
+                                    </div>
+
+                                    {activeEmailSuggestion && (
+                                        <div className="space-y-2 mt-4">
+                                            <p className="text-sm font-semibold text-foreground leading-snug">{activeEmailSuggestion.original_email_subject}</p>
+                                            <p className="text-[11px] text-muted-foreground flex items-center">
+                                                <Mail size={12} className="mr-2 text-primary/40" />
+                                                {activeEmailSuggestion.sender_email}
+                                            </p>
+                                            <p className="text-[10px] text-muted-foreground flex items-center">
+                                                <Clock size={12} className="mr-2 text-primary/40" />
+                                                {new Date(activeEmailSuggestion.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Body */}
+                                <div className="flex-1 overflow-y-auto p-6 md:p-8">
+                                    {isLoadingInterpretation ? (
+                                        <div className="space-y-6 animate-pulse">
+                                            <div className="flex items-center space-x-3 mb-6">
+                                                <Loader2 size={20} className="animate-spin text-primary" />
+                                                <p className="text-sm font-medium text-primary">Alea Intelligence está interpretando el email...</p>
+                                            </div>
+                                            <div className="space-y-4">
+                                                <div className="h-4 bg-muted/60 rounded-xl w-3/4" />
+                                                <div className="h-4 bg-muted/60 rounded-xl w-full" />
+                                                <div className="h-4 bg-muted/60 rounded-xl w-5/6" />
+                                                <div className="h-8 bg-muted/30 rounded-xl w-full mt-4" />
+                                                <div className="h-4 bg-muted/60 rounded-xl w-2/3" />
+                                                <div className="h-4 bg-muted/60 rounded-xl w-4/5" />
+                                            </div>
+                                        </div>
+                                    ) : emailInterpretation ? (
+                                        <div className="space-y-4">
+                                            <div className="p-6 bg-gradient-to-br from-primary/[0.04] to-transparent border border-primary/10 rounded-[2rem] relative overflow-hidden">
+                                                <div className="absolute top-0 right-0 p-4 opacity-[0.03]">
+                                                    <BrainCircuit size={120} />
+                                                </div>
+                                                <div className="relative z-10 prose prose-sm max-w-none">
+                                                    {emailInterpretation.split('\n').map((line, i) => {
+                                                        const trimmed = line.trim();
+                                                        if (!trimmed) return <div key={i} className="h-2" />;
+                                                        if (trimmed === '---') return <hr key={i} className="border-border/30 my-4" />;
+                                                        if (trimmed.startsWith('**') && trimmed.includes(':**')) {
+                                                            const parts = trimmed.match(/\*\*(.+?):\*\*\s*(.*)/);
+                                                            if (parts) {
+                                                                return (
+                                                                    <div key={i} className="flex items-start gap-2 py-2">
+                                                                        <span className="text-[10px] font-black uppercase tracking-[0.15em] text-primary min-w-[120px] pt-0.5">{parts[1]}:</span>
+                                                                        <span className="text-sm text-foreground/90 font-medium leading-relaxed">{parts[2]}</span>
+                                                                    </div>
+                                                                );
+                                                            }
+                                                        }
+                                                        return <p key={i} className="text-sm text-foreground/80 leading-relaxed">{trimmed}</p>;
+                                                    })}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground/40">
+                                            <BrainCircuit size={48} className="mb-4" />
+                                            <p className="text-xs uppercase tracking-[0.2em] font-black">Sin interpretación</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Footer */}
+                                <div className="p-6 border-t border-border/50 bg-muted/5">
+                                    <button
+                                        onClick={() => setShowEmailModal(false)}
+                                        className="w-full py-3.5 bg-foreground text-background rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 transition-all shadow-lg"
+                                    >
+                                        Cerrar Panel
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </>
+                    )}
+                </AnimatePresence>
+                {/* Tracking Note Modal */}
+                <AnimatePresence>
+                    {isTrackingModalOpen && (
+                        <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={() => setIsTrackingModalOpen(false)}
+                                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                            />
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                className="relative bg-card border border-border w-full max-w-lg rounded-[2.5rem] shadow-2xl p-10 overflow-hidden"
+                            >
+                                <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">
+                                    <Plus size={120} />
+                                </div>
+
+                                <h2 className="font-serif text-2xl mb-2">Añadir Seguimiento</h2>
+                                <p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground mb-8">Lead: {activeLeadForNote && typeof activeLeadForNote === 'object' ? activeLeadForNote.investors?.full_name : 'Inversor'}</p>
+
+                                <textarea
+                                    value={trackingNoteContent}
+                                    onChange={(e) => setTrackingNoteContent(e.target.value)}
+                                    placeholder="Escribe aquí los detalles del contacto..."
+                                    className="w-full h-40 bg-muted/30 border border-border/60 rounded-[2rem] p-6 text-sm focus:outline-none focus:border-primary/50 transition-all resize-none mb-6"
+                                    autoFocus
+                                />
+
+                                <div className="flex gap-4">
+                                    <button
+                                        onClick={() => setIsTrackingModalOpen(false)}
+                                        className="flex-1 py-4 border border-border rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-muted transition-all"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={handleSaveTrackingNote}
+                                        disabled={isSavingNote || !trackingNoteContent.trim()}
+                                        className="flex-1 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all shadow-xl shadow-primary/20 disabled:opacity-50"
+                                    >
+                                        {isSavingNote ? <Loader2 size={16} className="animate-spin mx-auto" /> : 'Guardar Nota'}
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
+            </main>
+            
+            {/* Botón flotante del Chat IA */}
+            <button
+                onClick={() => setShowAIChat(true)}
+                className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-emerald-500 to-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all z-50 animate-pulse"
+            >
+                <Sparkles size={28} />
+            </button>
+            
+            {/* Chat Pelayo - Asistente Principal */}
+            <PelayoChat 
+                isOpen={showAIChat} 
+                onClose={() => setShowAIChat(false)}
+                context={{
+                    leads,
+                    properties,
+                    investors,
+                    iaiSuggestions,
+                    mandatarios
+                }}
+                userInfo={{
+                    id: currentUser?.id,
+                    email: currentUser?.email || '',
+                    role: currentUser?.role || 'agent'
+                }}
+            />
+        </div>
     );
 }

@@ -1,0 +1,16 @@
+{
+  "module": "http:MakeRequest",
+  "version": 4,
+  "parameters": {
+    "url": "https://www.aleasignature.com/api/webhook/email",
+    "method": "POST",
+    "authenticationType": "noAuth"
+  },
+  "mapper": {
+    "headers": [
+      { "name": "Content-Type", "value": "application/json" }
+    ],
+    "contentType": "json",
+    "body": "{\"from\": \"{{1.from}}\", \"subject\": \"{{1.subject}}\", \"text\": \"{{1.text}}\"}"
+  }
+}

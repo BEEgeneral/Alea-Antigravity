@@ -123,9 +123,8 @@ def main():
             if pdf_attachments:
                 payload['attachment_data'] = [
                     {'filename': a['filename'], 'content_type': a['content_type'], 'data': a['data']}
-                    for a in pdf_attachments[:2]  # Máximo 2 PDFs para no exceder tamaño
+                    for a in pdf_attachments[:2]
                 ]
-            ]
         
         try:
             r = requests.post(WEBHOOK_URL, json=payload, timeout=60)

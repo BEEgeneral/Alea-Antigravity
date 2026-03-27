@@ -1,3 +1,4 @@
+// GEMINI ONLY - NO GROQ - Updated 2026-03-27
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, X, Plus, Building, Users, ShieldCheck, FileText, Brain, Sparkles, ChevronRight, Trash2, Mic, MicOff, Bell, BellOff, Check, XCircle } from 'lucide-react';
+import { Send, Bot, User, Loader2, X, Plus, Building, Users, ShieldCheck, FileText, Brain, Sparkles, ChevronRight, Trash2, Mic, MicOff, Bell, BellOff, Check, XCircle, Paperclip, File, Upload, Image } from 'lucide-react';
+import { extractPDFContent } from '@/lib/pdf-utils';
 
 interface Message {
   id: string;
@@ -43,6 +44,9 @@ export default function PelayoChat({ isOpen, onClose, context, userInfo }: AICha
   const [isRecording, setIsRecording] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [pendingPreview, setPendingPreview] = useState<any>(null);
+  const [attachedFile, setAttachedFile] = useState<{ name: string; data: string; type: string; extractedContent?: { text: string; images: { page: number; data: string }[] } } | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
@@ -66,13 +70,74 @@ export default function PelayoChat({ isOpen, onClose, context, userInfo }: AICha
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert('El archivo es demasiado grande. Máximo 10MB.');
+      return;
+    }
+
+    const isPDF = file.type === 'application/pdf';
+    const isImage = file.type.startsWith('image/');
+    const isDoc = file.type.includes('document') || file.type.includes('word');
+
+    if (!isPDF && !isImage && !isDoc) {
+      alert('Formato no soportado. Sube PDF, imagen o documento de Word.');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const reader = new FileReader();
+      const fileData = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const fileInfo: { name: string; data: string; type: string; extractedContent?: { text: string; images: { page: number; data: string }[] } } = {
+        name: file.name,
+        data: fileData,
+        type: file.type
+      };
+
+      if (isPDF) {
+        try {
+          const pdfContent = await extractPDFContent(fileData);
+          fileInfo.extractedContent = {
+            text: pdfContent.text,
+            images: pdfContent.images.map(img => ({ page: img.page, data: img.data }))
+          };
+        } catch (pdfError) {
+          console.error('Error extracting PDF content:', pdfError);
+        }
+      }
+
+      setAttachedFile(fileInfo);
+    } catch (error) {
+      console.error('Error reading file:', error);
+      alert('Error al leer el archivo.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const removeAttachedFile = () => {
+    setAttachedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && !attachedFile) || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: input.trim(),
+      content: input.trim() || (attachedFile ? `[Archivo adjunto: ${attachedFile.name}]` : ''),
       timestamp: new Date()
     };
 
@@ -82,7 +147,7 @@ export default function PelayoChat({ isOpen, onClose, context, userInfo }: AICha
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
 
       const response = await fetch('/api/pelayo-chat', {
         method: 'POST',
@@ -90,6 +155,8 @@ export default function PelayoChat({ isOpen, onClose, context, userInfo }: AICha
         signal: controller.signal,
         body: JSON.stringify({
           message: userMessage.content,
+          file: attachedFile,
+          extractedContent: attachedFile?.extractedContent,
           history: messages.slice(-8).map(m => ({ role: m.role, content: m.content })),
           context: {
             leads: context?.leads || [],
@@ -100,6 +167,9 @@ export default function PelayoChat({ isOpen, onClose, context, userInfo }: AICha
           user: userInfo
         })
       });
+
+      setAttachedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
 
       clearTimeout(timeoutId);
 
@@ -479,6 +549,45 @@ export default function PelayoChat({ isOpen, onClose, context, userInfo }: AICha
                 ))}
               </div>
             )}
+
+            {/* Attached File Preview */}
+            {attachedFile && (
+              <div className="mb-3 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                    <File size={20} className="text-emerald-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium truncate max-w-[200px]">{attachedFile.name}</p>
+                    {attachedFile.extractedContent ? (
+                      <p className="text-xs text-muted-foreground flex items-center gap-2">
+                        <span className="flex items-center gap-1">
+                          <FileText size={10} />
+                          {attachedFile.extractedContent.text.substring(0, 50)}...
+                        </span>
+                        {attachedFile.extractedContent.images.length > 0 && (
+                          <span className="flex items-center gap-1">
+                            <Image size={10} />
+                            {attachedFile.extractedContent.images.length} imágenes
+                          </span>
+                        )}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Upload size={10} />
+                        Listo para enviar a Pelayo
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={removeAttachedFile}
+                  className="p-1.5 hover:bg-red-500/20 rounded-lg text-red-500 transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
             
             <div className="flex gap-2">
               <button
@@ -491,6 +600,25 @@ export default function PelayoChat({ isOpen, onClose, context, userInfo }: AICha
                 title="Entrada por voz"
               >
                 {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,image/*,.doc,.docx"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className={`px-3 rounded-xl flex items-center gap-2 ${
+                  attachedFile 
+                    ? 'bg-emerald-500/20 text-emerald-500' 
+                    : 'bg-muted hover:bg-muted/70'
+                }`}
+                title="Adjuntar dossier"
+              >
+                {isUploading ? <Loader2 size={18} className="animate-spin" /> : <Paperclip size={18} />}
               </button>
               <input
                 type="text"

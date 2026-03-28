@@ -105,10 +105,58 @@ async function createNotification(userId: string, type: string, title: string, m
         });
 }
 
+async function uploadImageToStorage(base64Data: string, fileName: string): Promise<string | null> {
+    try {
+        const base64Clean = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
+        const binaryString = atob(base64Clean);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        const uploadRes = await fetch(
+            `${env.SUPABASE_URL}/storage/v1/objects/dossiers/${fileName}`,
+            {
+                method: 'POST',
+                headers: new Headers({
+                    'Content-Type': 'image/jpeg',
+                    'apikey': env.SUPABASE_ANON_KEY || '',
+                    'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+                    'x-upsert': 'true'
+                }),
+                body: bytes
+            }
+        );
+
+        if (uploadRes.ok) {
+            return `${env.SUPABASE_URL}/storage/v1/object/public/dossiers/${fileName}`;
+        }
+        return null;
+    } catch (error) {
+        console.error('Error uploading image:', error);
+        return null;
+    }
+}
+
 export async function POST(req: Request) {
     try {
-        const { message, user, action: userAction, pendingActionId } = await req.json();
+        const { message, user, action: userAction, pendingActionId, file, extractedContent } = await req.json();
         const userId = user?.id || user?.email || 'anonymous';
+
+        let uploadedImageUrls: string[] = [];
+        let dossierText = '';
+
+        if (extractedContent && extractedContent.images && extractedContent.images.length > 0) {
+            dossierText = extractedContent.text || '';
+            
+            const imageUploadPromises = extractedContent.images.slice(0, 5).map((img: any, idx: number) => {
+                const fileName = `dossier_${Date.now()}_page${img.page}_${idx}.jpg`;
+                return uploadImageToStorage(img.data, fileName);
+            });
+            
+            const uploadResults = await Promise.all(imageUploadPromises);
+            uploadedImageUrls = uploadResults.filter((url): url is string => url !== null);
+        }
 
         // Handle action confirmations
         if (userAction === 'confirm' && pendingActionId) {
@@ -177,17 +225,28 @@ ${mandatariosData.data.slice(0, 3).map((m: any) => `- ${m.full_name}`).join('\n'
 `;
         }
 
-        // Analyze user intent
+        // Build dossier context if present
+        let dossierContext = '';
+        if (dossierText || uploadedImageUrls.length > 0) {
+            dossierContext = `
+📄 CONTENIDO DEL DOSSIER ADJUNTO:
+${dossierText ? `Texto extraído:\n${dossierText.substring(0, 3000)}${dossierText.length > 3000 ? '...(truncado)' : ''}` : ''}
+${uploadedImageUrls.length > 0 ? `\nImágenes adjuntas (${uploadedImageUrls.length}):\n${uploadedImageUrls.map((url, i) => `[Imagen ${i + 1}]: ${url}`).join('\n')}` : ''}
+`;
+        }
+
+        // Analyze user intent - include dossier content for better analysis
         const analysisPrompt = `
 Analiza si el usuario quiere CREAR algo en el CRM.
 
 El usuario dice: "${message}"
+${dossierText ? `\n\nContenido del dossier subido:\n${dossierText.substring(0, 2000)}` : ''}
 
 Responde en JSON:
 {
   "intent": "create" | "query" | "none",
   "entity": "property" | "investor" | "lead" | "mandatario" | "none",
-  "data": { ...datos extraidos del mensaje },
+  "data": { ...datos extraidos del mensaje Y del dossier },
   "confidence": 0.0-1.0,
   "is_opportunity": true | false,
   "opportunity_type": "high" | "medium" | "low" | null,
@@ -205,7 +264,7 @@ Responde en JSON:
         } catch (e) {}
 
         // Save user message to history
-        await saveConversation(userId, 'user', message, analysis);
+        await saveConversation(userId, 'user', message + (dossierText ? `\n\n[Dossier adjuntado: ${dossierText.substring(0, 500)}...]` : ''), analysis);
 
         // Handle explicit confirmations
         const lowerMessage = message.toLowerCase();
@@ -254,14 +313,15 @@ Tu función es:
 1. **Responder preguntas** sobre propiedades, inversores, leads, mandatarios del CRM
 2. **Detectar oportunidades** en las conversaciones y describirlas claramente
 3. **Crear registros** SOLO cuando el usuario confirma explícitamente
-4. **Generar alertas** cuando detectes oportunidades de inversión importantes
+4. **Analizar dossiers** - cuando el usuario sube un PDF, extrae información relevante (datos de propiedades, inversores, etc.) y ofrece crear registros en el CRM
+5. **Gestionar imágenes** - si hay imágenes del dossier, puedes asociarlas a propiedades
 
 REGLAS IMPORTANTES:
 - Si detectas que el usuario quiere crear algo, NO lo crees inmediatamente
 - En su lugar, muestra un "preview" de los datos y pide confirmación explícita
 - Si detectas una oportunidad de inversión, crea una notificación
 - Siempre responde en español, de forma clara y directa
-- Máximo 300 palabras${historyText}${pendingConfirmationText}
+- Máximo 300 palabras${historyText}${pendingConfirmationText}${dossierContext}
 
 ${summary}
 
@@ -282,12 +342,18 @@ El usuario pregunta: ${message}`;
         // If AI detected a create intent with high confidence, suggest creating
         if (analysis.intent === 'create' && analysis.entity !== 'none' && analysis.data && analysis.confidence > 0.7 && !pendingAction) {
             const actionType = `create_${analysis.entity}`;
-            const pendingRecord = await createPendingAction(userId, actionType, analysis.entity, {
+            const dataWithImages = {
                 ...analysis.data,
+                ...(uploadedImageUrls.length > 0 && { thumbnail_url: uploadedImageUrls[0], images: uploadedImageUrls }),
                 created_at: new Date().toISOString()
-            });
+            };
+            const pendingRecord = await createPendingAction(userId, actionType, analysis.entity, dataWithImages);
 
-            response += `\n\n📝 **Vista previa:** Parece que quieres crear un ${analysis.entity}. Datos detectados:\n\`\`\`${JSON.stringify(analysis.data, null, 2)}\`\`\`\n\nResponde "sí, créalo" para confirmar o "cancelar" para否决ar.`;
+            response += `\n\n📝 **Vista previa:** Parece que quieres crear un ${analysis.entity}. Datos detectados:\n\`\`\`${JSON.stringify(analysis.data, null, 2)}\`\`\``;
+            if (uploadedImageUrls.length > 0) {
+                response += `\n📷 ${uploadedImageUrls.length} imagen(es) del dossier adjuntada(s)`;
+            }
+            response += `\n\nResponde "sí, créalo" para confirmar o "cancelar" para否决ar.`;
             response += `\n\n[pending_action:${pendingRecord?.id}]`;
         }
 
@@ -316,7 +382,8 @@ El usuario pregunta: ${message}`;
             response,
             analysis,
             pendingAction: userPendingActions.data?.[0] || null,
-            pendingActionsCount: userPendingActions.data?.length || 0
+            pendingActionsCount: userPendingActions.data?.length || 0,
+            uploadedImages: uploadedImageUrls.length
         });
 
     } catch (error: any) {

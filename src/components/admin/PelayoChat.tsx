@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, X, Plus, Building, Users, ShieldCheck, FileText, Brain, Sparkles, ChevronRight, Trash2 } from 'lucide-react';
+import { Send, Bot, User, Loader2, X, Plus, Building, Users, ShieldCheck, FileText, Brain, Sparkles, ChevronRight, Trash2, Mic, MicOff, Bell, BellOff, Check, XCircle } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -39,7 +39,12 @@ export default function PelayoChat({ isOpen, onClose, context, userInfo }: AICha
   const [isLoading, setIsLoading] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [pendingActions, setPendingActions] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [pendingPreview, setPendingPreview] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     if (isOpen && messages.length === 0) {
@@ -164,6 +169,139 @@ export default function PelayoChat({ isOpen, onClose, context, userInfo }: AICha
       sendMessage();
     }
   };
+
+  const startVoiceInput = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Tu navegador no soporta reconocimiento de voz');
+      return;
+    }
+
+    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
+    
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'es-ES';
+    
+    recognition.onstart = () => {
+      setIsRecording(true);
+    };
+    
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results)
+        .map((result: any) => result[0].transcript)
+        .join('');
+      setInput(transcript);
+    };
+    
+    recognition.onend = () => {
+      setIsRecording(false);
+      if (input.trim()) {
+        sendMessage();
+      }
+    };
+    
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      setIsRecording(false);
+    };
+    
+    recognition.start();
+  };
+
+  const stopVoiceInput = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    setIsRecording(false);
+  };
+
+  const fetchNotifications = async () => {
+    if (!userInfo?.id) return;
+    try {
+      const res = await fetch(`/api/pelayo-chat?type=notifications&userId=${userInfo.id}`);
+      const data = await res.json();
+      setNotifications(data.notifications || []);
+    } catch (e) {
+      console.error('Error fetching notifications:', e);
+    }
+  };
+
+  const fetchPendingActions = async () => {
+    if (!userInfo?.id) return;
+    try {
+      const res = await fetch(`/api/pelayo-chat?type=pending&userId=${userInfo.id}`);
+      const data = await res.json();
+      setPendingActions(data.pendingActions || []);
+    } catch (e) {
+      console.error('Error fetching pending actions:', e);
+    }
+  };
+
+  const confirmPendingAction = async (actionId: string) => {
+    try {
+      const res = await fetch('/api/pelayo-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user: userInfo,
+          action: 'confirm',
+          pendingActionId: actionId
+        })
+      });
+      const data = await res.json();
+      if (data.response) {
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: data.response,
+          timestamp: new Date()
+        }]);
+        setPendingActions(prev => prev.filter(a => a.id !== actionId));
+      }
+    } catch (e) {
+      console.error('Error confirming action:', e);
+    }
+  };
+
+  const cancelPendingAction = async (actionId: string) => {
+    try {
+      const res = await fetch('/api/pelayo-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user: userInfo,
+          action: 'cancel',
+          pendingActionId: actionId
+        })
+      });
+      const data = await res.json();
+      if (data.response) {
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: data.response,
+          timestamp: new Date()
+        }]);
+        setPendingActions(prev => prev.filter(a => a.id !== actionId));
+      }
+    } catch (e) {
+      console.error('Error cancelling action:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchNotifications();
+      fetchPendingActions();
+      const interval = setInterval(() => {
+        fetchNotifications();
+        fetchPendingActions();
+      }, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [isOpen, userInfo?.id]);
 
   if (!isOpen) return null;
 
@@ -313,7 +451,47 @@ export default function PelayoChat({ isOpen, onClose, context, userInfo }: AICha
 
           {/* Input */}
           <div className="p-4 border-t border-border">
+            {/* Pending Actions Preview */}
+            {pendingActions.length > 0 && (
+              <div className="mb-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles size={16} className="text-amber-500" />
+                  <span className="text-sm font-medium text-amber-500">Acciones pendientes</span>
+                </div>
+                {pendingActions.map((action: any) => (
+                  <div key={action.id} className="flex items-center justify-between gap-2">
+                    <span className="text-xs">{action.action_type.replace('create_', '')}</span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => confirmPendingAction(action.id)}
+                        className="px-2 py-1 bg-emerald-500 text-white rounded-lg text-xs flex items-center gap-1"
+                      >
+                        <Check size={12} /> Crear
+                      </button>
+                      <button
+                        onClick={() => cancelPendingAction(action.id)}
+                        className="px-2 py-1 bg-red-500 text-white rounded-lg text-xs flex items-center gap-1"
+                      >
+                        <XCircle size={12} /> Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
             <div className="flex gap-2">
+              <button
+                onClick={isRecording ? stopVoiceInput : startVoiceInput}
+                className={`px-3 rounded-xl flex items-center gap-2 ${
+                  isRecording 
+                    ? 'bg-red-500 text-white animate-pulse' 
+                    : 'bg-muted hover:bg-muted/70'
+                }`}
+                title="Entrada por voz"
+              >
+                {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
+              </button>
               <input
                 type="text"
                 value={input}
@@ -324,6 +502,15 @@ export default function PelayoChat({ isOpen, onClose, context, userInfo }: AICha
                 disabled={isLoading}
               />
               <button
+                onClick={() => setNotificationsEnabled(!notificationsEnabled)}
+                className={`px-3 rounded-xl ${
+                  notificationsEnabled ? 'bg-emerald-500/20 text-emerald-500' : 'bg-muted text-muted-foreground'
+                }`}
+                title="Notificaciones"
+              >
+                {notificationsEnabled ? <Bell size={18} /> : <BellOff size={18} />}
+              </button>
+              <button
                 onClick={sendMessage}
                 disabled={isLoading || !input.trim()}
                 className="px-4 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
@@ -331,6 +518,25 @@ export default function PelayoChat({ isOpen, onClose, context, userInfo }: AICha
                 <Send size={18} />
               </button>
             </div>
+            
+            {/* Notifications */}
+            {notificationsEnabled && notifications.length > 0 && (
+              <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
+                {notifications.map((notif: any) => (
+                  <div 
+                    key={notif.id}
+                    className={`px-3 py-1 rounded-full text-xs flex items-center gap-1 whitespace-nowrap ${
+                      notif.type === 'opportunity' 
+                        ? 'bg-red-500/20 text-red-500' 
+                        : 'bg-blue-500/20 text-blue-500'
+                    }`}
+                  >
+                    <Bell size={12} />
+                    {notif.title}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

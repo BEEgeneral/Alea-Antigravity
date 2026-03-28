@@ -32,11 +32,17 @@ export const env = {
   /** Supabase Anon Key */
   SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   
-  /** Groq API Key (Server side only) */
-  GROQ_API_KEY: process.env.GROQ_API_KEY,
+  /** Supabase Service Role Key (Server side ONLY - never expose to client) */
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   
   /** Gemini API Key (Server side only) */
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  
+  /** Chatwoot API Token (Server side only) */
+  CHATWOOT_TOKEN: process.env.CHATWOOT_TOKEN,
+  
+  /** Webhook secret for verification */
+  WEBHOOK_SECRET: process.env.WEBHOOK_SECRET,
 
   // --- Helper Methods ---
 

@@ -1,13 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+import { env } from '@/lib/env';
 
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmbWpob2lyb3B2eWV2eWt2cWV5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTcwNTA3MywiZXhwIjoyMDg3MjgxMDczfQ.yS9a0r4PUSASs50SOC3Q5H4Z-Q9HfYUHz2vLHwK21es'
-);
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
 const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
 type Tables = 'leads' | 'properties' | 'investors' | 'mandatarios' | 'collaborators';
@@ -90,13 +86,16 @@ Mensaje del usuario: ${message}`;
             analysis = JSON.parse(analysisResult.response.text());
         } catch (e) {}
 
-        // Si el usuario confirma creación (contiene "sí", "ok", "confirmo", etc.)
-        const userConfirm = message.toLowerCase().includes('sí') || 
-                          message.toLowerCase().includes('si') ||
-                          message.toLowerCase().includes('ok') ||
-                          message.toLowerCase().includes('confirmo') ||
-                          message.toLowerCase().includes('crea') ||
-                          message.toLowerCase().includes('dale');
+        // Si el usuario confirma creación (debe ser explícito - no accidental)
+        const lowerMessage = message.toLowerCase();
+        const explicitConfirmPatterns = [
+            'sí, créalo', 'sí, crealo', 'sí, créala', 'sí, creala',
+            'confirmo', 'confirmado', 'confirmed',
+            'sí, crea', 'si, crea', 'sí, crear',
+            'vale, crea', 'ok, crea', 'dale, crea',
+            'procede', 'proceder'
+        ];
+        const userConfirm = explicitConfirmPatterns.some(p => lowerMessage.includes(p));
 
         let createdRecord = null;
         

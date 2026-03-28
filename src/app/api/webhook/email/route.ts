@@ -1,17 +1,21 @@
 // GEMINI ONLY - NO GROQ - Updated 2026-03-27
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+import { env } from '@/lib/env';
 
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmbWpob2lyb3B2eWV2eWt2cWV5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTcwNTA3MywiZXhwIjoyMDg3MjgxMDczfQ.yS9a0r4PUSASs50SOC3Q5H4Z-Q9HfYUHz2vLHwK21es'
-);
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
 
 export async function POST(req: Request) {
     try {
+        // Verify webhook secret if configured
+        if (env.WEBHOOK_SECRET) {
+            const authHeader = req.headers.get('authorization');
+            if (authHeader !== `Bearer ${env.WEBHOOK_SECRET}`) {
+                return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+            }
+        }
+
         let body;
         const contentType = req.headers.get('content-type') || '';
 
@@ -73,15 +77,15 @@ export async function POST(req: Request) {
                     const fileName = `${Date.now()}_${att.filename}`;
                     
                     const uploadRes = await fetch(
-                        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/objects/email-attachments/${fileName}`,
+                        `${env.SUPABASE_URL}/storage/v1/objects/email-attachments/${fileName}`,
                         {
                             method: 'POST',
-                            headers: {
+                            headers: new Headers({
                                 'Content-Type': att.content_type || 'application/octet-stream',
-                                'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmbWpob2lyb3B2eWV2eWt2cWV5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTcwNTA3MywiZXhwIjoyMDg3MjgxMDczfQ.yS9a0r4PUSASs50SOC3Q5H4Z-Q9HfYUHz2vLHwK21es',
-                                'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmbWpob2lyb3B2eWV2eWt2cWV5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTcwNTA3MywiZXhwIjoyMDg3MjgxMDczfQ.yS9a0r4PUSASs50SOC3Q5H4Z-Q9HfYUHz2vLHwK21es',
+                                'apikey': env.SUPABASE_ANON_KEY || '',
+                                'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
                                 'x-upsert': 'true'
-                            },
+                            }),
                             body: buffer
                         }
                     );
@@ -89,7 +93,7 @@ export async function POST(req: Request) {
                     if (uploadRes.ok) {
                         savedAttachments.push({
                             filename: att.filename,
-                            url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/email-attachments/${fileName}`
+                            url: `${env.SUPABASE_URL}/storage/v1/object/public/email-attachments/${fileName}`
                         });
                     }
                 } catch (e) {
@@ -199,20 +203,12 @@ export async function POST(req: Request) {
             status: 'pending'
         };
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/iai_inbox_suggestions`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmbWpob2lyb3B2eWV2eWt2cWV5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTcwNTA3MywiZXhwIjoyMDg3MjgxMDczfQ.yS9a0r4PUSASs50SOC3Q5H4Z-Q9HfYUHz2vLHwK21es',
-                'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmbWpob2lyb3B2eWV2eWt2cWV5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTcwNTA3MywiZXhwIjoyMDg3MjgxMDczfQ.yS9a0r4PUSASs50SOC3Q5H4Z-Q9HfYUHz2vLHwK21es',
-                'Prefer': 'return=minimal'
-            },
-            body: JSON.stringify(insertData)
-        });
+        const { error: dbError } = await supabaseAdmin
+            .from('iai_inbox_suggestions')
+            .insert(insertData);
 
-        if (!response.ok) {
-            const err = await response.text();
-            throw new Error(err);
+        if (dbError) {
+            throw new Error(dbError.message);
         }
 
         return NextResponse.json({ 

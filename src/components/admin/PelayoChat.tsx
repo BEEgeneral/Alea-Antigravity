@@ -611,14 +611,15 @@ export default function PelayoChat({ isOpen, onClose, context, userInfo }: AICha
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
-                className={`px-3 rounded-xl flex items-center gap-2 ${
+                className={`px-3 py-2 rounded-xl flex items-center gap-2 text-xs font-medium ${
                   attachedFile 
                     ? 'bg-emerald-500/20 text-emerald-500' 
                     : 'bg-muted hover:bg-muted/70'
                 }`}
-                title="Adjuntar dossier"
+                title="Subir PDF"
               >
-                {isUploading ? <Loader2 size={18} className="animate-spin" /> : <Paperclip size={18} />}
+                {isUploading ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+                <span>PDF</span>
               </button>
               <input
                 type="text"

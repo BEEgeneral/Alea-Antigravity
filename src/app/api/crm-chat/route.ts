@@ -6,9 +6,6 @@ import { env } from '@/lib/env';
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
 const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-const CHATWOOT_TOKEN = env.CHATWOOT_TOKEN || '';
-const CHATWOOT_ACCOUNT = '157966';
-
 type Tables = 'leads' | 'properties' | 'investors' | 'mandatarios' | 'collaborators';
 
 async function getTableData(table: Tables) {

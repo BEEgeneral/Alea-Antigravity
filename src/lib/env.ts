@@ -38,9 +38,6 @@ export const env = {
   /** Gemini API Key (Server side only) */
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   
-  /** Chatwoot API Token (Server side only) */
-  CHATWOOT_TOKEN: process.env.CHATWOOT_TOKEN,
-  
   /** Webhook secret for verification */
   WEBHOOK_SECRET: process.env.WEBHOOK_SECRET,
 

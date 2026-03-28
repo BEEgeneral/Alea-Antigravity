@@ -227,9 +227,6 @@ export async function POST(req: Request) {
 export async function GET() {
     return NextResponse.json({ 
         status: 'Email webhook ready',
-        endpoints: {
-            email: '/api/webhook/email',
-            chatwoot: '/api/webhook/chatwoot'
-        }
+        endpoint: '/api/webhook/email'
     });
 }

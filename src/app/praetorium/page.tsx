@@ -3,11 +3,12 @@
 
 import {
     Users, Building, Activity, ShieldAlert, ArrowUpRight, Search,
-    CheckCircle2, FileText, Download, UserCheck, Mail, GripVertical,
+    CheckCircle2, CheckCircle, FileText, Download, UserCheck, Mail, GripVertical,
     Clock, MapPin, LayoutDashboard, Plus, MoreHorizontal, Share2,
     ChevronLeft, Maximize2, Bed, Bath, Sparkles, TrendingUp, Wind,
     Trees, ShoppingBag, Umbrella, Tag, Calendar, ShieldCheck, Star,
-    Trash2, Edit2, Upload, Loader2, User, LogOut, Settings, Menu, X, Inbox, BrainCircuit, MessageCircle
+    Trash2, Edit2, Upload, Loader2, User, LogOut, Settings, Menu, X, Inbox, BrainCircuit, MessageCircle,
+    Check, Paperclip
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -129,6 +130,8 @@ export default function AdminDashboard() {
 
     // IAI Inbox Suggestions
     const [iaiSuggestions, setIaiSuggestions] = useState<any[]>([]);
+    const [iaiFilter, setIaiFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+    const [iaiTypeFilter, setIaiTypeFilter] = useState<'all' | 'property' | 'investor' | 'lead' | 'mandatario'>('all');
 
     // IAI Email Interpretation Modal
     const [showEmailModal, setShowEmailModal] = useState(false);
@@ -2587,51 +2590,150 @@ export default function AdminDashboard() {
                                                 <h2 className="text-2xl font-serif font-bold">Bandeja IAI</h2>
                                                 <p className="text-muted-foreground text-sm">Emails analizados por Inteligencia Artificial</p>
                                             </div>
-                                            <div className="flex items-center space-x-2">
-                                                <span className="text-xs text-muted-foreground">
-                                                    {iaiSuggestions.filter(s => s.status === 'pending').length} pendientes
-                                                </span>
+                                        </div>
+
+                                        {/* KPIs */}
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                            <div className="bg-card border border-border rounded-2xl p-4">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <Inbox size={16} className="text-muted-foreground" />
+                                                    <span className="text-xs text-muted-foreground">Total</span>
+                                                </div>
+                                                <p className="text-3xl font-bold">{iaiSuggestions.length}</p>
+                                            </div>
+                                            <div className="bg-card border border-border rounded-2xl p-4">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <Clock size={16} className="text-amber-500" />
+                                                    <span className="text-xs text-muted-foreground">Pendientes</span>
+                                                </div>
+                                                <p className="text-3xl font-bold text-amber-500">{iaiSuggestions.filter(s => s.status === 'pending').length}</p>
+                                            </div>
+                                            <div className="bg-card border border-border rounded-2xl p-4">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <CheckCircle size={16} className="text-emerald-500" />
+                                                    <span className="text-xs text-muted-foreground">Aprobados</span>
+                                                </div>
+                                                <p className="text-3xl font-bold text-emerald-500">{iaiSuggestions.filter(s => s.status === 'approved').length}</p>
+                                            </div>
+                                            <div className="bg-card border border-border rounded-2xl p-4">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <Building size={16} className="text-blue-500" />
+                                                    <span className="text-xs text-muted-foreground">Properties</span>
+                                                </div>
+                                                <p className="text-3xl font-bold text-blue-500">{iaiSuggestions.filter(s => s.suggestion_type === 'property').length}</p>
                                             </div>
                                         </div>
+
+                                        {/* Filters */}
+                                        <div className="flex flex-wrap gap-4">
+                                            <select
+                                                value={iaiFilter}
+                                                onChange={(e) => setIaiFilter(e.target.value as any)}
+                                                className="bg-card border border-border rounded-xl px-4 py-2 text-sm"
+                                            >
+                                                <option value="all">Todos los estados</option>
+                                                <option value="pending">Pendientes</option>
+                                                <option value="approved">Aprobados</option>
+                                                <option value="rejected">Rechazados</option>
+                                            </select>
+                                            <select
+                                                value={iaiTypeFilter}
+                                                onChange={(e) => setIaiTypeFilter(e.target.value as any)}
+                                                className="bg-card border border-border rounded-xl px-4 py-2 text-sm"
+                                            >
+                                                <option value="all">Todos los tipos</option>
+                                                <option value="property">Propiedades</option>
+                                                <option value="investor">Inversores</option>
+                                                <option value="lead">Leads</option>
+                                                <option value="mandatario">Mandatarios</option>
+                                            </select>
+                                        </div>
                                         
-                                        {iaiSuggestions.filter(s => s.status === 'pending').length === 0 ? (
+                                        {iaiSuggestions.filter(s => {
+                                            const statusMatch = iaiFilter === 'all' || s.status === iaiFilter;
+                                            const typeMatch = iaiTypeFilter === 'all' || s.suggestion_type === iaiTypeFilter;
+                                            return statusMatch && typeMatch;
+                                        }).length === 0 ? (
                                             <div className="bg-card/40 backdrop-blur-sm border border-white/5 p-12 rounded-[3rem] shadow-sm flex items-center justify-center min-h-[300px]">
                                                 <div className="text-center">
                                                     <Inbox size={48} className="mx-auto text-muted-foreground mb-4" />
-                                                    <h3 className="text-xl font-serif font-bold text-foreground/80 mb-2">No hay emails pendientes</h3>
+                                                    <h3 className="text-xl font-serif font-bold text-foreground/80 mb-2">No hay emails</h3>
                                                     <p className="text-muted-foreground">Los nuevos emails aparecerán aquí para revisión.</p>
                                                 </div>
                                             </div>
                                         ) : (
                                             <div className="grid gap-4">
-                                                {iaiSuggestions.filter(s => s.status === 'pending').map((suggestion: any) => (
+                                                {iaiSuggestions.filter(s => {
+                                                    const statusMatch = iaiFilter === 'all' || s.status === iaiFilter;
+                                                    const typeMatch = iaiTypeFilter === 'all' || s.suggestion_type === iaiTypeFilter;
+                                                    return statusMatch && typeMatch;
+                                                }).map((suggestion: any) => (
                                                     <div 
                                                         key={suggestion.id}
-                                                        className="bg-card border border-border rounded-2xl p-6 hover:border-primary/50 transition-all cursor-pointer"
-                                                        onClick={() => {
-                                                            setSelectedSuggestion(suggestion);
-                                                            handleViewEmail(suggestion);
-                                                        }}
+                                                        className="bg-card border border-border rounded-2xl p-6 hover:border-primary/50 transition-all"
                                                     >
                                                         <div className="flex justify-between items-start mb-4">
-                                                            <div>
-                                                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full ${
-                                                                    suggestion.suggestion_type === 'property' ? 'bg-emerald-500/20 text-emerald-400' :
-                                                                    suggestion.suggestion_type === 'investor' ? 'bg-blue-500/20 text-blue-400' :
-                                                                    'bg-purple-500/20 text-purple-400'
-                                                                }`}>
-                                                                    {suggestion.suggestion_type}
-                                                                </span>
-                                                                <h4 className="font-medium mt-2">{suggestion.original_email_subject}</h4>
+                                                            <div className="flex-1 cursor-pointer" onClick={() => {
+                                                                setSelectedSuggestion(suggestion);
+                                                                handleViewEmail(suggestion);
+                                                            }}>
+                                                                <div className="flex items-center gap-2 mb-2">
+                                                                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full ${
+                                                                        suggestion.suggestion_type === 'property' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                                        suggestion.suggestion_type === 'investor' ? 'bg-blue-500/20 text-blue-400' :
+                                                                        'bg-purple-500/20 text-purple-400'
+                                                                    }`}>
+                                                                        {suggestion.suggestion_type}
+                                                                    </span>
+                                                                    <span className={`text-[10px] px-2 py-1 rounded-full ${
+                                                                        suggestion.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
+                                                                        suggestion.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                                        'bg-red-500/20 text-red-400'
+                                                                    }`}>
+                                                                        {suggestion.status}
+                                                                    </span>
+                                                                </div>
+                                                                <h4 className="font-medium">{suggestion.original_email_subject}</h4>
                                                                 <p className="text-sm text-muted-foreground">{suggestion.sender_email}</p>
                                                             </div>
-                                                            <span className="text-xs text-muted-foreground">
-                                                                {new Date(suggestion.created_at).toLocaleDateString('es-ES')}
-                                                            </span>
+                                                            <div className="flex flex-col items-end gap-2">
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    {new Date(suggestion.created_at).toLocaleDateString('es-ES')}
+                                                                </span>
+                                                                {suggestion.status === 'pending' && (
+                                                                    <div className="flex gap-2">
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleApproveSuggestion(suggestion);
+                                                                            }}
+                                                                            className="px-3 py-1 bg-emerald-500 text-white rounded-lg text-xs flex items-center gap-1 hover:bg-emerald-600"
+                                                                        >
+                                                                            <Check size={12} /> Aprobar
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={async (e) => {
+                                                                                e.stopPropagation();
+                                                                                await supabase.from('iai_inbox_suggestions').update({ status: 'rejected' }).eq('id', suggestion.id);
+                                                                                setIaiSuggestions(prev => prev.map(s => s.id === suggestion.id ? { ...s, status: 'rejected' } : s));
+                                                                            }}
+                                                                            className="px-3 py-1 bg-red-500 text-white rounded-lg text-xs flex items-center gap-1 hover:bg-red-600"
+                                                                        >
+                                                                            <X size={12} /> Rechazar
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                         <div className="text-sm text-muted-foreground line-clamp-2">
                                                             {suggestion.extracted_data?._iai_summary || suggestion.ai_interpretation?.substring(0, 150)}
                                                         </div>
+                                                        {suggestion.extracted_data?.attachments?.length > 0 && (
+                                                            <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                                                                <Paperclip size={12} />
+                                                                {suggestion.extracted_data.attachments.length} adjunto(s)
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>

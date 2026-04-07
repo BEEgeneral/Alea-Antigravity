@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createSupabaseMiddlewareClient } from '@/lib/supabase-server'
+import { env } from '@/lib/env'
 
 const PROTECTED_ROUTES = ['/praetorium', '/radar', '/profile', '/admin'];
 
@@ -25,9 +26,8 @@ export default async function proxy(request: NextRequest) {
         }
 
         const userRole = user.user_metadata?.role;
-        const userEmail = user.email;
-        const normalizedEmail = userEmail?.toLowerCase();
-        const isGodMode = normalizedEmail === 'beenocode@gmail.com' || normalizedEmail === 'albertogala@beenocode.com';
+        const userEmail = user.email?.toLowerCase();
+        const isGodMode = env.ADMIN_EMAILS.includes(userEmail || '');
 
         // /praetorium or /admin → only admin or approved agent (or God Mode)
         if (request.nextUrl.pathname.startsWith('/praetorium') || request.nextUrl.pathname.startsWith('/admin')) {

@@ -8,12 +8,15 @@ const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
 
 export async function POST(req: Request) {
     try {
-        // Verify webhook secret if configured
-        if (env.WEBHOOK_SECRET) {
-            const authHeader = req.headers.get('authorization');
-            if (authHeader !== `Bearer ${env.WEBHOOK_SECRET}`) {
-                return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-            }
+        // CRITICAL: Webhook secret is MANDATORY
+        if (!env.WEBHOOK_SECRET) {
+            console.error('WEBHOOK_SECRET not configured - rejecting request');
+            return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 });
+        }
+        
+        const authHeader = req.headers.get('authorization');
+        if (authHeader !== `Bearer ${env.WEBHOOK_SECRET}`) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         let body;

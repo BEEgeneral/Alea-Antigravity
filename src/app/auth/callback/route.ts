@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 // The client you created from the Server-Side Auth instructions
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { env } from '@/lib/env'
 
 export async function GET(request: Request) {
     const { searchParams, origin } = new URL(request.url)
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
             const { data: { user } } = await supabase.auth.getUser()
             const userRole = user?.user_metadata?.role
             const userEmail = user?.email?.toLowerCase()
-            const isGodMode = userEmail === 'beenocode@gmail.com' || userEmail === 'albertogala@beenocode.com'
+            const isGodMode = env.ADMIN_EMAILS.includes(userEmail || '')
 
             let finalNext = next
             // If try to go to /praetorium but not authorized, force /radar

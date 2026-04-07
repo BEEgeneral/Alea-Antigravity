@@ -41,6 +41,9 @@ export const env = {
   /** Webhook secret for verification */
   WEBHOOK_SECRET: process.env.WEBHOOK_SECRET,
 
+  /** Comma-separated admin emails for God Mode (super admin bypass) */
+  ADMIN_EMAILS: (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean),
+
   // --- Helper Methods ---
 
   /** Returns true if running in Production */

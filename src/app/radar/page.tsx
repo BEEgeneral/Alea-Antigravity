@@ -35,12 +35,7 @@ export default function InvestmentRadar() {
     const [loading, setLoading] = useState(true);
     const [authChecked, setAuthChecked] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
-    const [investorId] = useState<string | null>(() => {
-        if (typeof window !== 'undefined') {
-            return localStorage.getItem('alea_investor_id');
-        }
-        return null;
-    });
+    const [investorId, setInvestorId] = useState<string | null>(null);
     const [showContactSuccess, setShowContactSuccess] = useState(false);
     const [ndaRequired, setNdaRequired] = useState(false);
     const [fetchError, setFetchError] = useState<string | null>(null);
@@ -92,6 +87,7 @@ export default function InvestmentRadar() {
                     .maybeSingle();
 
                 if (investor) {
+                    setInvestorId(investor.id);
                     if (investor.is_verified) {
                         setAuthChecked(true);
                     } else {

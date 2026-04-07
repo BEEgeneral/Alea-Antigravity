@@ -1,0 +1,95 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2026-04-07",
+  "company": "Alea Signature",
+  "documentType": "Comisiones y Estructura de Incentivos",
+
+  "reglaOro": {
+    "descripcion": "El 40% corporativo es intocable. La empresa cobra primero.",
+    "division": {
+      "margenCorporativo": 40,
+      "bonusPool": 60
+    }
+  },
+
+  "estructuraIncentivos": {
+    "perfilAgenteSenior": {
+      "descripcion": "Autonomía total - captación, gestión y cierre propio",
+      "roles": {
+        "agenteSenior": {
+          "conReferidorExterno": {
+            "agenteSenior": 75,
+            "referidor": 25
+          },
+          "sinReferidor": {
+            "agenteSenior": 100
+          }
+        }
+      }
+    },
+    "perfilAgenteJunior": {
+      "descripcion": "Mentoría de founders - fomentar formación",
+      "roles": {
+        "agenteJunior": 60,
+        "mentor": 40
+      }
+    }
+  },
+
+  "matrizRepartoPorHitos": {
+    "descripcion": "Pago por hacer, no por estar",
+    "hitos": {
+      "apertura": {
+        "porcentaje": 25,
+        "descripcion": "Intro de activo/comprador validado con NDA"
+      },
+      "gestion": {
+        "porcentaje": 50,
+        "descripcion": "Dossiers técnicos, visitas, due diligence"
+      },
+      "cierre": {
+        "porcentaje": 25,
+        "descripcion": "Firma en notaría y cobro efectivo"
+      }
+    }
+  },
+
+  "clausulasProteccion": {
+    "noElusion": {
+      "descripcion": "Prohibición de saltar a la empresa para contactar clientes presentados",
+      "penalizacion": "2x comisión"
+    },
+    "confidencialidad": {
+      "duracion": "5 años",
+      "descripcion": "Protección estricta base de datos inversores y activos off-market"
+    },
+    "derechosRemanentes": {
+      "descripcion": "Si el agente se va, cobra operaciones cerradas en 12 meses siguientes",
+      "condicion": "Clientes registrados oficialmente por el agente"
+    }
+  },
+
+  "resumenRentabilidad": {
+    "cajaAlea": {
+      "porcentaje": 40,
+      "destino": "Crecimiento, IA y Founders"
+    },
+    "agenteResponsable": {
+      "porcentajeMin": 45,
+      "porcentajeMax": 60,
+      "descripcion": "Remuneración por éxito"
+    },
+    "colaboradorFinder": {
+      "porcentajeMin": 0,
+      "porcentajeMax": 15,
+      "descripcion": "Pago por contacto puntual"
+    }
+  },
+
+  "notas": [
+    "Esta estructura elimina el reparto artesanal y la convierte en sistema institucional",
+    "El beneficio corporativo está protegido antes de cualquier reparto",
+    "Los hitos garantizan que el pago está ligado al valor real aportado",
+    "Las cláusulas de protección evitan fuga de clientes"
+  ]
+}

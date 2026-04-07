@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { env } from '@/lib/env';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
 const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
@@ -140,6 +141,9 @@ async function uploadImageToStorage(base64Data: string, fileName: string): Promi
 
 export async function POST(req: Request) {
     try {
+        const rateLimitResponse = checkRateLimit(req);
+        if (rateLimitResponse) return rateLimitResponse;
+
         const { message, user, action: userAction, pendingActionId, file, extractedContent } = await req.json();
         const userId = user?.id || user?.email || 'anonymous';
 
@@ -149,7 +153,17 @@ export async function POST(req: Request) {
         if (extractedContent && extractedContent.images && extractedContent.images.length > 0) {
             dossierText = extractedContent.text || '';
             
-            const imageUploadPromises = extractedContent.images.slice(0, 5).map((img: any, idx: number) => {
+            const maxImages = 5;
+            const maxImageSize = 5 * 1024 * 1024;
+            const imagesToProcess = extractedContent.images.slice(0, maxImages);
+            
+            const validImages = imagesToProcess.filter((img: any) => {
+                if (!img.data || typeof img.data !== 'string') return false;
+                const size = img.data.length * 0.75;
+                return size <= maxImageSize;
+            });
+
+            const imageUploadPromises = validImages.map((img: any, idx: number) => {
                 const fileName = `dossier_${Date.now()}_page${img.page}_${idx}.jpg`;
                 return uploadImageToStorage(img.data, fileName);
             });

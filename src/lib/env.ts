@@ -48,7 +48,7 @@ export const env = {
   RESEND_API_KEY: process.env.RESEND_API_KEY,
 
   /** Default from email for outgoing emails */
-  EMAIL_FROM: process.env.EMAIL_FROM || 'Alea Signature <noreply@aleasignature.com>',
+  EMAIL_FROM: process.env.EMAIL_FROM || 'Alea Signature <radar@aleasignature.com>',
 
   // --- Helper Methods ---
 

@@ -39,6 +39,7 @@ export default function InvestmentRadar() {
     const [showContactSuccess, setShowContactSuccess] = useState(false);
     const [ndaRequired, setNdaRequired] = useState(false);
     const [fetchError, setFetchError] = useState<string | null>(null);
+    const [lastInterestSave, setLastInterestSave] = useState<number>(0);
 
     // Auth & Permission guard — uses getUser() for server-validated auth
     useEffect(() => {
@@ -143,11 +144,34 @@ export default function InvestmentRadar() {
         fetchRadarProperties();
     }, [authChecked]);
 
+    const saveInterest = async (type: 'filter_search' | 'property_view', propertyId?: string, filterCriteria?: object) => {
+        if (!investorId) return;
+        
+        // Debounce: only save once every 30 seconds
+        const now = Date.now();
+        if (now - lastInterestSave < 30000 && type === 'filter_search') return;
+        
+        try {
+            await supabase.from('investor_interests').insert({
+                investor_id: investorId,
+                property_id: propertyId || null,
+                interest_type: type,
+                filter_criteria: type === 'filter_search' ? filterCriteria : null
+            });
+            setLastInterestSave(now);
+        } catch (e) {
+            console.error('Error saving interest:', e);
+        }
+    };
+
     const handleContactAgent = async (propertyId: string) => {
         if (!investorId) {
             alert("Por favor, complete el registro primero.");
             return;
         }
+
+        // Save property view interest
+        await saveInterest('property_view', propertyId);
 
         const { error } = await supabase
             .from('leads')
@@ -162,6 +186,13 @@ export default function InvestmentRadar() {
             setTimeout(() => setShowContactSuccess(false), 5000);
         } else {
             console.error("Error creating lead:", error);
+        }
+    };
+
+    const handleSearchChange = (value: string) => {
+        setSearchTerm(value);
+        if (value.length > 2 && investorId) {
+            saveInterest('filter_search', undefined, { search_term: value });
         }
     };
 
@@ -248,7 +279,7 @@ export default function InvestmentRadar() {
                                 type="text"
                                 placeholder="Filtrar por ciudad o activo..."
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onChange={(e) => handleSearchChange(e.target.value)}
                                 className="w-full bg-muted/30 border border-border rounded-2xl py-4 pl-12 pr-6 text-sm focus:outline-none focus:border-primary/50 transition-all placeholder:text-muted-foreground/40"
                             />
                         </div>

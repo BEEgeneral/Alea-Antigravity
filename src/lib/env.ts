@@ -44,6 +44,12 @@ export const env = {
   /** Comma-separated admin emails for God Mode (super admin bypass) */
   ADMIN_EMAILS: (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean),
 
+  /** Resend API Key for sending emails */
+  RESEND_API_KEY: process.env.RESEND_API_KEY,
+
+  /** Default from email for outgoing emails */
+  EMAIL_FROM: process.env.EMAIL_FROM || 'Alea Signature <noreply@aleasignature.com>',
+
   // --- Helper Methods ---
 
   /** Returns true if running in Production */

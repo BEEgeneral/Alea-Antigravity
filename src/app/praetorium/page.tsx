@@ -2367,15 +2367,15 @@ export default function AdminDashboard() {
                         <span>Alea Intelligence</span>
                     </button>
 
-                    {/* Alea Catfish */}
+{/* Alea Centurión */}
                     {currentUser?.role === 'admin' && (
                         <button
-                            onClick={() => { setActiveTab("catfish"); setSelectedInvestor(null); setSelectedLead(null); }}
-                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${activeTab === "catfish" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                            onClick={() => { setActiveTab("centurion"); setSelectedInvestor(null); setSelectedLead(null); }}
+                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${activeTab === "centurion" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
                         >
                             <div className="flex items-center space-x-3">
                                 <BrainCircuit size={18} />
-                                <span>Alea Catfish</span>
+                                <span>Alea Centurión</span>
                             </div>
                         </button>
                     )}
@@ -2536,7 +2536,7 @@ export default function AdminDashboard() {
                                                 activeTab === 'templates' ? 'Document Factory' :
                                                     activeTab === 'assets' ? 'Asset Portfolio' :
                                                         activeTab === 'intelligence' ? 'Alea Intelligence Core' :
-                                                            activeTab === 'catfish' ? 'Alea Catfish - Perfiles de Atención' :
+                                                            activeTab === 'centurion' ? 'Alea Centurión - Perfiles de Atención' :
                                                                 activeTab === 'agenda' ? 'Alea Agenda - Acciones y Recordatorios' :
                                                                     activeTab === 'profile' ? 'Perfil de Usuario' :
                                                                         activeTab === 'agents' ? 'Control de Agentes' : 'System Logs'}
@@ -2972,8 +2972,14 @@ export default function AdminDashboard() {
                                     <ValuationAgent />
                                 )}
 
-                                {activeTab === "catfish" && (
-                                    <CatfishPanel />
+                                {activeTab === "centurion" && (
+                                    <div className="max-w-6xl mx-auto w-full py-8">
+                                        <div className="bg-card border border-border rounded-[2.5rem] p-10 text-center">
+                                            <BrainCircuit size={48} className="mx-auto text-muted-foreground mb-4" />
+                                            <h2 className="font-serif text-2xl font-bold mb-2">Alea Centurión</h2>
+                                            <p className="text-muted-foreground">Sistema de perfiles OSINT para análisis de counterparts.</p>
+                                        </div>
+                                    </div>
                                 )}
 
                                 {activeTab === "agenda" && (

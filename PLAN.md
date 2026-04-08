@@ -37,7 +37,7 @@
 - **SEO & Indexación:** Implementación de `sitemap.ts`, `robots.txt` y **Structured Data (JSON-LD)**. Verificación de Google Search Console integrada.
 - **AI UI Core:** Tipografía kinética en resúmenes IAI y transiciones spring-physics en modales de interpretación.
 - **Visual Clarity:** Estandarización de formato numérico `es-ES` para métricas financieras y superficies.
-- **Alea Catfish:** Sistema de OSINT para perfiles de personas/empresas con scraping de LinkedIn, Google, Twitter, Instagram.
+- **Alea Centurión:** Sistema de OSINT para perfiles de personas/empresas con scraping de LinkedIn, Google, Twitter, Instagram.
 - **Alea Agenda:** Sistema completo de acciones y recordatorios vinculada al CRM.
 
 ## 🎯 Alea Agenda - Sistema de Acciones y Recordatorios

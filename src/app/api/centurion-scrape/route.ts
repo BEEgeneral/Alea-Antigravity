@@ -140,13 +140,13 @@ export async function POST(req: Request) {
 
     // Update status to in_progress
     await supabaseAdmin
-      .from('catfish_profiles')
+      .from('centurion_profiles')
       .update({ scrape_status: 'in_progress' })
       .eq('id', profileId);
 
     // Create scrape job
     const { data: job } = await supabaseAdmin
-      .from('catfish_scrape_jobs')
+      .from('centurion_scrape_jobs')
       .insert({
         profile_id: profileId,
         scrape_type: 'full_osint',
@@ -181,13 +181,13 @@ export async function POST(req: Request) {
     };
 
     await supabaseAdmin
-      .from('catfish_profiles')
+      .from('centurion_profiles')
       .update(updateData)
       .eq('id', profileId);
 
     // Update job as completed
     await supabaseAdmin
-      .from('catfish_scrape_jobs')
+      .from('centurion_scrape_jobs')
       .update({
         status: 'completed',
         results: { ...aiAnalysis, googleResults, additionalData },
@@ -218,13 +218,13 @@ export async function GET(req: Request) {
   }
 
   const { data: profile } = await supabaseAdmin
-    .from('catfish_profiles')
+    .from('centurion_profiles')
     .select('*')
     .eq('id', profileId)
     .single();
 
   const { data: jobs } = await supabaseAdmin
-    .from('catfish_scrape_jobs')
+    .from('centurion_scrape_jobs')
     .select('*')
     .eq('profile_id', profileId)
     .order('created_at', { ascending: false });

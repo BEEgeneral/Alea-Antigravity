@@ -77,7 +77,7 @@ Devuelve null si no encuentras personas.
     for (const person of externalPeople) {
       // Check if profile already exists
       const { data: existing } = await supabaseAdmin
-        .from('catfish_profiles')
+        .from('centurion_profiles')
         .select('*')
         .or(`full_name.ilike.%${person.name}%,email.ilike.%${person.email}%`)
         .maybeSingle();
@@ -85,7 +85,7 @@ Devuelve null si no encuentras personas.
       if (existing) {
         // Update existing profile
         const { data: updated } = await supabaseAdmin
-          .from('catfish_profiles')
+          .from('centurion_profiles')
           .update({
             company_name: person.company || existing.company_name,
             company_role: person.role || existing.company_role,
@@ -103,7 +103,7 @@ Devuelve null si no encuentras personas.
       } else {
         // Create new profile
         const { data: newProfile } = await supabaseAdmin
-          .from('catfish_profiles')
+          .from('centurion_profiles')
           .insert({
             full_name: person.name,
             company_name: person.company,
@@ -147,7 +147,7 @@ export async function GET(req: Request) {
     const limit = parseInt(searchParams.get('limit') || '50');
 
     let query = supabaseAdmin
-      .from('catfish_profiles')
+      .from('centurion_profiles')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -214,7 +214,7 @@ export async function PATCH(req: Request) {
     if (is_verified !== undefined) updateData.is_verified = is_verified;
 
     const { data: updated, error } = await supabaseAdmin
-      .from('catfish_profiles')
+      .from('centurion_profiles')
       .update(updateData)
       .eq('id', profileId)
       .select()

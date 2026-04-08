@@ -439,11 +439,11 @@ export default function AdminDashboard() {
     const handleApproveAgent = async (id: string) => {
         const { error } = await supabase
             .from('agents')
-            .update({ is_approved: true })
+            .update({ is_approved: true, has_centurion_access: true })
             .eq('id', id);
 
         if (!error) {
-            setAllAgents(prev => prev.map(a => a.id === id ? { ...a, is_approved: true } : a));
+            setAllAgents(prev => prev.map(a => a.id === id ? { ...a, is_approved: true, has_centurion_access: true } : a));
             setShowToast(true);
             setTimeout(() => setShowToast(false), 3000);
         }
@@ -715,7 +715,8 @@ export default function AdminDashboard() {
             .update({
                 full_name: agent.full_name,
                 role: agent.role,
-                is_approved: agent.is_approved
+                is_approved: agent.is_approved,
+                has_centurion_access: agent.has_centurion_access
             })
             .eq('id', agent.id);
 
@@ -809,14 +810,12 @@ export default function AdminDashboard() {
     };
 
     const handleCreateAgent = async () => {
-        // Note: Creating a user via admin typically requires Service Role or specific Auth logic.
-        // For simplicity in this UI, we assume we insert into 'agents' and the user will register later,
-        // or we use this just for administrative tracking.
         const { error } = await supabase
             .from('agents')
             .insert([{
                 ...agentForm,
                 is_approved: true,
+                has_centurion_access: agentForm.role === 'admin',
                 created_at: new Date().toISOString()
             }]);
 
@@ -3143,6 +3142,16 @@ export default function AdminDashboard() {
                                             className="accent-primary"
                                         />
                                         <label htmlFor="edit-approved" className="text-xs font-bold uppercase tracking-wider cursor-pointer">Estado de Acceso: {selectedAgentToEdit.is_approved ? 'Aprobado' : 'Pendiente'}</label>
+                                    </div>
+                                    <div className="flex items-center space-x-3 p-2">
+                                        <input
+                                            type="checkbox"
+                                            id="edit-centurion"
+                                            checked={selectedAgentToEdit.has_centurion_access}
+                                            onChange={(e) => setSelectedAgentToEdit({ ...selectedAgentToEdit, has_centurion_access: e.target.checked })}
+                                            className="accent-primary"
+                                        />
+                                        <label htmlFor="edit-centurion" className="text-xs font-bold uppercase tracking-wider cursor-pointer">Acceso Alea Centurión</label>
                                     </div>
                                 </div>
 

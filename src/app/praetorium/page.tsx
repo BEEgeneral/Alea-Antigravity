@@ -397,8 +397,25 @@ export default function AdminDashboard() {
             }
 
             if (isGodMode && !agent) {
-                // Pre-set God Mode user if not in DB
-                setCurrentUser({
+                // Create real admin record in DB for GodMode user
+                const { data: newAgent, error: createError } = await supabase
+                    .from('agents')
+                    .insert({
+                        id: user.id,
+                        full_name: 'Super Admin',
+                        email: user.email,
+                        role: 'admin',
+                        is_approved: true,
+                        has_centurion_access: true
+                    })
+                    .select()
+                    .single();
+                
+                if (createError) {
+                    console.error("Error creating GodMode agent:", createError);
+                }
+                
+                setCurrentUser(newAgent || {
                     id: user.id,
                     full_name: 'Super Admin',
                     email: user.email,

@@ -403,7 +403,8 @@ export default function AdminDashboard() {
                     full_name: 'Super Admin',
                     email: user.email,
                     role: 'admin',
-                    is_approved: true
+                    is_approved: true,
+                    has_centurion_access: true
                 });
             } else {
                 setCurrentUser(agent);

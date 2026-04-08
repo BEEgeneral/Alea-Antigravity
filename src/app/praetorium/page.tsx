@@ -813,22 +813,25 @@ export default function AdminDashboard() {
         const { error } = await supabase
             .from('agents')
             .insert([{
+                id: crypto.randomUUID(),
                 ...agentForm,
                 is_approved: true,
                 has_centurion_access: agentForm.role === 'admin',
                 created_at: new Date().toISOString()
             }]);
 
-        if (!error) {
-            const { data } = await supabase.from('agents').select('*').order('created_at', { ascending: false });
-            if (data) setAllAgents(data);
-            setIsAddingAgent(false);
-            setAgentForm({ full_name: "", email: "", role: "agent" });
-            setShowToast(true);
-            setTimeout(() => setShowToast(false), 3000);
-        } else {
+        if (error) {
             console.error("Error creating agent:", error);
+            alert("Error al crear agente: " + error.message);
+            return;
         }
+
+        const { data } = await supabase.from('agents').select('*').order('created_at', { ascending: false });
+        if (data) setAllAgents(data);
+        setIsAddingAgent(false);
+        setAgentForm({ full_name: "", email: "", role: "agent" });
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
     };
 
     const handleCreateInvestor = async () => {

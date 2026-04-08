@@ -201,13 +201,18 @@ export async function POST(req: Request) {
             : '';
 
         // Get current CRM data
-        const [leadsData, propertiesData, investorsData, mandatariosData, suggestionsData] = await Promise.all([
+        const [leadsData, propertiesData, investorsData, mandatariosData, suggestionsData, agendaData] = await Promise.all([
             getTableData('leads'),
             getTableData('properties'),
             getTableData('investors'),
             getTableData('mandatarios'),
-            supabaseAdmin.from('iai_inbox_suggestions').select('*').eq('status', 'pending').order('created_at', { ascending: false })
+            supabaseAdmin.from('iai_inbox_suggestions').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
+            supabaseAdmin.from('agenda_actions').select('*, lead:leads(id, investors:investors(full_name))').order('due_date', { ascending: true }).limit(20)
         ]);
+
+        const overdueActions = agendaData.data?.filter((a: any) => 
+            new Date(a.due_date) < new Date() && a.status !== 'completed' && a.status !== 'cancelled'
+        ) || [];
 
         const summary = `
 CRM ALEA SIGNATURE - RESUMEN ACTUAL:
@@ -224,7 +229,13 @@ ${investorsData.data.slice(0, 5).map((i: any) => `- ${i.full_name}: ${i.budget_m
 🛡️ MANDATARIOS (${mandatariosData.data.length}):
 ${mandatariosData.data.slice(0, 3).map((m: any) => `- ${m.full_name}`).join('\n')}
 
-📬 BANDEJA IAI (${suggestionsData.data?.length || 0} pendientes):`;
+📬 BANDEJA IAI (${suggestionsData.data?.length || 0} pendientes):
+
+📅 ALEA AGENDA:
+${overdueActions.length > 0 ? `⚠️ TIENES ${overdueActions.length} ACCIÓN(ES) VENCIDA(S):
+${overdueActions.slice(0, 5).map((a: any) => `- ${a.title} (vence hace ${Math.floor((new Date().getTime() - new Date(a.due_date).getTime()) / (1000 * 60 * 60))}h)`).join('\n')}` : '✅ No hay acciones vencidas'}
+${agendaData.data?.filter((a: any) => a.status !== 'completed' && a.status !== 'cancelled').length > 0 ? `📋 ACCIONES PENDIENTES (${agendaData.data?.filter((a: any) => a.status !== 'completed' && a.status !== 'cancelled').length}):
+${agendaData.data?.filter((a: any) => a.status !== 'completed' && a.status !== 'cancelled').slice(0, 5).map((a: any) => `- ${a.title} (${a.action_type}) - ${a.lead?.investors?.full_name || 'sin lead'}`).join('\n')}` : ''}`;
 
         // Check for pending actions that need confirmation
         const pendingAction = await getPendingAction(userId);

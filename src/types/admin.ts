@@ -148,3 +148,106 @@ export const MOCK_TEMPLATES: DocumentTemplate[] = [
     { id: "t3", name: "Carta de Mandato" },
     { id: "t4", name: "Due Diligence Checklist" },
 ];
+
+// ─────────────────────────────────────────────────────────
+// Alea Agenda Types
+// ─────────────────────────────────────────────────────────
+
+export type ActionType = 'call' | 'email' | 'meeting' | 'document' | 'follow_up' | 'kyc' | 'nda' | 'loi' | 'offer' | 'closing' | 'custom';
+export type ActionCategory = 'contact' | 'documentation' | 'legal' | 'financial' | 'negotiation' | 'closing';
+export type ActionPriority = 'low' | 'medium' | 'high' | 'urgent' | 'critical';
+export type ActionStatus = 'pending' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'failed' | 'waiting';
+export type ReminderType = 'notification' | 'sla_warning' | 'sla_breach' | 'follow_up' | 'escalation' | 'suggestion';
+
+export interface AgendaAction {
+    id: string;
+    lead_id: string;
+    investor_id?: string;
+    property_id?: string;
+    title: string;
+    description?: string;
+    action_type: ActionType;
+    action_category?: ActionCategory;
+    due_date: string;
+    scheduled_for?: string;
+    estimated_duration_minutes?: number;
+    priority: ActionPriority;
+    status: ActionStatus;
+    outcome?: string;
+    completion_notes?: string;
+    completed_at?: string;
+    completed_by?: string;
+    is_recurring: boolean;
+    recurring_pattern?: Record<string, unknown>;
+    is_auto_generated: boolean;
+    trigger_rule?: string;
+    sla_hours?: number;
+    sla_breached: boolean;
+    sla_breach_notified: boolean;
+    pipeline_stage?: string;
+    assigned_agent_id?: string;
+    created_by?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface AgendaReminder {
+    id: string;
+    action_id: string;
+    lead_id: string;
+    reminder_type: ReminderType;
+    title: string;
+    message?: string;
+    scheduled_for: string;
+    sent_at?: string;
+    read_at?: string;
+    status: 'pending' | 'sent' | 'read' | 'dismissed' | 'failed';
+    channel: 'in_app' | 'email' | 'sms' | 'push' | 'pelayo_chat';
+    priority: ActionPriority;
+    assigned_agent_id?: string;
+    metadata?: Record<string, unknown>;
+    created_at?: string;
+}
+
+export interface PipelineActionTemplate {
+    id: string;
+    name: string;
+    description?: string;
+    action_type: ActionType;
+    action_category?: ActionCategory;
+    title_template?: string;
+    description_template?: string;
+    default_sla_hours: number;
+    min_sla_hours: number;
+    max_sla_hours: number;
+    trigger_at_stage?: string;
+    trigger_event?: 'stage_entry' | 'stage_exit' | 'manual' | 'sla_breach' | 'time_based';
+    auto_create: boolean;
+    auto_assign_to?: 'owner' | 'assigned_agent' | 'admin';
+    default_priority: ActionPriority;
+    is_active: boolean;
+    display_order: number;
+}
+
+export interface AgendaSettings {
+    config_key: string;
+    config_value: Record<string, unknown>;
+    description?: string;
+    scope: 'global' | 'pipeline_stage' | 'action_type' | 'agent';
+    scope_id?: string;
+}
+
+export interface AgendaSuggestion {
+    id: string;
+    lead_id: string;
+    lead_name: string;
+    property_title?: string;
+    action_id?: string;
+    suggestion_type: 'overdue' | 'upcoming' | 'sla_warning' | 'stage_suggestion' | 'follow_up';
+    title: string;
+    message: string;
+    priority: ActionPriority;
+    days_overdue?: number;
+    hours_until_due?: number;
+    pipeline_stage: string;
+}

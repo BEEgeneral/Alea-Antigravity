@@ -8,7 +8,7 @@ import {
     ChevronLeft, Maximize2, Bed, Bath, Sparkles, TrendingUp, Wind,
     Trees, ShoppingBag, Umbrella, Tag, Calendar, ShieldCheck, Star,
     Trash2, Edit2, Upload, Loader2, User, LogOut, Settings, Menu, X, Inbox, BrainCircuit, MessageCircle,
-    Check, Paperclip
+    Check, Paperclip, Calendar
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import AIChat from "@/components/admin/AIChat";
 import PelayoChat from "@/components/admin/PelayoChat";
 import ValuationAgent from "@/components/admin/ValuationAgent";
+import AgendaPanel from "@/components/admin/AgendaPanel";
 
 // Defined Pipeline Stages
 const PIPELINE_STAGES = [
@@ -2366,6 +2367,30 @@ export default function AdminDashboard() {
                         <span>Alea Intelligence</span>
                     </button>
 
+                    {/* Alea Catfish */}
+                    {currentUser?.role === 'admin' && (
+                        <button
+                            onClick={() => { setActiveTab("catfish"); setSelectedInvestor(null); setSelectedLead(null); }}
+                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${activeTab === "catfish" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                        >
+                            <div className="flex items-center space-x-3">
+                                <BrainCircuit size={18} />
+                                <span>Alea Catfish</span>
+                            </div>
+                        </button>
+                    )}
+
+                    {/* Alea Agenda */}
+                    <button
+                        onClick={() => { setActiveTab("agenda"); setSelectedInvestor(null); setSelectedLead(null); }}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${activeTab === "agenda" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                    >
+                        <div className="flex items-center space-x-3">
+                            <Calendar size={18} />
+                            <span>Alea Agenda</span>
+                        </div>
+                    </button>
+
                     <button
                         onClick={() => { setActiveTab("audit"); setSelectedInvestor(null); setSelectedLead(null); }}
                         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "audit" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
@@ -2511,8 +2536,10 @@ export default function AdminDashboard() {
                                                 activeTab === 'templates' ? 'Document Factory' :
                                                     activeTab === 'assets' ? 'Asset Portfolio' :
                                                         activeTab === 'intelligence' ? 'Alea Intelligence Core' :
-                                                            activeTab === 'profile' ? 'Perfil de Usuario' :
-                                                                activeTab === 'agents' ? 'Control de Agentes' : 'System Logs'}
+                                                            activeTab === 'catfish' ? 'Alea Catfish - Perfiles de Atención' :
+                                                                activeTab === 'agenda' ? 'Alea Agenda - Acciones y Recordatorios' :
+                                                                    activeTab === 'profile' ? 'Perfil de Usuario' :
+                                                                        activeTab === 'agents' ? 'Control de Agentes' : 'System Logs'}
                             </h1>
                             <div className="flex items-center space-x-2 mt-1 hidden sm:flex">
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -2943,6 +2970,16 @@ export default function AdminDashboard() {
 
                                 {activeTab === "intelligence" && (
                                     <ValuationAgent />
+                                )}
+
+                                {activeTab === "catfish" && (
+                                    <CatfishPanel />
+                                )}
+
+                                {activeTab === "agenda" && (
+                                    <div className="pb-20">
+                                        <AgendaPanel />
+                                    </div>
                                 )}
 
                                 {activeTab === "audit" && (

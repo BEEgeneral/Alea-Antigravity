@@ -440,6 +440,24 @@ export default function PelayoChat({ isOpen, onClose, context, userInfo }: AICha
                   </div>
                   <p className="text-2xl font-bold">{context?.mandatarios?.length || 0}</p>
                 </div>
+                {context?.agendaStats && (
+                  <>
+                    <div className="bg-card p-3 rounded-xl border-l-4 border-red-500">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Bell size={14} className="text-red-500" />
+                        <span className="text-xs font-medium">Acciones Vencidas</span>
+                      </div>
+                      <p className="text-2xl font-bold text-red-500">{context.agendaStats.overdue || 0}</p>
+                    </div>
+                    <div className="bg-card p-3 rounded-xl border-l-4 border-amber-500">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Calendar size={14} className="text-amber-500" />
+                        <span className="text-xs font-medium">Acciones Pendientes</span>
+                      </div>
+                      <p className="text-2xl font-bold text-amber-500">{context.agendaStats.pending || 0}</p>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>

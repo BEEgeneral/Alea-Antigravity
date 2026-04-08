@@ -13,6 +13,7 @@
 - [x] **Milestone 10:** SEO Power-Up & Search Console Strategy.
 - [x] **Milestone 11:** Production Deployment - Sync GitHub & Vercel.
 - [x] **Milestone 12:** Advanced AI Interactions & Animations (Kinetic UI).
+- [x] **Milestone 13:** Alea Agenda - Sistema de Acciones y Recordatorios con SLAs y Sugerencias Proactivas.
 
 ## 📝 Current Trajectory
 **Optimización de Experiencia IA:** Implementación de tipografía kinética, transiciones Loom-style y animaciones de "presencia" de IA para elevar el dashboard al estándar Alea. Sincronización final con Vercel.
@@ -31,8 +32,60 @@
 ## 💾 State Snapshot
 - **Database:** Tabla `mandatarios` definida y columnas de relación en `leads` añadidas para soporte de intermediación delegada.
 - **Frontend Stack:** Nueva pestaña de navegación con visualización de tarjetas premium y formularios de alta/edición de mandatarios operativos.
-- **Flujo de Negociación:** La "Sala de Negociación" ahora refleja si una parte está gestionada por un mandatario, permitiendo su selección directa.
+- **Flujo de Negociación:** La "Sala de Negociación" ahora refleja si una parte está gestionada por un mandatos, permitiendo su selección directa.
 - **Quality Gate:** Auditoría completada con éxito. Implementación de estados de carga (Skeletons) premium para transiciones fluidas y confianza del usuario.
 - **SEO & Indexación:** Implementación de `sitemap.ts`, `robots.txt` y **Structured Data (JSON-LD)**. Verificación de Google Search Console integrada.
 - **AI UI Core:** Tipografía kinética en resúmenes IAI y transiciones spring-physics en modales de interpretación.
 - **Visual Clarity:** Estandarización de formato numérico `es-ES` para métricas financieras y superficies.
+- **Alea Catfish:** Sistema de OSINT para perfiles de personas/empresas con scraping de LinkedIn, Google, Twitter, Instagram.
+- **Alea Agenda:** Sistema completo de acciones y recordatorios vinculada al CRM.
+
+## 🎯 Alea Agenda - Sistema de Acciones y Recordatorios
+
+### Arquitectura
+| Tabla | Propósito |
+|-------|-----------|
+| `agenda_actions` | Acciones principales vinculadas a leads (llamadas, emails, reuniones, docs) |
+| `agenda_reminders` | Recordatorios automáticos con timing y SLA |
+| `pipeline_action_templates` | Plantillas de acciones por etapa del pipeline |
+| `agenda_settings` | Configuración global de SLAs y timing |
+| `agenda_activity_log` | Log de auditoría para tracking |
+
+### Flujo de Operativa por Etapa
+```
+PROSPECT → QUALIFIED → DUE DILIGENCE → OFFER → CLOSING
+   │           │            │           │         │
+   ├─ Contacto inicial    ├─ Visita    ├─ Oferta  ├─ Closing
+   ├─ Presentación Alea    ├─ Due Dil.  ├─ Jurídico├─ Docs finales
+   └─ Registrar interés   ├─ Verificar  └─ Mandato  └─ Transferencia
+                          └─ Análisis
+```
+
+### SLAs por Defecto
+| Etapa | SLA (horas) | Acciones típicas |
+|-------|-------------|------------------|
+| Prospect | 72h | Contacto, Presentación |
+| Qualified | 96h | NDA, KYC, Match |
+| Due Diligence | 120h | Visita, Due Diligence, Financiación |
+| Offer | 72h | Oferta, Revisión, Mandato |
+| Closing | 48h | Closing, Docs, Transferencia |
+
+### APis
+- `GET/POST/PATCH/DELETE /api/agenda/actions` - CRUD de acciones
+- `GET/POST/PATCH/DELETE /api/agenda/reminders` - CRUD de recordatorios
+- `GET /api/agenda/suggestions` - Sugerencias proactivas para agentes
+- `GET /api/agenda/pelayo` - Datos para chat de Pelayo
+
+### Sugerencias Proactivas
+El sistema genera automáticamente:
+1. **Overdue** - Acciones vencidas con horas de retraso
+2. **SLA Warning** - Acciones próximas a romper SLA (24h antes)
+3. **Stage Suggestions** - Acciones que deberían existir según etapa
+4. **Follow-up** - Leads sin actividad en 3+ días
+
+### Integración Pelayo
+Pelayo puede consultar `/api/agenda/pelayo` para obtener:
+- Resumen de acciones pendientes
+- Count de acciones overdue
+- Acciones de hoy
+- Resumen en lenguaje natural

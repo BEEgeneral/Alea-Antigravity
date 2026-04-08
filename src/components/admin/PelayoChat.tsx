@@ -3,6 +3,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Loader2, X, Plus, Building, Users, ShieldCheck, FileText, Brain, Sparkles, ChevronRight, Trash2, Mic, MicOff, Bell, BellOff, Check, XCircle, Paperclip, File, Upload, Image } from 'lucide-react';
 import { extractPDFContent } from '@/lib/pdf-utils';
+import { marked } from 'marked';
+
+marked.setOptions({ breaks: true });
+
+function renderMarkdown(text: string): string {
+  return marked.parse(text, { async: false }) as string;
+}
 
 interface Message {
   id: string;
@@ -479,7 +486,10 @@ export default function PelayoChat({ isOpen, onClose, context, userInfo }: AICha
                   <div className="flex items-start gap-2">
                     {message.role === 'assistant' && <Bot className="w-4 h-4 mt-1 text-emerald-500 flex-shrink-0" />}
                     {message.role === 'user' && <User className="w-4 h-4 mt-1 flex-shrink-0" />}
-                    <div className="text-sm whitespace-pre-wrap flex-1">{message.content}</div>
+                    <div 
+                      className="text-sm whitespace-pre-wrap flex-1 [&_strong]:font-bold [&_em]:italic"
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(message.content) }} 
+                    />
                   </div>
                   
                   {/* Suggested actions */}

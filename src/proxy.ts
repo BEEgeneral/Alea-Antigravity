@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createServerClient } from '@/lib/insforge-server';
+import { createAuthenticatedClient } from '@/lib/insforge-server';
 import { cookies } from 'next/headers';
 
 const PUBLIC_PATHS = [
@@ -48,10 +48,10 @@ export default async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
 
-    const client = createServerClient();
+    const client = await createAuthenticatedClient();
     const { data, error } = await client.auth.getCurrentUser();
 
-    if (error || !data.user) {
+    if (error || !data?.user) {
       if (pathname.startsWith('/api/')) {
         return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
       }

@@ -18,14 +18,11 @@ export async function createAuthenticatedClient(): Promise<InsForgeClient> {
   const client = createClient({
     baseUrl: INSFORGE_APP_URL,
     anonKey: INSFORGE_API_KEY,
+    isServerMode: true,
   });
   
   if (token) {
-    try {
-      (client as any)._token = token;
-    } catch (e) {
-      // Token handling may vary by SDK version
-    }
+    (client.auth as any).setAuthToken(token);
   }
   
   return client;

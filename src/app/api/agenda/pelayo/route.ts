@@ -1,9 +1,9 @@
-import { createClient } from "@/lib/supabase-server";
+import { createAuthenticatedClient } from "@/lib/insforge-server";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const client = await createAuthenticatedClient();
+  const { data: { user } } = await client.auth.getCurrentUser();
   
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -12,8 +12,8 @@ export async function GET(request: NextRequest) {
   const agentId = searchParams.get("agent_id") || user.id;
   const includeHistory = searchParams.get("include_history") === "true";
 
-  // Get current actions for this lead or agent
-  let actionsQuery = supabase
+  let actionsQuery = client
+    .database
     .from("agenda_actions")
     .select(`
       id, title, description, action_type, action_category, due_date, priority, status,
@@ -31,8 +31,8 @@ export async function GET(request: NextRequest) {
   const { data: actions, error: actionsError } = await actionsQuery;
   if (actionsError) return NextResponse.json({ error: actionsError.message }, { status: 500 });
 
-  // Get recent reminders
-  const { data: reminders } = await supabase
+  const { data: reminders } = await client
+    .database
     .from("agenda_reminders")
     .select("*")
     .eq("assigned_agent_id", agentId)
@@ -40,8 +40,8 @@ export async function GET(request: NextRequest) {
     .order("scheduled_for", { ascending: true })
     .limit(10);
 
-  // Get overdue count
-  const { count: overdueCount } = await supabase
+  const { count: overdueCount } = await client
+    .database
     .from("agenda_actions")
     .select("id", { count: "exact" })
     .eq("assigned_agent_id", agentId)
@@ -49,13 +49,13 @@ export async function GET(request: NextRequest) {
     .neq("status", "cancelled")
     .lt("due_date", new Date().toISOString());
 
-  // Get today's actions
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const { data: todayActions } = await supabase
+  const { data: todayActions } = await client
+    .database
     .from("agenda_actions")
     .select("id, title, due_date, priority, action_type")
     .eq("assigned_agent_id", agentId)

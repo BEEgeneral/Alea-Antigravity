@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createAuthenticatedClient } from '@/lib/insforge-server';
 
 interface BlindListingProperty {
   id: string;
@@ -16,6 +16,13 @@ interface BlindListingProperty {
 
 export async function POST(req: Request) {
   try {
+    const client = await createAuthenticatedClient();
+    const { data: { user } } = await client.auth.getCurrentUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { investorId, propertyIds, investorEmail } = await req.json();
 
     if (!investorId && !investorEmail) {
@@ -24,10 +31,10 @@ export async function POST(req: Request) {
 
     let investor = null;
     if (investorId) {
-      const { data } = await supabaseAdmin.from('investors').select('*').eq('id', investorId).single();
+      const { data } = await client.database.from('investors').select('*').eq('id', investorId).single();
       investor = data;
     } else if (investorEmail) {
-      const { data } = await supabaseAdmin.from('investors').select('*').eq('email', investorEmail).single();
+      const { data } = await client.database.from('investors').select('*').eq('email', investorEmail).single();
       investor = data;
     }
 
@@ -37,7 +44,8 @@ export async function POST(req: Request) {
 
     let properties: BlindListingProperty[] = [];
     if (propertyIds && propertyIds.length > 0) {
-      const { data } = await supabaseAdmin
+      const { data } = await client
+        .database
         .from('properties')
         .select('id, title, address, asset_type, price, is_off_market, thumbnail_url')
         .in('id', propertyIds);
@@ -48,7 +56,8 @@ export async function POST(req: Request) {
         maxPrice: Number(p.price) * 1.1
       }));
     } else {
-      const { data } = await supabaseAdmin
+      const { data } = await client
+        .database
         .from('properties')
         .select('id, title, address, asset_type, price, is_off_market, thumbnail_url')
         .eq('is_published', true)

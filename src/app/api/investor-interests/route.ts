@@ -1,14 +1,22 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createAuthenticatedClient } from '@/lib/insforge-server';
 
 export async function GET(req: Request) {
   try {
+    const client = await createAuthenticatedClient();
+    const { data: { user } } = await client.auth.getCurrentUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const investorId = searchParams.get('investorId');
     const status = searchParams.get('status') || 'new';
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    let query = supabaseAdmin
+    let query = client
+      .database
       .from('investor_interests')
       .select(`
         *,
@@ -33,7 +41,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Group by investor for easier display
     const byInvestor: Record<string, any[]> = {};
     (interests || []).forEach((interest: any) => {
       const invId = interest.investor_id;
@@ -58,6 +65,13 @@ export async function GET(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
+    const client = await createAuthenticatedClient();
+    const { data: { user } } = await client.auth.getCurrentUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { interestId, status, notes } = await req.json();
 
     if (!interestId) {
@@ -68,7 +82,8 @@ export async function PATCH(req: Request) {
     if (status) updateData.status = status;
     if (notes !== undefined) updateData.notes = notes;
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await client
+      .database
       .from('investor_interests')
       .update(updateData)
       .eq('id', interestId)

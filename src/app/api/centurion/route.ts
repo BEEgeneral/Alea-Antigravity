@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createAuthenticatedClient } from '@/lib/insforge-server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { env } from '@/lib/env';
 
@@ -21,35 +21,41 @@ function isKnownTeam(name: string): boolean {
 
 export async function POST(req: Request) {
   try {
+    const client = await createAuthenticatedClient();
+    const { data: { user } } = await client.auth.getCurrentUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { text, sourceType, sourceId, createdBy } = await req.json();
 
     if (!text) {
       return NextResponse.json({ error: 'Missing text to analyze' }, { status: 400 });
     }
 
-    // Use AI to extract names and companies
     const prompt = `
-Eres un extractor de entidades. Analiza el siguiente texto y extrae TODAS las personas mencionadas con su información.
+    Eres un extractor de entidades. Analiza el siguiente texto y extrae TODAS las personas mencionadas con su información.
 
-Texto:
-"""
-${text.substring(0, 10000)}
-"""
+    Texto:
+    """
+    ${text.substring(0, 10000)}
+    """
 
-Devuelve SOLO un JSON array con este formato:
-[
-  {
-    "name": "Nombre completo de la persona",
-    "company": "Empresa a la que pertenece (si se menciona)",
-    "role": "Cargo/posición (si se menciona)",
-    "email": "Email (si se menciona)",
-    "phone": "Teléfono (si se menciona)"
-  }
-]
+    Devuelve SOLO un JSON array con este formato:
+    [
+      {
+        "name": "Nombre completo de la persona",
+        "company": "Empresa a la que pertenece (si se menciona)",
+        "role": "Cargo/posición (si se menciona)",
+        "email": "Email (si se menciona)",
+        "phone": "Teléfono (si se menciona)"
+      }
+    ]
 
-Sé exhaustivo. Si no hay personas claras, devuelve un array vacío.
-Devuelve null si no encuentras personas.
-`;
+    Sé exhaustivo. Si no hay personas claras, devuelve un array vacío.
+    Devuelve null si no encuentras personas.
+    `;
 
     const result = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -65,26 +71,24 @@ Devuelve null si no encuentras personas.
       return NextResponse.json({ profiles: [], message: 'No se pudieron extraer personas' });
     }
 
-    // Filter out known team members
     const externalPeople = extractedPeople.filter(
       (p: any) => p.name && !isKnownTeam(p.name)
     );
 
-    // Create or update profiles
     const createdProfiles = [];
     const existingProfiles = [];
 
     for (const person of externalPeople) {
-      // Check if profile already exists
-      const { data: existing } = await supabaseAdmin
+      const { data: existing } = await client
+        .database
         .from('centurion_profiles')
         .select('*')
         .or(`full_name.ilike.%${person.name}%,email.ilike.%${person.email}%`)
         .maybeSingle();
 
       if (existing) {
-        // Update existing profile
-        const { data: updated } = await supabaseAdmin
+        const { data: updated } = await client
+          .database
           .from('centurion_profiles')
           .update({
             company_name: person.company || existing.company_name,
@@ -101,8 +105,8 @@ Devuelve null si no encuentras personas.
 
         existingProfiles.push(updated);
       } else {
-        // Create new profile
-        const { data: newProfile } = await supabaseAdmin
+        const { data: newProfile } = await client
+          .database
           .from('centurion_profiles')
           .insert({
             full_name: person.name,
@@ -112,7 +116,7 @@ Devuelve null si no encuentras personas.
             phone: person.phone,
             source_type: sourceType || 'document_analysis',
             source_id: sourceId,
-            created_by: createdBy,
+            created_by: createdBy || user.id,
             needs_deep_scrape: true,
             scrape_status: 'pending',
             is_verified: false
@@ -141,12 +145,20 @@ Devuelve null si no encuentras personas.
 
 export async function GET(req: Request) {
   try {
+    const client = await createAuthenticatedClient();
+    const { data: { user } } = await client.auth.getCurrentUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const assignedAgentId = searchParams.get('assignedAgentId');
     const status = searchParams.get('status');
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    let query = supabaseAdmin
+    let query = client
+      .database
       .from('centurion_profiles')
       .select('*')
       .order('created_at', { ascending: false })
@@ -176,6 +188,13 @@ export async function GET(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
+    const client = await createAuthenticatedClient();
+    const { data: { user } } = await client.auth.getCurrentUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { 
       profileId, 
       assignedAgentId,
@@ -213,7 +232,8 @@ export async function PATCH(req: Request) {
     if (sentiment_trend) updateData.sentiment_trend = sentiment_trend;
     if (is_verified !== undefined) updateData.is_verified = is_verified;
 
-    const { data: updated, error } = await supabaseAdmin
+    const { data: updated, error } = await client
+      .database
       .from('centurion_profiles')
       .update(updateData)
       .eq('id', profileId)

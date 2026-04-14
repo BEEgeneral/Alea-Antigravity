@@ -2,90 +2,68 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Mail, ArrowRight, AlertCircle, ChevronLeft } from "lucide-react";
+import { Shield, Mail, ArrowRight, AlertCircle, ChevronLeft, Lock } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 import { Suspense } from "react";
 
 function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const fromOnboarding = searchParams.get("from") === "onboarding";
+    const errorParam = searchParams.get("error");
     const prefillEmail = searchParams.get("email") || "";
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<string | null>(null);
     const [email, setEmail] = useState(prefillEmail);
+    const [password, setPassword] = useState("");
 
-    // Handle initial auth state check - uses getUser() for server-verified session
     useEffect(() => {
-        supabase.auth.getUser().then(({ data: { user } }: { data: { user: any } }) => {
-            if (user && !fromOnboarding) {
-                const userRole = user.user_metadata?.role;
-                const userEmail = user.email || "";
-                const normalizedEmail = userEmail.toLowerCase();
-                const isGodMode = normalizedEmail === 'beenocode@gmail.com' || normalizedEmail === 'albertogala@beenocode.com';
-                const isAdminOrAgent = isGodMode || userRole === 'admin' || userRole === 'agent';
+        if (errorParam === 'access-revoked') {
+            setError("Tu acceso ha sido revocado. Contacta con el administrador.");
+        }
+    }, [errorParam]);
 
-                const redirectTo = searchParams.get("redirectTo");
-                const defaultHome = isAdminOrAgent ? "/praetorium" : "/radar";
-
-                // Final safety: if redirectTo is /praetorium but user is not admin/agent, go to /radar
-                let finalTarget = redirectTo || defaultHome;
-                if (finalTarget.startsWith('/praetorium') && !isAdminOrAgent) {
-                    finalTarget = "/radar";
+    useEffect(() => {
+        fetch('/api/auth/me')
+            .then(res => {
+                if (res.ok) return res.json();
+                throw new Error('Not authenticated');
+            })
+            .then(data => {
+                if (data.redirectPath) {
+                    router.push(data.redirectPath);
                 }
-
-                router.push(finalTarget);
-            }
-        });
-    }, [fromOnboarding, router, searchParams]);
+            })
+            .catch(() => {});
+    }, [router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
-        setSuccess(null);
-
-        const trimmedEmail = email.trim().toLowerCase();
-        // Default specifically to /praetorium for agents/admin
-        const redirectTo = searchParams.get("redirectTo") || "/praetorium";
 
         try {
-            const currentOrigin = window.location.origin;
-            const redirectUrl = `${currentOrigin}/auth/callback?next=${redirectTo}`;
-            console.log("Attempting Magic Link with redirect:", redirectUrl);
-
-            const { error: signInError } = await supabase.auth.signInWithOtp({
-                email: trimmedEmail,
-                options: {
-                    shouldCreateUser: false,
-                    emailRedirectTo: redirectUrl,
-                },
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
             });
 
-            if (signInError) {
-                // Supabase returns a specific error when user doesn't exist
-                if (signInError.message.toLowerCase().includes('not found') ||
-                    signInError.message.toLowerCase().includes('user not found') ||
-                    signInError.status === 422) {
-                    setError("Este correo no está registrado. Contacta con tu agente de referencia.");
-                } else {
-                    setError(signInError.message || "Error al enviar el enlace. Inténtalo de nuevo.");
-                }
+            const data = await res.json();
+
+            if (!res.ok) {
+                setError(data.error || 'Error al iniciar sesión');
                 return;
             }
 
-            setSuccess("Enlace de acceso enviado. Revisa tu bandeja de entrada o carpeta de spam.");
-        } catch (err: unknown) {
-            console.error("Login Error Details:", err);
-            const errorMessage = err instanceof Error 
-                ? err.message 
-                : (typeof err === 'object' && err !== null ? JSON.stringify(err) : "Error de conexión. Inténtalo de nuevo.");
-            setError(errorMessage);
+            if (data.redirectPath) {
+                router.push(data.redirectPath);
+            }
+        } catch (err: any) {
+            console.error("Login Error:", err);
+            setError("Error de conexión. Inténtalo de nuevo.");
         } finally {
             setLoading(false);
         }
@@ -94,13 +72,11 @@ function LoginForm() {
     return (
         <main className="min-h-screen bg-background text-foreground selection:bg-primary/30 font-sans flex items-center justify-center relative overflow-hidden px-6">
 
-            {/* Background Effects matching Home */}
             <div className="absolute inset-0 z-0 text-white">
                 <div className="absolute inset-0 bg-gradient-to-b from-background via-background/90 to-background z-10 text-white" />
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] opacity-40" />
             </div>
 
-            {/* Back Button */}
             <Link
                 href="/"
                 className="fixed top-8 left-8 z-50 flex items-center space-x-2 text-xs font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors group"
@@ -115,7 +91,6 @@ function LoginForm() {
                 transition={{ duration: 0.8, ease: "easeOut" }}
                 className="w-full max-w-md relative z-10"
             >
-                {/* Branding matching Home */}
                 <div className="text-center mb-12">
                     <div className="flex flex-col items-center space-y-4">
                         <Image
@@ -135,7 +110,7 @@ function LoginForm() {
                         <h1 className="font-serif text-3xl tracking-widest font-medium">Aleasignature.</h1>
                     </div>
                     <p className="text-muted-foreground uppercase tracking-widest text-[10px] font-bold mt-4">
-                        Acceso Reservado — Protocolo Magic Link
+                        Acceso Reservado
                     </p>
                 </div>
 
@@ -143,7 +118,7 @@ function LoginForm() {
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
 
                     <h2 className="text-2xl font-serif mb-8 text-center">
-                        {fromOnboarding ? "Confirmar Acceso" : "Identificación Digital"}
+                        Iniciar Sesión
                     </h2>
 
                     <AnimatePresence mode="wait">
@@ -158,29 +133,12 @@ function LoginForm() {
                                 <span>{error}</span>
                             </motion.div>
                         )}
-
-                        {success && (
-                            <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="mb-6 p-5 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl flex flex-col space-y-2 text-emerald-600 text-xs font-medium"
-                            >
-                                <div className="flex items-center space-x-3">
-                                    <Shield size={16} className="shrink-0" />
-                                    <span className="font-bold">Enlace enviado</span>
-                                </div>
-                                <p className="text-emerald-600/80 text-[11px] leading-relaxed pl-7">
-                                    {success}
-                                </p>
-                            </motion.div>
-                        )}
                     </AnimatePresence>
 
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-2">
                             <label className="text-[10px] uppercase tracking-widest text-muted-foreground ml-4 font-bold">
-                                Correo Autorizado
+                                Correo
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-5 flex items-center text-muted-foreground">
@@ -190,15 +148,34 @@ function LoginForm() {
                                     type="email"
                                     required
                                     className="w-full bg-muted/30 border border-border rounded-2xl py-4 pl-14 pr-4 text-sm focus:outline-none focus:border-primary/50 focus:bg-muted/50 transition-all font-medium"
-                                    placeholder="ejemplo@aleasignature.com"
+                                    placeholder="tu@email.com"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    readOnly={fromOnboarding && !!prefillEmail}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] uppercase tracking-widest text-muted-foreground ml-4 font-bold">
+                                Contraseña
+                            </label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-5 flex items-center text-muted-foreground">
+                                    <Lock size={18} />
+                                </div>
+                                <input
+                                    type="password"
+                                    required
+                                    className="w-full bg-muted/30 border border-border rounded-2xl py-4 pl-14 pr-4 text-sm focus:outline-none focus:border-primary/50 focus:bg-muted/50 transition-all font-medium"
+                                    placeholder="Tu contraseña"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
                                 />
                             </div>
                         </div>
 
                         <button
+                            type="submit"
                             disabled={loading}
                             className="w-full bg-foreground text-background font-bold py-5 rounded-2xl transition-all shadow-xl hover:-translate-y-1 active:scale-[0.98] flex items-center justify-center space-x-2 group"
                         >
@@ -207,7 +184,7 @@ function LoginForm() {
                             ) : (
                                 <>
                                     <span className="uppercase tracking-widest text-xs">
-                                        Solicitar Enlace de Acceso
+                                        Iniciar Sesión
                                     </span>
                                     <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                                 </>
@@ -215,9 +192,21 @@ function LoginForm() {
                         </button>
                     </form>
 
+                    <div className="mt-6 text-center">
+                        <Link 
+                            href="/auth/forgot-password"
+                            className="text-[10px] uppercase tracking-widest text-muted-foreground/60 hover:text-foreground transition-colors font-medium"
+                        >
+                            ¿Olvidaste tu contraseña?
+                        </Link>
+                    </div>
+
                     <div className="mt-8 pt-8 border-t border-border/50 text-center">
                         <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60 leading-relaxed max-w-[200px] mx-auto font-medium">
-                            Sin contraseñas. Acceso seguro mediante validación de identidad por email.
+                            ¿No tienes cuenta? 
+                            <Link href="/register" className="text-primary hover:underline ml-1">
+                                Regístrate
+                            </Link>
                         </p>
                     </div>
                 </div>

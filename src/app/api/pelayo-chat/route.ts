@@ -1,26 +1,33 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createAuthenticatedClient, INSFORGE_APP_URL, INSFORGE_API_KEY } from '@/lib/insforge-server';
 import { env } from '@/lib/env';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { 
+    getMemoryContext, 
+    addMemory, 
+    addKnowledgeTriple,
+    investorWingName,
+    type HallType 
+} from '@/lib/memory';
 
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
 const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
 type Tables = 'leads' | 'properties' | 'investors' | 'mandatarios' | 'collaborators';
 
-async function getTableData(table: Tables) {
-    const { data, error } = await supabaseAdmin.from(table).select('*').order('created_at', { ascending: false });
+async function getTableData(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, table: Tables) {
+    const { data, error } = await client.database.from(table).select('*').order('created_at', { ascending: false });
     return { data: data || [], error };
 }
 
-async function createRecord(table: Tables, record: any) {
-    const { data, error } = await supabaseAdmin.from(table).insert(record).select().single();
+async function createRecord(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, table: Tables, record: any) {
+    const { data, error } = await client.database.from(table).insert(record).select().single();
     return { data, error };
 }
 
-async function saveConversation(userId: string, role: 'user' | 'assistant', content: string, analysis?: any) {
-    await supabaseAdmin.from('pelayo_conversations').insert({
+async function saveConversation(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, userId: string, role: 'user' | 'assistant', content: string, analysis?: any) {
+    await client.database.from('pelayo_conversations').insert({
         user_id: userId,
         role,
         content,
@@ -28,8 +35,9 @@ async function saveConversation(userId: string, role: 'user' | 'assistant', cont
     });
 }
 
-async function getConversationHistory(userId: string, limit = 10) {
-    const { data } = await supabaseAdmin
+async function getConversationHistory(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, userId: string, limit = 10) {
+    const { data } = await client
+        .database
         .from('pelayo_conversations')
         .select('*')
         .eq('user_id', userId)
@@ -38,8 +46,9 @@ async function getConversationHistory(userId: string, limit = 10) {
     return data || [];
 }
 
-async function createPendingAction(userId: string, actionType: string, entityType: string, data: any) {
-    const { data: result } = await supabaseAdmin
+async function createPendingAction(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, userId: string, actionType: string, entityType: string, data: any) {
+    const { data: result } = await client
+        .database
         .from('pelayo_pending_actions')
         .insert({
             user_id: userId,
@@ -53,8 +62,9 @@ async function createPendingAction(userId: string, actionType: string, entityTyp
     return result;
 }
 
-async function getPendingAction(userId: string, actionId?: string) {
-    let query = supabaseAdmin
+async function getPendingAction(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, userId: string, actionId?: string) {
+    let query = client
+        .database
         .from('pelayo_pending_actions')
         .select('*')
         .eq('user_id', userId)
@@ -68,8 +78,8 @@ async function getPendingAction(userId: string, actionId?: string) {
     return data;
 }
 
-async function confirmPendingAction(actionId: string) {
-    const action = await getPendingAction('', actionId);
+async function confirmPendingAction(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, actionId: string) {
+    const action = await getPendingAction(client, '', actionId);
     if (!action) return { data: null, error: 'Action not found' };
     
     const tableMap: Record<string, Tables> = {
@@ -82,20 +92,22 @@ async function confirmPendingAction(actionId: string) {
     const table = tableMap[action.action_type];
     if (!table) return { data: null, error: 'Invalid action type' };
     
-    const result = await createRecord(table, action.data);
+    const result = await createRecord(client, table, action.data);
     return result;
 }
 
-async function cancelPendingAction(actionId: string, userId: string) {
-    await supabaseAdmin
+async function cancelPendingAction(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, actionId: string, userId: string) {
+    await client
+        .database
         .from('pelayo_pending_actions')
         .update({ status: 'cancelled' })
         .eq('id', actionId)
         .eq('user_id', userId);
 }
 
-async function createNotification(userId: string, type: string, title: string, message: string, data?: any) {
-    await supabaseAdmin
+async function createNotification(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, userId: string, type: string, title: string, message: string, data?: any) {
+    await client
+        .database
         .from('pelayo_notifications')
         .insert({
             user_id: userId,
@@ -116,13 +128,12 @@ async function uploadImageToStorage(base64Data: string, fileName: string): Promi
         }
 
         const uploadRes = await fetch(
-            `${env.SUPABASE_URL}/storage/v1/objects/dossiers/${fileName}`,
+            `${INSFORGE_APP_URL}/api/storage/buckets/dossiers/files/${fileName}`,
             {
                 method: 'POST',
                 headers: new Headers({
                     'Content-Type': 'image/jpeg',
-                    'apikey': env.SUPABASE_ANON_KEY || '',
-                    'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+                    'Authorization': `Bearer ${INSFORGE_API_KEY}`,
                     'x-upsert': 'true'
                 }),
                 body: bytes
@@ -130,7 +141,7 @@ async function uploadImageToStorage(base64Data: string, fileName: string): Promi
         );
 
         if (uploadRes.ok) {
-            return `${env.SUPABASE_URL}/storage/v1/object/public/dossiers/${fileName}`;
+            return `${INSFORGE_APP_URL}/api/storage/buckets/dossiers/files/${fileName}`;
         }
         return null;
     } catch (error) {
@@ -144,8 +155,11 @@ export async function POST(req: Request) {
         const rateLimitResponse = checkRateLimit(req);
         if (rateLimitResponse) return rateLimitResponse;
 
-        const { message, user, action: userAction, pendingActionId, file, extractedContent } = await req.json();
-        const userId = user?.id || user?.email || 'anonymous';
+        const client = await createAuthenticatedClient();
+        const { data: { user } } = await client.auth.getCurrentUser();
+        
+        const { message, user: chatUser, action: userAction, pendingActionId, file, extractedContent } = await req.json();
+        const userId = user?.id || user?.email || chatUser?.id || chatUser?.email || 'anonymous';
 
         let uploadedImageUrls: string[] = [];
         let dossierText = '';
@@ -174,9 +188,9 @@ export async function POST(req: Request) {
 
         // Handle action confirmations
         if (userAction === 'confirm' && pendingActionId) {
-            const result = await confirmPendingAction(pendingActionId);
+            const result = await confirmPendingAction(client, pendingActionId);
             if (result.data) {
-                await saveConversation(userId, 'assistant', `✅ Registro creado exitosamente: ${JSON.stringify(result.data)}`);
+                await saveConversation(client, userId, 'assistant', `✅ Registro creado exitosamente: ${JSON.stringify(result.data)}`);
                 return NextResponse.json({
                     response: `Perfecto, he creado el registro exitosamente.`,
                     confirmed: true,
@@ -187,7 +201,7 @@ export async function POST(req: Request) {
         }
 
         if (userAction === 'cancel' && pendingActionId) {
-            await cancelPendingAction(pendingActionId, userId);
+            await cancelPendingAction(client, pendingActionId, userId);
             return NextResponse.json({
                 response: `Entendido, he cancelado la acción.`,
                 cancelled: true
@@ -195,19 +209,47 @@ export async function POST(req: Request) {
         }
 
         // Get conversation history for memory
-        const history = await getConversationHistory(userId, 10);
+        const history = await getConversationHistory(client, userId, 10);
         const historyText = history.length > 0 
             ? `\n\nCONVERSACIÓN ANTERIOR:\n${history.map(h => `${h.role === 'user' ? 'Usuario' : 'Pelayo'}: ${h.content}`).join('\n')}`
             : '';
 
+        // Get memory context from MemPalace-style storage
+        let memoryContext = '';
+        try {
+            // Get user email if available
+            const userEmail = user?.email || chatUser?.email;
+            if (userEmail) {
+                const wingName = investorWingName(userId, userEmail);
+                const memories = await getMemoryContext(wingName, 10);
+                
+                if (memories.length > 0) {
+                    const byHall: Record<string, string[]> = {};
+                    for (const mem of memories) {
+                        if (!byHall[mem.hall_type]) {
+                            byHall[mem.hall_type] = [];
+                        }
+                        byHall[mem.hall_type].push(`[${mem.room_name}] ${mem.content.substring(0, 200)}`);
+                    }
+                    
+                    memoryContext = '\n\n📚 MEMORIA DE CONVERSACIONES ANTERIORES:\n';
+                    for (const [hall, items] of Object.entries(byHall)) {
+                        memoryContext += `\n## ${hall.toUpperCase()}:\n${items.join('\n')}\n`;
+                    }
+                }
+            }
+        } catch (memErr) {
+            console.error('Error getting memory context:', memErr);
+        }
+
         // Get current CRM data
         const [leadsData, propertiesData, investorsData, mandatariosData, suggestionsData, agendaData] = await Promise.all([
-            getTableData('leads'),
-            getTableData('properties'),
-            getTableData('investors'),
-            getTableData('mandatarios'),
-            supabaseAdmin.from('iai_inbox_suggestions').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
-            supabaseAdmin.from('agenda_actions').select('*, lead:leads(id, investors:investors(full_name))').order('due_date', { ascending: true }).limit(20)
+            getTableData(client, 'leads'),
+            getTableData(client, 'properties'),
+            getTableData(client, 'investors'),
+            getTableData(client, 'mandatarios'),
+            client.database.from('iai_inbox_suggestions').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
+            client.database.from('agenda_actions').select('*, lead:leads(id, investors:investors(full_name))').order('due_date', { ascending: true }).limit(20)
         ]);
 
         const overdueActions = agendaData.data?.filter((a: any) => 
@@ -238,7 +280,7 @@ ${agendaData.data?.filter((a: any) => a.status !== 'completed' && a.status !== '
 ${agendaData.data?.filter((a: any) => a.status !== 'completed' && a.status !== 'cancelled').slice(0, 5).map((a: any) => `- ${a.title} (${a.action_type}) - ${a.lead?.investors?.full_name || 'sin lead'}`).join('\n')}` : ''}`;
 
         // Check for pending actions that need confirmation
-        const pendingAction = await getPendingAction(userId);
+        const pendingAction = await getPendingAction(client, userId);
         let pendingConfirmationText = '';
         if (pendingAction) {
             const entityLabel = pendingAction.action_type.replace('create_', '');
@@ -289,7 +331,7 @@ Responde en JSON:
         } catch (e) {}
 
         // Save user message to history
-        await saveConversation(userId, 'user', message + (dossierText ? `\n\n[Dossier adjuntado: ${dossierText.substring(0, 500)}...]` : ''), analysis);
+        await saveConversation(client, userId, 'user', message + (dossierText ? `\n\n[Dossier adjuntado: ${dossierText.substring(0, 500)}...]` : ''), analysis);
 
         // Handle explicit confirmations
         const lowerMessage = message.toLowerCase();
@@ -306,10 +348,10 @@ Responde en JSON:
 
         // If there's a pending action and user confirms
         if (pendingAction && userConfirm) {
-            const result = await confirmPendingAction(pendingAction.id);
+            const result = await confirmPendingAction(client, pendingAction.id);
             if (result.data) {
-                await saveConversation(userId, 'assistant', `Registro creado: ${JSON.stringify(result.data)}`);
-                await createNotification(userId, 'info', 'Registro creado', `Se ha creado ${pendingAction.entity_type} exitosamente`);
+                await saveConversation(client, userId, 'assistant', `Registro creado: ${JSON.stringify(result.data)}`);
+                await createNotification(client, userId, 'info', 'Registro creado', `Se ha creado ${pendingAction.entity_type} exitosamente`);
                 
                 return NextResponse.json({
                     response: `✅ Perfecto, he creado el ${pendingAction.entity_type} exitosamente.`,
@@ -322,7 +364,7 @@ Responde en JSON:
 
         // If user cancels
         if ((pendingAction && userCancel) || userAction === 'cancel') {
-            await cancelPendingAction(pendingAction?.id || pendingActionId, userId);
+            await cancelPendingAction(client, pendingAction?.id || pendingActionId, userId);
             return NextResponse.json({
                 response: `De acuerdo, he cancelado la acción.`,
                 cancelled: true
@@ -373,7 +415,7 @@ REGLAS IMPORTANTES:
 - Si detectas una oportunidad de inversión, crea una notificación
 - Para cálculos de comisión, aplica la estructura 40/60 y los hitos correspondientes
 - Siempre responde en español, de forma clara y directa
-- Máximo 300 palabras${historyText}${pendingConfirmationText}${dossierContext}
+- Máximo 300 palabras${historyText}${memoryContext}${pendingConfirmationText}${dossierContext}
 
 ${summary}
 
@@ -399,7 +441,7 @@ El usuario pregunta: ${message}`;
                 ...(uploadedImageUrls.length > 0 && { thumbnail_url: uploadedImageUrls[0], images: uploadedImageUrls }),
                 created_at: new Date().toISOString()
             };
-            const pendingRecord = await createPendingAction(userId, actionType, analysis.entity, dataWithImages);
+            const pendingRecord = await createPendingAction(client, userId, actionType, analysis.entity, dataWithImages);
 
             response += `\n\n📝 **Vista previa:** Parece que quieres crear un ${analysis.entity}. Datos detectados:\n\`\`\`${JSON.stringify(analysis.data, null, 2)}\`\`\``;
             if (uploadedImageUrls.length > 0) {
@@ -412,6 +454,7 @@ El usuario pregunta: ${message}`;
         // If this is a high-value opportunity, create notification
         if (analysis.is_opportunity && analysis.opportunity_type === 'high') {
             await createNotification(
+                client,
                 userId,
                 'opportunity',
                 '🚨 Oportunidad detectada',
@@ -421,10 +464,48 @@ El usuario pregunta: ${message}`;
         }
 
         // Save assistant response to history
-        await saveConversation(userId, 'assistant', response, analysis);
+        await saveConversation(client, userId, 'assistant', response, analysis);
+
+        // Store interaction in memory (MemPalace-style)
+        try {
+            const userEmail = user?.email || chatUser?.email;
+            if (userEmail) {
+                const wingName = investorWingName(userId, userEmail);
+                
+                // Store conversation exchange
+                await addMemory(wingName, 'conversations', 'events' as HallType,
+                    `User: ${message.substring(0, 500)}\nPelayo: ${response.substring(0, 500)}`,
+                    { 
+                        source: 'pelayo_chat',
+                        importanceScore: analysis.confidence && analysis.confidence > 0.7 ? 70 : 50 
+                    }
+                );
+
+                // If AI detected a decision, store as fact
+                if (analysis.intent === 'create' || analysis.intent === 'decision') {
+                    await addMemory(wingName, 'decisions', 'facts' as HallType,
+                        `Decision: ${message.substring(0, 300)} → Created: ${analysis.entity || 'unknown'}`,
+                        { source: 'pelayo_chat', importanceScore: 80 }
+                    );
+                }
+
+                // If an investor was mentioned, create knowledge triple
+                if (analysis.entity === 'investor' && analysis.data?.email) {
+                    await addKnowledgeTriple(
+                        userEmail,
+                        'discussed_about',
+                        analysis.data.email,
+                        { source: 'pelayo_chat', confidenceScore: Math.round((analysis.confidence || 0.5) * 100) }
+                    );
+                }
+            }
+        } catch (memErr) {
+            console.error('Error storing memory:', memErr);
+        }
 
         // Get pending actions for this user
-        const userPendingActions = await supabaseAdmin
+        const userPendingActions = await client
+            .database
             .from('pelayo_pending_actions')
             .select('*')
             .eq('user_id', userId)
@@ -445,12 +526,14 @@ El usuario pregunta: ${message}`;
 }
 
 export async function GET(req: Request) {
+    const client = await createAuthenticatedClient();
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get('userId');
     const type = searchParams.get('type') || 'notifications';
 
     if (type === 'notifications' && userId) {
-        const { data } = await supabaseAdmin
+        const { data } = await client
+            .database
             .from('pelayo_notifications')
             .select('*')
             .eq('user_id', userId)
@@ -462,7 +545,8 @@ export async function GET(req: Request) {
     }
 
     if (type === 'pending' && userId) {
-        const { data } = await supabaseAdmin
+        const { data } = await client
+            .database
             .from('pelayo_pending_actions')
             .select('*')
             .eq('user_id', userId)

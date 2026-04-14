@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "alea-crm": {
+      "command": "node",
+      "args": ["/Users/albertogala/Library/CloudStorage/Dropbox/Alea Antigravity/mcp-server/dist/index.js"],
+      "env": {
+        "INSFORGE_APP_URL": "https://if8rkq6j.eu-central.insforge.app",
+        "INSFORGE_API_KEY": "ik_dbb952a6fd01508d4ae7f53b36e23eaf",
+        "GMAIL_CLIENT_ID": "${GMAIL_CLIENT_ID}",
+        "GMAIL_CLIENT_SECRET": "${GMAIL_CLIENT_SECRET}"
+      }
+    }
+  }
+}

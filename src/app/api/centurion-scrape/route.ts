@@ -1,28 +1,15 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createAuthenticatedClient } from '@/lib/insforge-server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { env } from '@/lib/env';
 
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
 const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-interface ScrapeResult {
-  success: boolean;
-  data?: {
-    linkedin?: string;
-    twitter?: string;
-    website?: string;
-    googleResults?: string;
-    summary?: string;
-  };
-  error?: string;
-}
-
 async function searchGoogle(name: string, company?: string): Promise<string> {
   const query = encodeURIComponent(`${name} ${company || ''} LinkedIn OR Twitter OR website`.trim());
   
   try {
-    // Using DuckDuckGo HTML (no API key needed for basic search)
     const response = await fetch(`https://html.duckduckgo.com/html/?q=${query}`, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
@@ -35,11 +22,9 @@ async function searchGoogle(name: string, company?: string): Promise<string> {
     
     const html = await response.text();
     
-    // Extract URLs from results (simple regex)
     const urlRegex = /https?:\/\/[^\s<>"]+/g;
     const urls = html.match(urlRegex) || [];
     
-    // Filter for relevant platforms
     const relevantUrls = urls.filter(url => 
       url.includes('linkedin.com') ||
       url.includes('twitter.com') ||
@@ -68,15 +53,12 @@ async function scrapeWebsite(url: string): Promise<string> {
     
     const html = await response.text();
     
-    // Extract title
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     const title = titleMatch ? titleMatch[1].trim() : '';
     
-    // Extract meta description
     const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
     const description = descMatch ? descMatch[1].trim() : '';
     
-    // Extract emails
     const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
     const emails = html.match(emailRegex) || [];
     const uniqueEmails = [...new Set(emails)].filter(e => !e.includes('noreply'));
@@ -95,22 +77,22 @@ async function analyzeWithAI(name: string, company: string, scrapedData: string)
   personality_summary?: string;
 }> {
   const prompt = `
-Eres un asistente de OSINT. Analiza la siguiente información sobre "${name}" de "${company}".
+  Eres un asistente de OSINT. Analiza la siguiente información sobre "${name}" de "${company}".
 
-Datos encontrados:
-${scrapedData}
+  Datos encontrados:
+  ${scrapedData}
 
-Extrae y devuelve SOLO un JSON con este formato, sin texto adicional:
-{
-  "linkedin": "URL de LinkedIn si existe",
-  "twitter": "URL de Twitter si existe",  
-  "website": "URL del sitio web de la empresa si existe",
-  "personality_summary": "Resumen breve del perfil público de la persona (máx 200 caracteres)"
-}
+  Extrae y devuelve SOLO un JSON con este formato, sin texto adicional:
+  {
+    "linkedin": "URL de LinkedIn si existe",
+    "twitter": "URL de Twitter si existe",  
+    "website": "URL del sitio web de la empresa si existe",
+    "personality_summary": "Resumen breve del perfil público de la persona (máx 200 caracteres)"
+  }
 
-Si no encuentras algo, usa null para ese campo.
-Devuelve null si no hay información suficiente.
-`;
+  Si no encuentras algo, usa null para ese campo.
+  Devuelve null si no hay información suficiente.
+  `;
 
   try {
     const result = await model.generateContent({
@@ -132,20 +114,27 @@ Devuelve null si no hay información suficiente.
 
 export async function POST(req: Request) {
   try {
+    const client = await createAuthenticatedClient();
+    const { data: { user } } = await client.auth.getCurrentUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { profileId, name, company } = await req.json();
 
     if (!profileId || !name) {
       return NextResponse.json({ error: 'Missing profileId or name' }, { status: 400 });
     }
 
-    // Update status to in_progress
-    await supabaseAdmin
+    await client
+      .database
       .from('centurion_profiles')
       .update({ scrape_status: 'in_progress' })
       .eq('id', profileId);
 
-    // Create scrape job
-    const { data: job } = await supabaseAdmin
+    const { data: job } = await client
+      .database
       .from('centurion_scrape_jobs')
       .insert({
         profile_id: profileId,
@@ -156,21 +145,17 @@ export async function POST(req: Request) {
       .select()
       .single();
 
-    // Perform Google search
     const googleResults = await searchGoogle(name, company);
     
-    // Analyze with AI to extract URLs
     const aiAnalysis = await analyzeWithAI(name, company, googleResults);
     
     let additionalData = {};
     
-    // Scrape website if found
     if (aiAnalysis.website) {
       const websiteData = await scrapeWebsite(aiAnalysis.website);
       additionalData = { websiteData };
     }
 
-    // Update profile with scraped data
     const updateData: any = {
       scrape_status: 'completed',
       linkedin_url: aiAnalysis.linkedin,
@@ -180,13 +165,14 @@ export async function POST(req: Request) {
       needs_deep_scrape: !aiAnalysis.linkedin && !aiAnalysis.twitter
     };
 
-    await supabaseAdmin
+    await client
+      .database
       .from('centurion_profiles')
       .update(updateData)
       .eq('id', profileId);
 
-    // Update job as completed
-    await supabaseAdmin
+    await client
+      .database
       .from('centurion_scrape_jobs')
       .update({
         status: 'completed',
@@ -210,24 +196,38 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const profileId = searchParams.get('profileId');
+  try {
+    const client = await createAuthenticatedClient();
+    const { data: { user } } = await client.auth.getCurrentUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  if (!profileId) {
-    return NextResponse.json({ error: 'Missing profileId' }, { status: 400 });
+    const { searchParams } = new URL(req.url);
+    const profileId = searchParams.get('profileId');
+
+    if (!profileId) {
+      return NextResponse.json({ error: 'Missing profileId' }, { status: 400 });
+    }
+
+    const { data: profile } = await client
+      .database
+      .from('centurion_profiles')
+      .select('*')
+      .eq('id', profileId)
+      .single();
+
+    const { data: jobs } = await client
+      .database
+      .from('centurion_scrape_jobs')
+      .select('*')
+      .eq('profile_id', profileId)
+      .order('created_at', { ascending: false });
+
+    return NextResponse.json({ profile, jobs });
+  } catch (error: any) {
+    console.error('OSINT scrape error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
-
-  const { data: profile } = await supabaseAdmin
-    .from('centurion_profiles')
-    .select('*')
-    .eq('id', profileId)
-    .single();
-
-  const { data: jobs } = await supabaseAdmin
-    .from('centurion_scrape_jobs')
-    .select('*')
-    .eq('profile_id', profileId)
-    .order('created_at', { ascending: false });
-
-  return NextResponse.json({ profile, jobs });
 }

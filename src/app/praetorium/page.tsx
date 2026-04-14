@@ -8,17 +8,51 @@ import {
     ChevronLeft, Maximize2, Bed, Bath, Sparkles, TrendingUp, Wind,
     Trees, ShoppingBag, Umbrella, Tag, Calendar, ShieldCheck, Star,
     Trash2, Edit2, Upload, Loader2, User, LogOut, Settings, Menu, X, Inbox, BrainCircuit, MessageCircle,
-    Check, Paperclip, Calendar
+    Check, Paperclip, Video
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { supabase } from "@/lib/supabase";
+import { insforge } from "@/lib/insforge-client";
 import { useRouter } from "next/navigation";
 import AIChat from "@/components/admin/AIChat";
 import PelayoChat from "@/components/admin/PelayoChat";
 import ValuationAgent from "@/components/admin/ValuationAgent";
 import AgendaPanel from "@/components/admin/AgendaPanel";
+import AIDashboard from "@/components/admin/AIDashboard";
+import VideoCallPanel from "@/components/admin/video/VideoCallPanel";
+
+const INSFORGE_APP_URL = 'https://if8rkq6j.eu-central.insforge.app';
+const INSFORGE_API_KEY = 'ik_dbb952a6fd01508d4ae7f53b36e23eaf';
+
+async function uploadFileToInsforgeStorage(file: File, bucket: string, fileName: string): Promise<string | null> {
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+
+        const uploadRes = await fetch(
+            `${INSFORGE_APP_URL}/api/storage/buckets/${bucket}/files/${fileName}`,
+            {
+                method: 'POST',
+                headers: new Headers({
+                    'Content-Type': file.type || 'application/octet-stream',
+                    'Authorization': `Bearer ${INSFORGE_API_KEY}`,
+                    'x-upsert': 'true'
+                }),
+                body: bytes
+            }
+        );
+
+        if (uploadRes.ok) {
+            return `${INSFORGE_APP_URL}/api/storage/buckets/${bucket}/files/${fileName}`;
+        }
+        console.warn("InsForge storage upload failed:", uploadRes.status, await uploadRes.text());
+        return null;
+    } catch (error) {
+        console.error('Error uploading to InsForge storage:', error);
+        return null;
+    }
+}
 
 // Defined Pipeline Stages
 const PIPELINE_STAGES = [
@@ -192,7 +226,7 @@ export default function AdminDashboard() {
     };
 
     const handleRejectSuggestion = async (id: string) => {
-        await supabase.from('iai_inbox_suggestions').update({ status: 'rejected' }).eq('id', id);
+        await insforge.database.from('iai_inbox_suggestions').update({ status: 'rejected' }).eq('id', id);
         setIaiSuggestions(prev => prev.filter(s => s.id !== id));
     };
 
@@ -245,15 +279,9 @@ export default function AdminDashboard() {
             if (iaiDossierFile) {
                 const fileExt = iaiDossierFile.name.split('.').pop();
                 const fileName = `dossiers/iai_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-                const { data: uploadData, error: uploadError } = await supabase.storage
-                    .from('properties')
-                    .upload(fileName, iaiDossierFile);
-
-                if (uploadData && !uploadError) {
-                    const { data: { publicUrl } } = supabase.storage.from('properties').getPublicUrl(fileName);
-                    pdfUrl = publicUrl;
-                } else {
-                    console.warn("Could not upload AI PDF to Storage:", uploadError);
+                pdfUrl = await uploadFileToInsforgeStorage(iaiDossierFile, 'properties', fileName);
+                if (!pdfUrl) {
+                    console.warn("Could not upload AI PDF to InsForge Storage");
                 }
             }
 
@@ -291,8 +319,8 @@ export default function AdminDashboard() {
                 },
             };
 
-            const { data: insertedData, error: insertError } = await supabase
-                .from('properties')
+            const { data: insertedData, error: insertError } = await insforge.database
+                    .from('properties')
                 .insert([newProperty])
                 .select();
 
@@ -305,7 +333,7 @@ export default function AdminDashboard() {
 
             // Mark suggestion as approved
             if (selectedSuggestion) {
-                await supabase.from('iai_inbox_suggestions').update({ status: 'approved' }).eq('id', selectedSuggestion.id);
+                await insforge.database.from('iai_inbox_suggestions').update({ status: 'approved' }).eq('id', selectedSuggestion.id);
                 setIaiSuggestions(prev => prev.filter(s => s.id !== selectedSuggestion.id));
             }
 
@@ -336,15 +364,15 @@ export default function AdminDashboard() {
                 { data: mandatariosData },
                 { data: iaiSuggestionsData },
             ] = await Promise.all([
-                supabase
+                insforge.database
                     .from('leads')
                     .select(`*, investors (*), properties (*)`)
                     .order('created_at', { ascending: false }),
-                supabase.from('properties').select('*'),
-                supabase.from('investors').select('*'),
-                supabase.from('collaborators').select('*').order('created_at', { ascending: false }),
-                supabase.from('mandatarios').select('*').order('created_at', { ascending: false }),
-                supabase.from('iai_inbox_suggestions').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
+                insforge.database.from('properties').select('*'),
+                insforge.database.from('investors').select('*'),
+                insforge.database.from('collaborators').select('*').order('created_at', { ascending: false }),
+                insforge.database.from('mandatarios').select('*').order('created_at', { ascending: false }),
+                insforge.database.from('iai_inbox_suggestions').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
             ]);
 
             if (leadsData) setLeads(leadsData);
@@ -363,7 +391,7 @@ export default function AdminDashboard() {
     useEffect(() => {
         const checkAuth = async () => {
             // ✅ Use getUser() instead of getSession() for server-validated auth
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            const { data: { user }, error: authError } = await insforge.auth.getCurrentUser();
             if (authError || !user) {
                 router.push("/login");
                 return;
@@ -372,15 +400,15 @@ export default function AdminDashboard() {
             const normalizedEmail = user.email?.toLowerCase();
             const isGodMode = normalizedEmail === 'beenocode@gmail.com' || normalizedEmail === 'albertogala@beenocode.com';
 
-            const { data: agent } = await supabase
-                .from('agents')
+            const { data: agent } = await insforge.database
+                    .from('agents')
                 .select('*')
                 .eq('id', user.id)
                 .single();
             
             // Check if user is an investor
-            const { data: investor } = await supabase
-                .from('investors')
+            const { data: investor } = await insforge.database
+                    .from('investors')
                 .select('*')
                 .eq('email', user.email)
                 .single();
@@ -398,7 +426,7 @@ export default function AdminDashboard() {
 
             if (isGodMode && !agent) {
                 // Create real admin record in DB for GodMode user
-                const { data: newAgent, error: createError } = await supabase
+                const { data: newAgent, error: createError } = await insforge.database
                     .from('agents')
                     .insert({
                         id: user.id,
@@ -442,7 +470,7 @@ export default function AdminDashboard() {
     useEffect(() => {
         if (activeTab === "agents" && currentUser?.role === "admin") {
             const fetchAgents = async () => {
-                const { data } = await supabase.from('agents').select('*').order('created_at', { ascending: false });
+                const { data } = await insforge.database.from('agents').select('*').order('created_at', { ascending: false });
                 if (data) setAllAgents(data);
             };
             fetchAgents();
@@ -450,13 +478,13 @@ export default function AdminDashboard() {
     }, [activeTab, currentUser]);
 
     const handleLogout = async () => {
-        await supabase.auth.signOut();
+        await insforge.auth.signOut();
         window.location.href = "/";
     };
 
     const handleApproveAgent = async (id: string) => {
-        const { error } = await supabase
-            .from('agents')
+        const { error } = await insforge.database
+                    .from('agents')
             .update({ is_approved: true, has_centurion_access: true })
             .eq('id', id);
 
@@ -472,8 +500,8 @@ export default function AdminDashboard() {
             alert('Solo el administrador puede eliminar agentes.');
             return;
         }
-        const { error } = await supabase
-            .from('agents')
+        const { error } = await insforge.database
+                    .from('agents')
             .delete()
             .eq('id', id);
 
@@ -488,8 +516,8 @@ export default function AdminDashboard() {
             return;
         }
         if (!confirm("¿Estás seguro de que quieres eliminar a este inversor? Esta acción es irreversible.")) return;
-        const { error } = await supabase
-            .from('investors')
+        const { error } = await insforge.database
+                    .from('investors')
             .delete()
             .eq('id', id);
 
@@ -509,8 +537,8 @@ export default function AdminDashboard() {
             return;
         }
         if (!confirm("¿Estás seguro de que quieres eliminar esta ficha de Operativa (Lead)? Esta acción es irreversible.")) return;
-        const { error } = await supabase
-            .from('leads')
+        const { error } = await insforge.database
+                    .from('leads')
             .delete()
             .eq('id', id);
 
@@ -530,8 +558,8 @@ export default function AdminDashboard() {
             return;
         }
         if (!confirm("¿Estás seguro de que quieres dar de baja esta propiedad?")) return;
-        const { error } = await supabase
-            .from('properties')
+        const { error } = await insforge.database
+                    .from('properties')
             .delete()
             .eq('id', id);
 
@@ -546,8 +574,8 @@ export default function AdminDashboard() {
 
     const handleCreateLead = async (investorId: string, propertyId: string) => {
         try {
-            const { data, error } = await supabase
-                .from('leads')
+            const { data, error } = await insforge.database
+                    .from('leads')
                 .insert([{
                     investor_id: investorId,
                     property_id: propertyId,
@@ -576,8 +604,8 @@ export default function AdminDashboard() {
 
     const handleUpdatePropertyPrice = async () => {
         if (!selectedProperty) return;
-        const { error } = await supabase
-            .from('properties')
+        const { error } = await insforge.database
+                    .from('properties')
             .update({
                 price: priceForm.price,
                 comision_tercero: priceForm.comision_tercero,
@@ -605,20 +633,14 @@ export default function AdminDashboard() {
 
         setIsUploadingPdf(true);
         try {
-            // 1. Upload original PDF to Supabase Storage (bucket 'properties')
+            // 1. Upload original PDF to InsForge Storage (bucket 'properties')
             let pdfUrl = null;
             const fileExt = file.name.split('.').pop();
             const fileName = `dossiers/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-            const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('properties')
-                .upload(fileName, file);
-
-            if (uploadData && !uploadError) {
-                const { data: { publicUrl } } = supabase.storage.from('properties').getPublicUrl(fileName);
-                pdfUrl = publicUrl;
-            } else {
-                console.warn("Could not upload PDF to Storage:", uploadError);
+            pdfUrl = await uploadFileToInsforgeStorage(file, 'properties', fileName);
+            if (!pdfUrl) {
+                console.warn("Could not upload PDF to InsForge Storage");
             }
 
             // 2. Parse PDF dynamically
@@ -704,8 +726,8 @@ export default function AdminDashboard() {
                 }
             };
 
-            const { data: insertedData, error: insertError } = await supabase
-                .from('properties')
+            const { data: insertedData, error: insertError } = await insforge.database
+                    .from('properties')
                 .insert([newProperty])
                 .select();
 
@@ -728,8 +750,8 @@ export default function AdminDashboard() {
     };
 
     const handleUpdateAgent = async (agent: any) => {
-        const { error } = await supabase
-            .from('agents')
+        const { error } = await insforge.database
+                    .from('agents')
             .update({
                 full_name: agent.full_name,
                 role: agent.role,
@@ -747,8 +769,8 @@ export default function AdminDashboard() {
     };
 
     const handleUpdateInvestor = async (investor: any) => {
-        const { error } = await supabase
-            .from('investors')
+        const { error } = await insforge.database
+                    .from('investors')
             .update({
                 full_name: investor.full_name,
                 company_name: investor.company_name,
@@ -771,8 +793,8 @@ export default function AdminDashboard() {
     };
 
     const handleToggleVerification = async (investorId: string, currentStatus: boolean) => {
-        const { error } = await supabase
-            .from('investors')
+        const { error } = await insforge.database
+                    .from('investors')
             .update({ is_verified: !currentStatus })
             .eq('id', investorId);
 
@@ -789,8 +811,8 @@ export default function AdminDashboard() {
         const lead = leads.find(l => l.id === leadId);
         if (!lead) return;
 
-        const { error } = await supabase
-            .from('leads')
+        const { error } = await insforge.database
+                    .from('leads')
             .update(updates)
             .eq('id', leadId);
 
@@ -815,7 +837,7 @@ export default function AdminDashboard() {
                 }
 
                 if (Object.keys(propUpdates).length > 0) {
-                    await supabase.from('properties').update(propUpdates).eq('id', lead.property_id);
+                    await insforge.database.from('properties').update(propUpdates).eq('id', lead.property_id);
                     setProperties(prev => prev.map(p => p.id === lead.property_id ? { ...p, ...propUpdates } : p));
                 }
             }
@@ -828,8 +850,8 @@ export default function AdminDashboard() {
     };
 
     const handleCreateAgent = async () => {
-        const { error } = await supabase
-            .from('agents')
+        const { error } = await insforge.database
+                    .from('agents')
             .insert([{
                 id: crypto.randomUUID(),
                 ...agentForm,
@@ -844,7 +866,7 @@ export default function AdminDashboard() {
             return;
         }
 
-        const { data } = await supabase.from('agents').select('*').order('created_at', { ascending: false });
+        const { data } = await insforge.database.from('agents').select('*').order('created_at', { ascending: false });
         if (data) setAllAgents(data);
         setIsAddingAgent(false);
         setAgentForm({ full_name: "", email: "", role: "agent" });
@@ -854,8 +876,8 @@ export default function AdminDashboard() {
 
     const handleCreateInvestor = async () => {
         try {
-            const { error } = await supabase
-                .from('investors')
+            const { error } = await insforge.database
+                    .from('investors')
                 .insert([{
                     ...investorForm,
                     status: 'nuevo',
@@ -879,7 +901,7 @@ export default function AdminDashboard() {
                 setShowToast(true);
 
                 if (selectedSuggestion) {
-                    await supabase.from('iai_inbox_suggestions').update({ status: 'approved' }).eq('id', selectedSuggestion.id);
+                    await insforge.database.from('iai_inbox_suggestions').update({ status: 'approved' }).eq('id', selectedSuggestion.id);
                     setIaiSuggestions(prev => prev.filter(s => s.id !== selectedSuggestion.id));
                     setSelectedSuggestion(null);
                 }
@@ -901,8 +923,8 @@ export default function AdminDashboard() {
 
     const handleCreateMandatario = async () => {
         try {
-            const { error } = await supabase
-                .from('mandatarios')
+            const { error } = await insforge.database
+                    .from('mandatarios')
                 .insert([{
                     ...mandatarioForm,
                     status: 'nuevo',
@@ -924,7 +946,7 @@ export default function AdminDashboard() {
                 setShowToast(true);
 
                 if (selectedSuggestion) {
-                    await supabase.from('iai_inbox_suggestions').update({ status: 'approved' }).eq('id', selectedSuggestion.id);
+                    await insforge.database.from('iai_inbox_suggestions').update({ status: 'approved' }).eq('id', selectedSuggestion.id);
                     setIaiSuggestions(prev => prev.filter(s => s.id !== selectedSuggestion.id));
                     setSelectedSuggestion(null);
                 }
@@ -945,8 +967,8 @@ export default function AdminDashboard() {
     };
 
     const handleUpdateMandatario = async (mandatario: any) => {
-        const { error } = await supabase
-            .from('mandatarios')
+        const { error } = await insforge.database
+                    .from('mandatarios')
             .update({
                 full_name: mandatario.full_name,
                 company_name: mandatario.company_name,
@@ -971,8 +993,8 @@ export default function AdminDashboard() {
             alert('Solo el administrador puede eliminar mandatarios.');
             return;
         }
-        const { error } = await supabase
-            .from('mandatarios')
+        const { error } = await insforge.database
+                    .from('mandatarios')
             .delete()
             .eq('id', id);
 
@@ -987,8 +1009,8 @@ export default function AdminDashboard() {
 
     const handleCreateCollaborator = async () => {
         try {
-            const { data, error } = await supabase
-                .from('collaborators')
+            const { data, error } = await insforge.database
+                    .from('collaborators')
                 .insert([{
                     ...collaboratorForm,
                     created_at: new Date().toISOString()
@@ -999,7 +1021,7 @@ export default function AdminDashboard() {
                 if (data) setCollaborators(prev => [data[0], ...prev]);
 
                 if (selectedSuggestion) {
-                    await supabase.from('iai_inbox_suggestions').update({ status: 'approved' }).eq('id', selectedSuggestion.id);
+                    await insforge.database.from('iai_inbox_suggestions').update({ status: 'approved' }).eq('id', selectedSuggestion.id);
                     setIaiSuggestions(prev => prev.filter(s => s.id !== selectedSuggestion.id));
                     setSelectedSuggestion(null);
                 }
@@ -1028,8 +1050,8 @@ export default function AdminDashboard() {
             return;
         }
         if (!confirm("¿Estás seguro de que quieres eliminar a este colaborador?")) return;
-        const { error } = await supabase
-            .from('collaborators')
+        const { error } = await insforge.database
+                    .from('collaborators')
             .delete()
             .eq('id', id);
 
@@ -1045,8 +1067,8 @@ export default function AdminDashboard() {
     const handleUpdateCollaborator = async () => {
         if (!editingCollaborator) return;
         try {
-            const { data, error } = await supabase
-                .from('collaborators')
+            const { data, error } = await insforge.database
+                    .from('collaborators')
                 .update({
                     full_name: collaboratorForm.full_name,
                     specialty: collaboratorForm.specialty,
@@ -1106,7 +1128,7 @@ export default function AdminDashboard() {
                 ));
 
                 // Persist to Supabase
-                const { error } = await supabase
+                const { error } = await insforge.database
                     .from('leads')
                     .update({ status: targetStageId, updated_at: new Date().toISOString() })
                     .eq('id', leadId);
@@ -1134,8 +1156,8 @@ export default function AdminDashboard() {
 
         setIsSavingNote(true);
         try {
-            const { error } = await supabase
-                .from('interactions')
+            const { error } = await insforge.database
+                    .from('interactions')
                 .insert([{
                     lead_id: activeLeadForNote,
                     type: 'note',
@@ -2387,6 +2409,15 @@ export default function AdminDashboard() {
                         <span>Alea Intelligence</span>
                     </button>
 
+                    {/* AI Control Center */}
+                    <button
+                        onClick={() => { setActiveTab("ai"); setSelectedInvestor(null); setSelectedLead(null); }}
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "ai" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                    >
+                        <BrainCircuit size={18} />
+                        <span>AI Control Center</span>
+                    </button>
+
 {/* Alea Centurión */}
                     {currentUser?.role === 'admin' && (
                         <button
@@ -2408,6 +2439,17 @@ export default function AdminDashboard() {
                         <div className="flex items-center space-x-3">
                             <Calendar size={18} />
                             <span>Alea Agenda</span>
+                        </div>
+                    </button>
+
+                    {/* Video Llamadas */}
+                    <button
+                        onClick={() => { setActiveTab("video"); setSelectedInvestor(null); setSelectedLead(null); }}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${activeTab === "video" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                    >
+                        <div className="flex items-center space-x-3">
+                            <Video size={18} />
+                            <span>Video Llamadas</span>
                         </div>
                     </button>
 
@@ -2556,10 +2598,12 @@ export default function AdminDashboard() {
                                                 activeTab === 'templates' ? 'Document Factory' :
                                                     activeTab === 'assets' ? 'Asset Portfolio' :
                                                         activeTab === 'intelligence' ? 'Alea Intelligence Core' :
-                                                            activeTab === 'centurion' ? 'Alea Centurión - Perfiles de Atención' :
-                                                                activeTab === 'agenda' ? 'Alea Agenda - Acciones y Recordatorios' :
-                                                                    activeTab === 'profile' ? 'Perfil de Usuario' :
-                                                                        activeTab === 'agents' ? 'Control de Agentes' : 'System Logs'}
+                                                            activeTab === 'ai' ? 'AI Control Center' :
+                                                                            activeTab === 'centurion' ? 'Alea Centurión - Perfiles de Atención' :
+                                                                            activeTab === 'agenda' ? 'Alea Agenda - Acciones y Recordatorios' :
+                                                                            activeTab === 'video' ? 'Video Llamadas con Jitsi' :
+                                                                            activeTab === 'profile' ? 'Perfil de Usuario' :
+                                                                                activeTab === 'agents' ? 'Control de Agentes' : 'System Logs'}
                             </h1>
                             <div className="flex items-center space-x-2 mt-1 hidden sm:flex">
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -2761,7 +2805,7 @@ export default function AdminDashboard() {
                                                                         <button
                                                                             onClick={async (e) => {
                                                                                 e.stopPropagation();
-                                                                                await supabase.from('iai_inbox_suggestions').update({ status: 'rejected' }).eq('id', suggestion.id);
+                                                                                await insforge.database.from('iai_inbox_suggestions').update({ status: 'rejected' }).eq('id', suggestion.id);
                                                                                 setIaiSuggestions(prev => prev.map(s => s.id === suggestion.id ? { ...s, status: 'rejected' } : s));
                                                                             }}
                                                                             className="px-3 py-1 bg-red-500 text-white rounded-lg text-xs flex items-center gap-1 hover:bg-red-600"
@@ -2992,6 +3036,10 @@ export default function AdminDashboard() {
                                     <ValuationAgent />
                                 )}
 
+                                {activeTab === "ai" && (
+                                    <AIDashboard />
+                                )}
+
                                 {activeTab === "centurion" && (
                                     <div className="max-w-6xl mx-auto w-full py-8">
                                         <div className="bg-card border border-border rounded-[2.5rem] p-10 text-center">
@@ -3005,6 +3053,12 @@ export default function AdminDashboard() {
                                 {activeTab === "agenda" && (
                                     <div className="pb-20">
                                         <AgendaPanel />
+                                    </div>
+                                )}
+
+                                {activeTab === "video" && (
+                                    <div className="pb-20">
+                                        <VideoCallPanel />
                                     </div>
                                 )}
 

@@ -1,9 +1,9 @@
-import { createClient } from "@/lib/supabase-server";
+import { createAuthenticatedClient } from "@/lib/insforge-server";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const client = await createAuthenticatedClient();
+  const { data: { user } } = await client.auth.getCurrentUser();
   
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -13,7 +13,8 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get("status") || "pending";
   const limit = parseInt(searchParams.get("limit") || "50");
 
-  let query = supabase
+  let query = client
+    .database
     .from("agenda_reminders")
     .select("*")
     .eq("assigned_agent_id", agentId)
@@ -29,8 +30,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const client = await createAuthenticatedClient();
+  const { data: { user } } = await client.auth.getCurrentUser();
   
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -48,7 +49,8 @@ export async function POST(request: NextRequest) {
       assigned_agent_id,
     } = body;
 
-    const { data, error } = await supabase
+    const { data, error } = await client
+      .database
       .from("agenda_reminders")
       .insert({
         action_id,
@@ -73,8 +75,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const client = await createAuthenticatedClient();
+  const { data: { user } } = await client.auth.getCurrentUser();
   
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -84,7 +86,6 @@ export async function PATCH(request: NextRequest) {
 
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
 
-    // Mark as sent if sending
     if (updates.status === "sent" || updates.status === "read") {
       updates.sent_at = updates.sent_at || new Date().toISOString();
       if (updates.status === "read") {
@@ -92,7 +93,8 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await client
+      .database
       .from("agenda_reminders")
       .update(updates)
       .eq("id", id)
@@ -107,8 +109,8 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const client = await createAuthenticatedClient();
+  const { data: { user } } = await client.auth.getCurrentUser();
   
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -117,7 +119,8 @@ export async function DELETE(request: NextRequest) {
 
   if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
 
-  const { error } = await supabase
+  const { error } = await client
+    .database
     .from("agenda_reminders")
     .delete()
     .eq("id", id);

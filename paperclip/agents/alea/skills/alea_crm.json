@@ -1,0 +1,15 @@
+{
+  "name": "alea_crm",
+  "description": "Access and manage Alea Signature CRM data via InsForge",
+  "version": "1.0.0",
+  
+  "instructions": "You have access to Alea Signature's CRM via InsForge. Use the following endpoints:\n\n## Base URL\n```\nhttps://if8rkq6j.eu-central.insforge.app/api/db\n```\n\n## Authentication\nInclude the API key in headers:\n```\nAuthorization: Bearer ik_dbb952a6fd01508d4ae7f53b36e23eaf\n```\n\n## Available Tables\n\n### investors\nQuery investor profiles:\n```sql\nSELECT * FROM investors WHERE id = '{investorId}'\nSELECT * FROM investors WHERE email = '{email}'\nSELECT * FROM investors WHERE kyc_status = 'verified'\n```\n\n### properties\nQuery properties:\n```sql\nSELECT id, title, address, asset_type, price, is_off_market, thumbnail_url \nFROM properties WHERE is_published = true\nSELECT * FROM properties WHERE asset_type = '{type}'\n```\n\n### leads\nQuery leads:\n```sql\nSELECT * FROM leads WHERE status = 'new'\nSELECT * FROM leads WHERE assigned_agent_id = '{agentId}'\n```\n\n### investor_interests\nTrack investor interest:\n```sql\nSELECT * FROM investor_interests WHERE investor_id = '{investorId}'\nSELECT * FROM investor_interests WHERE status = 'new'\n```\n\n## Actions\n\n### Create Lead\n```sql\nINSERT INTO leads (name, email, phone, source, status) \nVALUES ('{name}', '{email}', '{phone}', 'pelayo_chat', 'new')\n```\n\n### Update Lead Status\n```sql\nUPDATE leads SET status = '{status}' WHERE id = '{leadId}'\n```\n\n### Log Interest\n```sql\nINSERT INTO investor_interests (investor_id, property_id, interest_type, status)\nVALUES ('{investorId}', '{propertyId}', 'property_view', 'new')\n```",
+
+  "triggers": [
+    "mostrar inversores",
+    "buscar lead",
+    "crear lead",
+    "actualizar lead",
+    "estado del crm"
+  ]
+}

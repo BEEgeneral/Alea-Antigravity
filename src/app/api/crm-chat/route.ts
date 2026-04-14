@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createAuthenticatedClient } from '@/lib/insforge-server';
 import { env } from '@/lib/env';
 
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
@@ -8,30 +8,37 @@ const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
 type Tables = 'leads' | 'properties' | 'investors' | 'mandatarios' | 'collaborators';
 
-async function getTableData(table: Tables) {
-    const { data, error } = await supabaseAdmin.from(table).select('*').order('created_at', { ascending: false });
+async function getTableData(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, table: Tables) {
+    const { data, error } = await client.database.from(table).select('*').order('created_at', { ascending: false });
     return { data: data || [], error };
 }
 
-async function createRecord(table: Tables, record: any) {
-    const { data, error } = await supabaseAdmin.from(table).insert(record).select().single();
+async function createRecord(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, table: Tables, record: any) {
+    const { data, error } = await client.database.from(table).insert(record).select().single();
     return { data, error };
 }
 
-async function updateRecord(table: Tables, id: string, record: any) {
-    const { data, error } = await supabaseAdmin.from(table).update(record).eq('id', id).select().single();
+async function updateRecord(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, table: Tables, id: string, record: any) {
+    const { data, error } = await client.database.from(table).update(record).eq('id', id).select().single();
     return { data, error };
 }
 
 export async function POST(req: Request) {
     try {
+        const client = await createAuthenticatedClient();
+        const { data: { user } } = await client.auth.getCurrentUser();
+        
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { message, action, data: actionData, history } = await req.json();
 
         const [leadsData, propertiesData, investorsData, mandatariosData] = await Promise.all([
-            getTableData('leads'),
-            getTableData('properties'),
-            getTableData('investors'),
-            getTableData('mandatarios')
+            getTableData(client, 'leads'),
+            getTableData(client, 'properties'),
+            getTableData(client, 'investors'),
+            getTableData(client, 'mandatarios')
         ]);
 
         const summary = `
@@ -53,7 +60,7 @@ ${mandatariosData.data.slice(0, 5).map((m: any) => `- ${m.name}`).join('\n') || 
         if (action === 'create' && actionData) {
             const { table, record } = actionData;
             
-            const result = await createRecord(table, record);
+            const result = await createRecord(client, table, record);
             
             if (result.error) {
                 return NextResponse.json({ 
@@ -69,7 +76,7 @@ ${mandatariosData.data.slice(0, 5).map((m: any) => `- ${m.name}`).join('\n') || 
         if (action === 'update' && actionData) {
             const { table, id, record } = actionData;
             
-            const result = await updateRecord(table, id, record);
+            const result = await updateRecord(client, table, id, record);
             
             if (result.error) {
                 return NextResponse.json({ 
@@ -83,7 +90,7 @@ ${mandatariosData.data.slice(0, 5).map((m: any) => `- ${m.name}`).join('\n') || 
         }
 
         if (action === 'list' && actionData?.table) {
-            const tableData = await getTableData(actionData.table as Tables);
+            const tableData = await getTableData(client, actionData.table as Tables);
             
             return NextResponse.json({ 
                 response: `📊 ${actionData.table.toUpperCase()} (${tableData.data.length}):\n\n${

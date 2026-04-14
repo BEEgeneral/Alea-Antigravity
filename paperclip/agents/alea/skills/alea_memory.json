@@ -1,0 +1,17 @@
+{
+  "name": "alea_memory",
+  "description": "Persistent memory system for Alea Signature - MemPalace-style architecture",
+  "version": "1.0.0",
+  
+  "instructions": "You have access to a persistent memory system inspired by MemPalace. This allows you to remember conversations, preferences, and decisions across sessions.\n\n## Architecture: Wing → Room → Drawer\n\n### Wing\nA wing represents an investor, property, or project:\n- investor_juan_garcia@example.com\n- property_palacio_gran_via\n- session_abc123\n\n### Room\nRooms are topics within a wing:\n- conversations (events)\n- decisions (facts)\n- preferences (preferences)\n- budget (facts)\n- locations (preferences)\n\n### Drawer\nVerbatim content storage - no summarization, raw memory.\n\n## InsForge Tables\n\n```sql\n-- Get or create wing\nSELECT * FROM memory_wings WHERE name = 'investor_{email}'\n\n-- Get rooms in a wing\nSELECT * FROM memory_rooms WHERE wing_id = '{wingId}'\n\n-- Get drawers (memories)\nSELECT * FROM memory_drawers \nWHERE room_id = '{roomId}'\nORDER BY importance_score DESC, created_at DESC\n\n-- Get context for AI\nSELECT r.hall_type, r.name, d.content, d.created_at\nFROM memory_drawers d\nJOIN memory_rooms r ON d.room_id = r.id\nJOIN memory_wings w ON r.wing_id = w.id\nWHERE w.name = 'investor_{email}'\nORDER BY d.importance_score DESC\nLIMIT 10\n```\n\n## Knowledge Graph\n\nTemporal entity-relationship triples:\n\n```sql\n-- Add fact\nINSERT INTO memory_knowledge_graph (entity_subject, relationship, entity_object, valid_from)\nVALUES ('{subject}', '{relationship}', '{object}', NOW())\n\n-- Query entity\nSELECT * FROM memory_knowledge_graph \nWHERE entity_subject = '{subject}'\n\n-- Timeline\nSELECT * FROM memory_knowledge_graph\nWHERE entity_subject = '{subject}'\nORDER BY valid_from ASC\n```\n\n## Usage Examples\n\n### Remembering an investor preference:\n```\nWing: investor_juan@ejemplo.com\nRoom: preferences (hall_type: preferences)\nDrawer: \"Juan prefiere propiedades en Madrid centro, presupuesto 2-5M€\"\n```\n\n### Remembering a decision:\n```\nWing: investor_juan@ejemplo.com  \nRoom: decisions (hall_type: facts)\nDrawer: \"Decisión: Juan quiere esperar a Q3 para invertir\"\nKnowledge: Juan → decided_wait_until → Q3\n```\n\n### Remembering a conversation:\n```\nWing: investor_juan@ejemplo.com\nRoom: conversations (hall_type: events)\nDrawer: \"User: Me interesa el palacio en Gran Via\\nPelayo: Es un activo excepcional...\"\n```\n\n## Best Practices\n\n1. **Always store verbatim** - Don't summarize, store the raw content\n2. **Use appropriate hall_type** - facts, events, discoveries, preferences, advice\n3. **Set importance_score** - Higher for important decisions (80-100), lower for general聊天 (50)\n4. **Create knowledge triples** - For relationships that can be queried (Juan → prefers → hoteles)",
+
+  "triggers": [
+    "recuerda",
+    "memoria",
+    "anterior",
+    "última vez",
+    "habíamos hablado",
+    "preferencias",
+    "decisión"
+  ]
+}

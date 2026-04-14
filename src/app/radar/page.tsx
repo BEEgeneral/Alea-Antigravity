@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { insforge } from "@/lib/insforge-client";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -44,7 +44,7 @@ export default function InvestmentRadar() {
     // Auth & Permission guard — uses getUser() for server-validated auth
     useEffect(() => {
         const checkAuth = async () => {
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            const { data: { user }, error: authError } = await insforge.auth.getCurrentUser();
             if (authError || !user) {
                 router.push("/login");
                 return;
@@ -64,7 +64,7 @@ export default function InvestmentRadar() {
             // 1. Admin or agent by auth metadata → instant access
             if (userRole === 'admin' || userRole === 'agent') {
                 if (userRole === 'agent') {
-                    const { data: agent } = await supabase
+                    const { data: agent } = await insforge.database
                         .from('agents')
                         .select('is_approved')
                         .eq('id', userId)
@@ -81,8 +81,8 @@ export default function InvestmentRadar() {
 
             // 2. Check if user is a registered investor (by email match)
             if (userEmail) {
-                const { data: investor } = await supabase
-                    .from('investors')
+                const { data: investor } = await insforge.database
+                        .from('investors')
                     .select('id, is_verified')
                     .eq('email', userEmail)
                     .maybeSingle();
@@ -101,8 +101,8 @@ export default function InvestmentRadar() {
 
             // 3. Check if user is a registered collaborator (by email match)
             if (userEmail) {
-                const { data: collaborator } = await supabase
-                    .from('collaborators')
+                const { data: collaborator } = await insforge.database
+                        .from('collaborators')
                     .select('id')
                     .eq('email', userEmail)
                     .maybeSingle();
@@ -129,8 +129,8 @@ export default function InvestmentRadar() {
     useEffect(() => {
         if (!authChecked) return;
         const fetchRadarProperties = async () => {
-            const { data, error } = await supabase
-                .from('properties')
+            const { data, error } = await insforge.database
+                        .from('properties')
                 .select('id, title, address, price, status, is_off_market, asset_type, thumbnail_url');
 
             if (error) {
@@ -152,7 +152,7 @@ export default function InvestmentRadar() {
         if (now - lastInterestSave < 30000 && type === 'filter_search') return;
         
         try {
-            await supabase.from('investor_interests').insert({
+            await insforge.database.from('investor_interests').insert({
                 investor_id: investorId,
                 property_id: propertyId || null,
                 interest_type: type,
@@ -173,8 +173,8 @@ export default function InvestmentRadar() {
         // Save property view interest
         await saveInterest('property_view', propertyId);
 
-        const { error } = await supabase
-            .from('leads')
+        const { error } = await insforge.database
+                        .from('leads')
             .insert([{
                 investor_id: investorId,
                 property_id: propertyId,

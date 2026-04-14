@@ -3,7 +3,7 @@
 import { FileText, ShieldCheck, Clock, Building2, Wallet, LogOut } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { insforge } from "@/lib/insforge-client";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 
@@ -23,26 +23,21 @@ export default function ProfilePage() {
 
     useEffect(() => {
         const fetchInvestor = async () => {
-            // SECURITY FIX: Use authenticated session instead of localStorage ID (IDOR fix)
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session?.user) {
+            const { data: { user } } = await insforge.auth.getCurrentUser();
+            if (!user) {
                 router.push('/login');
                 return;
             }
 
-            const userId = session.user.id;
-
-            const { data } = await supabase
+            const { data } = await insforge.database
                 .from('investors')
                 .select('id, full_name, email, kyc_status, interests, budget_max')
-                .eq('id', userId)
+                .eq('id', user.id)
                 .single();
 
             if (data) {
                 setInvestor(data);
             } else {
-                // User is authenticated but not an investor — could be an agent
-                // Redirect gracefully
                 router.push('/');
             }
             setLoading(false);
@@ -51,7 +46,7 @@ export default function ProfilePage() {
     }, [router]);
 
     const handleLogout = async () => {
-        await supabase.auth.signOut();
+        await insforge.auth.signOut();
         // Clean up any legacy localStorage items
         localStorage.removeItem('alea_investor_id');
         localStorage.removeItem('alea_investor_name');

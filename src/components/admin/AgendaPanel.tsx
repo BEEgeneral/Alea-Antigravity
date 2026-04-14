@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Clock, CheckCircle2, AlertCircle, Calendar, Plus, 
   ChevronRight, Bell, TrendingUp, User, Building, 
-  Mail, Phone, FileText, MoreVertical, Filter, X
+  Mail, Phone, FileText, MoreVertical, Filter, X,
+  RefreshCw, Link2, ExternalLink, Check
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
@@ -55,18 +56,79 @@ export default function AgendaPanel({ leadId, isEmbedded }: AgendaPanelProps) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "overdue" | "today" | "upcoming">("all");
   const [isCreating, setIsCreating] = useState(false);
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [showCalendarEvents, setShowCalendarEvents] = useState(false);
+  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
   const [newAction, setNewAction] = useState({
     title: "",
     description: "",
     action_type: "call" as ActionType,
     due_date: "",
     priority: "medium" as ActionPriority,
+    create_calendar_event: false,
   });
 
   useEffect(() => {
     fetchActions();
     fetchSuggestions();
+    checkGmailStatus();
   }, [leadId]);
+
+  async function checkGmailStatus() {
+    try {
+      const res = await fetch("/api/gmail/status");
+      const data = await res.json();
+      setGmailConnected(data.connected || false);
+    } catch { setGmailConnected(false); }
+  }
+
+  async function connectGmail() {
+    try {
+      const res = await fetch("/api/gmail/auth");
+      const data = await res.json();
+      if (data.authUrl) {
+        window.location.href = data.authUrl;
+      }
+    } catch (err) {
+      console.error("Error connecting Gmail:", err);
+    }
+  }
+
+  async function fetchCalendarEvents() {
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/agenda/calendar-sync?days=14");
+      const data = await res.json();
+      if (data.events) {
+        setCalendarEvents(data.events);
+        setShowCalendarEvents(true);
+      } else if (data.error) {
+        alert(data.error);
+      }
+    } catch (err) {
+      console.error("Error fetching calendar:", err);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function syncCalendarEvent(event: any) {
+    try {
+      const res = await fetch("/api/agenda/calendar-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ events: [event] }),
+      });
+      const data = await res.json();
+      if (data.created > 0) {
+        setCalendarEvents(prev => prev.filter(e => e.id !== event.id));
+        fetchActions();
+      }
+    } catch (err) {
+      console.error("Error syncing event:", err);
+    }
+  }
 
   async function fetchActions() {
     setLoading(true);
@@ -98,17 +160,27 @@ export default function AgendaPanel({ leadId, isEmbedded }: AgendaPanelProps) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ...newAction,
+        title: newAction.title,
+        description: newAction.description,
+        action_type: newAction.action_type,
+        due_date: new Date(newAction.due_date).toISOString(),
+        priority: newAction.priority,
         lead_id: leadId,
         assigned_agent_id: user.id,
+        create_calendar_event: newAction.action_type === 'meeting' && newAction.create_calendar_event && gmailConnected,
       }),
     });
 
     if (res.ok) {
+      const data = await res.json();
       setIsCreating(false);
-      setNewAction({ title: "", description: "", action_type: "call", due_date: "", priority: "medium" });
+      setNewAction({ title: "", description: "", action_type: "call", due_date: "", priority: "medium", create_calendar_event: false });
       fetchActions();
       fetchSuggestions();
+      
+      if (data.calendarEvent?.htmlLink) {
+        window.open(data.calendarEvent.htmlLink, '_blank');
+      }
     }
   }
 
@@ -184,6 +256,52 @@ export default function AgendaPanel({ leadId, isEmbedded }: AgendaPanelProps) {
             <span className="text-[10px] text-muted-foreground uppercase tracking-widest">Completadas</span>
           </div>
           <p className="text-2xl font-bold text-emerald-500">{stats.completed}</p>
+        </div>
+      </div>
+
+      {/* Google Calendar Integration */}
+      <div className="bg-card border border-border rounded-2xl p-4 mb-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${gmailConnected ? 'bg-emerald-500/20' : 'bg-muted'}`}>
+              {gmailConnected ? <CheckCircle2 size={18} className="text-emerald-500" /> : <Calendar size={18} className="text-muted-foreground" />}
+            </div>
+            <div>
+              <p className="text-sm font-bold">Google Calendar</p>
+              <p className="text-[10px] text-muted-foreground">
+                {gmailConnected ? 'Conectado - Sincroniza eventos de Google Calendar' : 'No conectado'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {!gmailConnected ? (
+              <button
+                onClick={connectGmail}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:opacity-90 transition-all"
+              >
+                <Link2 size={14} />
+                <span>Conectar</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={fetchCalendarEvents}
+                  disabled={syncing}
+                  className="flex items-center gap-2 px-4 py-2 border border-border rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-muted transition-all"
+                >
+                  <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+                  <span>{syncing ? 'Sincronizando...' : 'Ver Eventos'}</span>
+                </button>
+                <button
+                  onClick={() => setShowCalendarEvents(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-500/20 transition-all"
+                >
+                  <ExternalLink size={14} />
+                  <span>Importar</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -306,6 +424,22 @@ export default function AgendaPanel({ leadId, isEmbedded }: AgendaPanelProps) {
                     placeholder="Notas adicionales..."
                   />
                 </div>
+                
+                {newAction.action_type === 'meeting' && gmailConnected && (
+                  <div className="flex items-center gap-3 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl">
+                    <input
+                      type="checkbox"
+                      id="create_calendar_event"
+                      checked={newAction.create_calendar_event}
+                      onChange={e => setNewAction({ ...newAction, create_calendar_event: e.target.checked })}
+                      className="w-5 h-5 rounded border-emerald-500 text-emerald-500 focus:ring-emerald-500"
+                    />
+                    <label htmlFor="create_calendar_event" className="text-sm cursor-pointer">
+                      <span className="font-bold">Crear evento en Google Calendar</span>
+                      <span className="text-muted-foreground text-xs block">Se creará un Meet automáticamente</span>
+                    </label>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-4 mt-6">
@@ -322,6 +456,80 @@ export default function AgendaPanel({ leadId, isEmbedded }: AgendaPanelProps) {
                   Crear
                 </button>
               </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Google Calendar Events Modal */}
+      <AnimatePresence>
+        {showCalendarEvents && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-6"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={() => setShowCalendarEvents(false)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <div className="relative bg-card border border-border w-full max-w-2xl rounded-[2.5rem] shadow-2xl p-8 max-h-[80vh] overflow-y-auto">
+              <button
+                onClick={() => setShowCalendarEvents(false)}
+                className="absolute top-4 right-4 p-2 hover:bg-muted rounded-lg transition-colors"
+              >
+                <X size={18} />
+              </button>
+              <h2 className="font-serif text-2xl mb-2">Eventos de Google Calendar</h2>
+              <p className="text-xs text-muted-foreground uppercase tracking-widest mb-6">Selecciona eventos para importar a tu agenda</p>
+              
+              {calendarEvents.length === 0 ? (
+                <div className="text-center py-12">
+                  <Calendar size={48} className="mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">No hay eventos próximos en Google Calendar</p>
+                  <button
+                    onClick={fetchCalendarEvents}
+                    className="mt-4 px-6 py-2 bg-primary text-white rounded-xl text-[10px] font-bold uppercase tracking-widest"
+                  >
+                    Actualizar
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {calendarEvents.map(event => (
+                    <div key={event.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-2xl border border-border/60">
+                      <div className="flex-1">
+                        <p className="font-bold text-sm">{event.summary}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(event.start).toLocaleString('es-ES', { 
+                            weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' 
+                          })}
+                        </p>
+                        {event.location && <p className="text-xs text-muted-foreground mt-1">📍 {event.location}</p>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {event.meetLink && (
+                          <a href={event.meetLink} target="_blank" rel="noopener noreferrer"
+                            className="p-2 hover:bg-primary/10 rounded-lg transition-colors">
+                            <ExternalLink size={16} className="text-primary" />
+                          </a>
+                        )}
+                        <button
+                          onClick={() => syncCalendarEvent(event)}
+                          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:opacity-90 transition-all"
+                        >
+                          <Plus size={14} />
+                          Importar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </motion.div>
         )}

@@ -55,7 +55,8 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       user: data.user,
       profile,
-      redirectPath: getRedirectPath(profile.role)
+      redirectPath: getRedirectPath(profile.role),
+      accessToken: data.accessToken || ''
     });
 
     response.cookies.set('insforge_token', data.accessToken || '', {

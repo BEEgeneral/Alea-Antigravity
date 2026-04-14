@@ -7,6 +7,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { setInsforgeToken } from "@/lib/insforge-client";
 
 function LoginForm() {
     const router = useRouter();
@@ -56,6 +57,10 @@ function LoginForm() {
             if (!res.ok) {
                 setError(data.error || 'Error al iniciar sesión');
                 return;
+            }
+
+            if (data.accessToken) {
+                setInsforgeToken(data.accessToken);
             }
 
             if (data.redirectPath) {

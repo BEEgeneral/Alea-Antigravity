@@ -390,79 +390,41 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         const checkAuth = async () => {
-            // ✅ Use getUser() instead of getSession() for server-validated auth
-            const { data: { user }, error: authError } = await insforge.auth.getCurrentUser();
-            if (authError || !user) {
-                router.push("/login");
-                return;
-            }
-
-            const normalizedEmail = user.email?.toLowerCase();
-            const isGodMode = normalizedEmail === 'beenocode@gmail.com' || normalizedEmail === 'albertogala@beenocode.com';
-
-            const { data: agent } = await insforge.database
-                    .from('agents')
-                .select('*')
-                .eq('id', user.id)
-                .single();
-            
-            // Check if user is an investor
-            const { data: investor } = await insforge.database
-                    .from('investors')
-                .select('*')
-                .eq('email', user.email)
-                .single();
-
-            if (!isGodMode && (!agent || !agent.is_approved)) {
-                router.push("/login");
-                return;
-            }
-
-            // Redirect investors to radar
-            if (investor) {
-                router.push('/radar');
-                return;
-            }
-
-            if (isGodMode && !agent) {
-                // Create real admin record in DB for GodMode user
-                const { data: newAgent, error: createError } = await insforge.database
-                    .from('agents')
-                    .insert({
-                        id: user.id,
-                        full_name: 'Super Admin',
-                        email: user.email,
-                        role: 'admin',
-                        is_approved: true,
-                        has_centurion_access: true
-                    })
-                    .select()
-                    .single();
-                
-                if (createError) {
-                    console.error("Error creating GodMode agent:", createError);
-                }
-                
-                setCurrentUser(newAgent || {
-                    id: user.id,
-                    full_name: 'Super Admin',
-                    email: user.email,
-                    role: 'admin',
-                    is_approved: true,
-                    has_centurion_access: true
-                });
-            } else {
-                setCurrentUser(agent);
-                
-                // Redirect collaborators to radar
-                if (agent?.role === 'collaborator') {
-                    router.push('/radar');
+            try {
+                const res = await fetch('/api/auth/me');
+                if (!res.ok) {
+                    router.push("/login");
                     return;
                 }
-            }
+                
+                const { user, profile } = await res.json();
+                
+                if (!user || !profile) {
+                    router.push("/login");
+                    return;
+                }
+                
+                const normalizedEmail = user.email?.toLowerCase();
+                const isGodMode = normalizedEmail === 'beenocode@gmail.com' || normalizedEmail === 'albertogala@beenocode.com';
 
-            await fetchData();
-            setLoading(false);
+                if (profile.role !== 'admin' && profile.role !== 'agent' && !isGodMode) {
+                    router.push("/radar");
+                    return;
+                }
+
+                setCurrentUser({
+                    id: user.id,
+                    email: user.email,
+                    role: profile.role,
+                    full_name: profile.name || user.email
+                });
+
+                await fetchData();
+                setLoading(false);
+            } catch (err) {
+                console.error("Auth check failed:", err);
+                router.push("/login");
+            }
         };
         checkAuth();
     }, [router]);

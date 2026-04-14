@@ -71,9 +71,9 @@ export function getRedirectPath(role: UserRole): string {
 export async function getUserProfile(client: InsForgeClient, authUserId: string): Promise<UserProfile | null> {
   const { data, error } = await client
     .database
-    .from('profiles')
+    .from('user_profiles')
     .select('*')
-    .eq('id', authUserId)
+    .eq('auth_user_id', authUserId)
     .single();
   if (error) return null;
   return data as UserProfile;

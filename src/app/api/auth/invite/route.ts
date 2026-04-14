@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         .update({ accepted: true })
         .eq('id', invitation.id);
 
-      const { error: profileError } = await insforge.database.from('profiles').insert({
+      const { error: profileError } = await insforge.database.from('user_profiles').insert({
         id: authData.user.id,
         role: invitation.role,
         is_active: true,

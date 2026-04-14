@@ -25,9 +25,9 @@ export async function GET(request: NextRequest) {
 
     const { data: profile } = await insforge
       .database
-      .from('profiles')
+      .from('user_profiles')
       .select('*')
-      .eq('id', data.user.id)
+      .eq('auth_user_id', data.user.id)
       .single();
 
     if (!profile) {

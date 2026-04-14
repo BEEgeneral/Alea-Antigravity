@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { error: profileError } = await insforge.database.from('profiles').insert({
+    const { error: profileError } = await insforge.database.from('user_profiles').insert({
       id: data.user.id,
       role: 'investor',
       is_active: true,

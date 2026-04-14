@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
     const { data: adminProfile } = await insforge
       .database
-      .from('profiles')
+      .from('user_profiles')
       .select('*')
       .eq('id', currentUser.user.id)
       .single();
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
     const { data: profiles, error } = await insforge
       .database
-      .from('profiles')
+      .from('user_profiles')
       .select('*')
       .order('created_at', { ascending: false });
 

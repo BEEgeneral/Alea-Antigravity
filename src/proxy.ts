@@ -60,9 +60,9 @@ export default async function proxy(request: NextRequest) {
 
     const { data: profile } = await client
       .database
-      .from('profiles')
+      .from('user_profiles')
       .select('*')
-      .eq('id', data.user.id)
+      .eq('auth_user_id', data.user.id)
       .single();
 
     if (!profile) {

@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
     const { data: adminProfile } = await insforge
       .database
-      .from('profiles')
+      .from('user_profiles')
       .select('*')
       .eq('id', currentUser.user.id)
       .single();
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     const { error } = await insforge
       .database
-      .from('profiles')
+      .from('user_profiles')
       .update({ is_active: true, updated_at: new Date().toISOString() })
       .eq('id', userId);
 

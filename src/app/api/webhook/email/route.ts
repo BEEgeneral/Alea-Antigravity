@@ -1,7 +1,7 @@
 // GEMINI ONLY - NO GROQ - Updated 2026-03-27
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { insforgeAdmin } from '@/lib/insforge-admin';
 import { env } from '@/lib/env';
 
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
@@ -206,7 +206,8 @@ export async function POST(req: Request) {
             status: 'pending'
         };
 
-        const { error: dbError } = await supabaseAdmin
+        const { error: dbError } = await insforgeAdmin
+            .database
             .from('iai_inbox_suggestions')
             .insert(insertData);
 

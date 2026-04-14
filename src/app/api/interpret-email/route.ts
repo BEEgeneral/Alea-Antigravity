@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { insforgeAdmin } from '@/lib/insforge-admin';
 import { env } from '@/lib/env';
 
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
@@ -18,7 +18,8 @@ export async function POST(req: Request) {
         }
 
         // 1. Check cache — if already interpreted, return immediately
-        const { data: existing } = await supabaseAdmin
+        const { data: existing } = await insforgeAdmin
+            .database
             .from('iai_inbox_suggestions')
             .select('ai_interpretation')
             .eq('id', suggestion_id)
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ interpretation: existing.ai_interpretation, cached: true });
         }
 
-        // 2. Call Groq LLM to interpret the email
+        // 2. Call Gemini to interpret the email
         const prompt = `Eres un asistente ejecutivo experto en real estate institucional y capital markets.
 
 Analiza la siguiente conversación de email y genera una interpretación clara, profesional y directa en español.
@@ -68,15 +69,15 @@ ${email_body}
             throw new Error('No se recibió respuesta de la IA');
         }
 
-        // 3. Cache the interpretation in Supabase
-        const { error: updateError } = await supabaseAdmin
+        // 3. Cache the interpretation in InsForge
+        const { error: updateError } = await insforgeAdmin
+            .database
             .from('iai_inbox_suggestions')
             .update({ ai_interpretation: interpretation })
             .eq('id', suggestion_id);
 
         if (updateError) {
             console.warn('Could not cache interpretation:', updateError);
-            // Still return the interpretation even if caching fails
         }
 
         return NextResponse.json({ interpretation, cached: false });

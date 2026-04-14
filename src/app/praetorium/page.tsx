@@ -2371,14 +2371,16 @@ export default function AdminDashboard() {
                         <span>Alea Intelligence</span>
                     </button>
 
-                    {/* AI Control Center */}
-                    <button
-                        onClick={() => { setActiveTab("ai"); setSelectedInvestor(null); setSelectedLead(null); }}
-                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "ai" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
-                    >
-                        <BrainCircuit size={18} />
-                        <span>AI Control Center</span>
-                    </button>
+                    {/* AI Control Center - Admin only */}
+                    {currentUser?.role === 'admin' && (
+                        <button
+                            onClick={() => { setActiveTab("ai"); setSelectedInvestor(null); setSelectedLead(null); }}
+                            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "ai" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                        >
+                            <BrainCircuit size={18} />
+                            <span>AI Control Center</span>
+                        </button>
+                    )}
 
 {/* Alea Centurión */}
                     {currentUser?.role === 'admin' && (
@@ -2415,13 +2417,16 @@ export default function AdminDashboard() {
                         </div>
                     </button>
 
-                    <button
-                        onClick={() => { setActiveTab("audit"); setSelectedInvestor(null); setSelectedLead(null); }}
-                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "audit" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
-                    >
-                        <ShieldAlert size={18} />
-                        <span>Logs del Sistema</span>
-                    </button>
+                    {/* Logs del Sistema - Admin only */}
+                    {currentUser?.role === 'admin' && (
+                        <button
+                            onClick={() => { setActiveTab("audit"); setSelectedInvestor(null); setSelectedLead(null); }}
+                            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "audit" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                        >
+                            <ShieldAlert size={18} />
+                            <span>Logs del Sistema</span>
+                        </button>
+                    )}
 
                     {currentUser?.role === 'admin' && (
                         <button

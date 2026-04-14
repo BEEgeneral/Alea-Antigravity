@@ -21,13 +21,6 @@ import {
 
 export async function GET(req: Request) {
     try {
-        const client = await createAuthenticatedClient();
-        const { data: { user } } = await client.auth.getCurrentUser();
-        
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
         const { searchParams } = new URL(req.url);
         const action = searchParams.get('action') || 'list_wings';
         const wingName = searchParams.get('wingName');
@@ -36,8 +29,19 @@ export async function GET(req: Request) {
         const entity = searchParams.get('entity');
         const limit = parseInt(searchParams.get('limit') || '20');
 
+        // list_wings can be called without auth for status checks
+        if (action !== 'list_wings') {
+            const client = await createAuthenticatedClient();
+            const { data: { user } } = await client.auth.getCurrentUser();
+            
+            if (!user) {
+                return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+            }
+        }
+
         switch (action) {
             case 'list_wings': {
+                const client = await createAuthenticatedClient();
                 const type = searchParams.get('type') as 'investor' | 'property' | 'project' | 'session' | null;
                 const wings = await getWings({ type: type || undefined });
                 return NextResponse.json({ wings });

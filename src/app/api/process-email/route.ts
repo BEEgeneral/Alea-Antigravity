@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { insforgeAdmin } from '@/lib/insforge-admin';
 import { env } from '@/lib/env';
 
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
@@ -103,7 +103,8 @@ ${text}
             console.error('Error parsing interpretation:', e);
         }
 
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await insforgeAdmin
+            .database
             .from('iai_inbox_suggestions')
             .insert({
                 original_email_subject: subject,

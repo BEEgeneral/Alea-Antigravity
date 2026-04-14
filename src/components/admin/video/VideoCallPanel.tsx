@@ -13,18 +13,17 @@ import JitsiRoom from './JitsiRoom';
 interface Meeting {
   id: string;
   title: string;
-  room_name: string;
+  description?: string;
+  jitsi_room_name?: string;
+  jitsi_room_url?: string;
   host_id: string;
   scheduled_at: string;
-  end_at?: string;
   duration_minutes: number;
-  agenda_action_id?: string;
-  recording_enabled: boolean;
+  participant_ids: string[];
+  agenda_id?: string;
   status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
-  attendees: string[];
-  recording_url?: string;
-  summary?: string;
-  notes?: string;
+  meeting_notes?: string;
+  fathom_recording_id?: string;
   created_at: string;
 }
 
@@ -218,8 +217,8 @@ export default function VideoCallPanel({ leadId, isEmbedded }: VideoCallPanelPro
         {/* Jitsi Room */}
         <div className="flex-1">
           <JitsiRoom
-            roomName={activeMeeting.room_name}
-            jitsiUrl={`https://meet.jit.si/${activeMeeting.room_name}`}
+            roomName={activeMeeting.jitsi_room_name || 'default-room'}
+            jitsiUrl={`https://meet.jit.si/${activeMeeting.jitsi_room_name || 'default-room'}`}
             isHost={true}
             onLeave={endMeeting}
             userName="Alea Agent"
@@ -275,7 +274,7 @@ export default function VideoCallPanel({ leadId, isEmbedded }: VideoCallPanelPro
             <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Grabadas</span>
           </div>
           <p className="text-2xl font-bold">
-            {meetings.filter(m => m.recording_url).length}
+            {meetings.filter(m => m.fathom_recording_id).length}
           </p>
         </div>
       </div>
@@ -328,10 +327,10 @@ export default function VideoCallPanel({ leadId, isEmbedded }: VideoCallPanelPro
                        meeting.status === 'in_progress' ? 'En curso' :
                        meeting.status === 'completed' ? 'Completada' : 'Cancelada'}
                     </span>
-                    {meeting.recording_enabled && (
+                    {meeting.status === 'in_progress' && (
                       <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 text-[10px]">
                         <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                        Grabando
+                        En vivo
                       </span>
                     )}
                   </div>
@@ -350,10 +349,10 @@ export default function VideoCallPanel({ leadId, isEmbedded }: VideoCallPanelPro
                       <Video size={12} />
                       {meeting.duration_minutes} min
                     </span>
-                    {meeting.attendees?.length > 0 && (
+                    {meeting.participant_ids?.length > 0 && (
                       <span className="flex items-center gap-1">
                         <Users size={12} />
-                        {meeting.attendees.length}
+                        {meeting.participant_ids.length}
                       </span>
                     )}
                   </div>
@@ -370,9 +369,9 @@ export default function VideoCallPanel({ leadId, isEmbedded }: VideoCallPanelPro
                     </button>
                   )}
                   
-                  {meeting.recording_url && (
+                  {meeting.fathom_recording_id && (
                     <a
-                      href={meeting.recording_url}
+                      href={`https://app.usefathom.com/recordings/${meeting.fathom_recording_id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="px-3 py-2 bg-muted rounded-lg text-xs flex items-center gap-1 hover:bg-muted/80"
@@ -383,7 +382,7 @@ export default function VideoCallPanel({ leadId, isEmbedded }: VideoCallPanelPro
                   )}
 
                   <button
-                    onClick={() => copyLink(`https://meet.jit.si/${meeting.room_name}`)}
+                    onClick={() => copyLink(`https://meet.jit.si/${meeting.jitsi_room_name}`)}
                     className="p-2 hover:bg-muted rounded-lg"
                     title="Copiar enlace"
                   >
@@ -400,13 +399,13 @@ export default function VideoCallPanel({ leadId, isEmbedded }: VideoCallPanelPro
               </div>
 
               {/* Recording & Summary */}
-              {meeting.recording_url && (
+              {meeting.fathom_recording_id && (
                 <div className="mt-4 pt-4 border-t border-border">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
                     <FileText size={12} />
                     <span>Resumen</span>
                   </div>
-                  <p className="text-sm">{meeting.summary || 'Sin resumen disponible'}</p>
+                  <p className="text-sm">{meeting.meeting_notes || 'Sin resumen disponible'}</p>
                 </div>
               )}
             </div>

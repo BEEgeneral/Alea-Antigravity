@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { env } from '@/lib/env';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { insforgeAdmin } from '@/lib/insforge-admin';
 
 const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 
@@ -18,7 +18,8 @@ export async function POST(req: Request) {
     }
 
     // Get investor details
-    const { data: investor } = await supabaseAdmin
+    const { data: investor } = await insforgeAdmin
+      .database
       .from('investors')
       .select('*')
       .eq('id', investorId)
@@ -29,7 +30,8 @@ export async function POST(req: Request) {
     }
 
     // Get properties
-    let propertiesQuery = supabaseAdmin
+    let propertiesQuery = insforgeAdmin
+      .database
       .from('properties')
       .select('id, title, address, asset_type, price, is_off_market, thumbnail_url')
       .eq('is_published', true);
@@ -142,7 +144,8 @@ export async function POST(req: Request) {
 
     // Update interests status to contacted
     if (propertyIds && propertyIds.length > 0) {
-      await supabaseAdmin
+      await insforgeAdmin
+        .database
         .from('investor_interests')
         .update({ status: 'contacted' })
         .eq('investor_id', investorId)

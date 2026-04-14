@@ -1,20 +1,19 @@
-import { createClient } from '@insforge/sdk';
+import { createClient, type InsForgeClient } from '@insforge/sdk';
 
 export const INSFORGE_APP_URL = 'https://if8rkq6j.eu-central.insforge.app';
 export const INSFORGE_API_KEY = 'ik_dbb952a6fd01508d4ae7f53b36e23eaf';
 
-export function createServerClient() {
+export function createServerClient(): InsForgeClient {
   return createClient({
     baseUrl: INSFORGE_APP_URL,
     anonKey: INSFORGE_API_KEY
   });
 }
 
-export function createAuthenticatedClient(token?: string) {
+export function createAuthenticatedClient(_token?: string): InsForgeClient {
   return createClient({
     baseUrl: INSFORGE_APP_URL,
     anonKey: INSFORGE_API_KEY,
-    token
   });
 }
 
@@ -69,33 +68,33 @@ export function getRedirectPath(role: UserRole): string {
   }
 }
 
-export async function getUserProfile(client: ReturnType<typeof createClient>, authUserId: string): Promise<UserProfile | null> {
+export async function getUserProfile(client: InsForgeClient, authUserId: string): Promise<UserProfile | null> {
   const { data, error } = await client
     .database
-    .from('user_profiles')
+    .from('profiles')
     .select('*')
-    .eq('auth_user_id', authUserId)
+    .eq('id', authUserId)
     .single();
   if (error) return null;
   return data as UserProfile;
 }
 
-export async function isUserActive(client: ReturnType<typeof createClient>, authUserId: string): Promise<boolean> {
+export async function isUserActive(client: InsForgeClient, authUserId: string): Promise<boolean> {
   const profile = await getUserProfile(client, authUserId);
   return profile?.is_active ?? false;
 }
 
-export async function isAdmin(client: ReturnType<typeof createClient>, authUserId: string): Promise<boolean> {
+export async function isAdmin(client: InsForgeClient, authUserId: string): Promise<boolean> {
   const profile = await getUserProfile(client, authUserId);
   return profile?.role === 'admin';
 }
 
-export async function isAgent(client: ReturnType<typeof createClient>, authUserId: string): Promise<boolean> {
+export async function isAgent(client: InsForgeClient, authUserId: string): Promise<boolean> {
   const profile = await getUserProfile(client, authUserId);
   return profile?.role === 'agent';
 }
 
-export async function isInvestor(client: ReturnType<typeof createClient>, authUserId: string): Promise<boolean> {
+export async function isInvestor(client: InsForgeClient, authUserId: string): Promise<boolean> {
   const profile = await getUserProfile(client, authUserId);
   return profile?.role === 'investor';
 }

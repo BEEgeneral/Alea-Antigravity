@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Mail, ArrowRight, AlertCircle, ChevronLeft, Lock } from "lucide-react";
+import { Shield, Mail, ArrowRight, AlertCircle, ChevronLeft, Lock, Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -220,13 +220,17 @@ function LoginForm() {
     );
 }
 
+function LoadingFallback() {
+    return (
+        <main className="min-h-screen flex items-center justify-center">
+            <Loader2 className="w-8 h-8 animate-spin" />
+        </main>
+    );
+}
+
 export default function LoginPage() {
     return (
-        <Suspense fallback={
-            <main className="min-h-screen bg-background flex items-center justify-center">
-                <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-            </main>
-        }>
+        <Suspense fallback={<LoadingFallback />}>
             <LoginForm />
         </Suspense>
     );

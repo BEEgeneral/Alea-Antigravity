@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { CheckCircle, XCircle, Loader2, Mail, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 
-export default function ConfirmPage() {
+function ConfirmContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -131,5 +131,21 @@ export default function ConfirmPage() {
                 </div>
             </motion.div>
         </main>
+    );
+}
+
+function LoadingFallback() {
+    return (
+        <main className="min-h-screen bg-background text-foreground selection:bg-primary/30 font-sans flex items-center justify-center relative overflow-hidden px-6">
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </main>
+    );
+}
+
+export default function ConfirmPage() {
+    return (
+        <Suspense fallback={<LoadingFallback />}>
+            <ConfirmContent />
+        </Suspense>
     );
 }

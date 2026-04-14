@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { insforge, getUserProfile } from '@/lib/insforge';
+import { insforge } from '@/lib/insforge';
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,11 +10,17 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: currentUser, error: authError } = await insforge.auth.getCurrentUser();
-    if (authError || !currentUser.user) {
+    if (authError || !currentUser?.user) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const adminProfile = await getUserProfile(currentUser.user.id);
+    const { data: adminProfile } = await insforge
+      .database
+      .from('profiles')
+      .select('*')
+      .eq('id', currentUser.user.id)
+      .single();
+      
     if (!adminProfile || adminProfile.role !== 'admin') {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
@@ -25,7 +31,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    const profile = await getUserProfile(userId);
+    const { data: profile } = await insforge
+      .database
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+      
     if (!profile) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
     }
@@ -35,9 +47,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { error } = await insforge
-      .from('user_profiles')
+      .database
+      .from('profiles')
       .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq('id', profile.id);
+      .eq('id', userId);
 
     if (error) {
       return NextResponse.json({ error: 'Failed to revoke access' }, { status: 500 });

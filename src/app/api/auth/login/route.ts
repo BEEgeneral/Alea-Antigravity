@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { insforge, INSFORGE_APP_URL, getUserProfile, getRedirectPath } from '@/lib/insforge';
+import { insforge, getRedirectPath } from '@/lib/insforge';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,14 +24,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!data.user) {
+    if (!data?.user) {
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }
       );
     }
 
-    const profile = await getUserProfile(data.user.id);
+    const { data: profile } = await insforge
+      .database
+      .from('profiles')
+      .select('*')
+      .eq('id', data.user.id)
+      .single();
 
     if (!profile) {
       return NextResponse.json(

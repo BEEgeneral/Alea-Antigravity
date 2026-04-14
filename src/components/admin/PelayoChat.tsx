@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, X, Plus, Building, Users, ShieldCheck, FileText, Brain, Sparkles, ChevronRight, Trash2, Mic, MicOff, Bell, BellOff, Check, XCircle, Paperclip, File, Upload, Image } from 'lucide-react';
+import { Send, Bot, User, Loader2, X, Plus, Building, Users, ShieldCheck, FileText, Brain, Sparkles, ChevronRight, Trash2, Mic, MicOff, Bell, BellOff, Check, XCircle, Paperclip, File, Upload, Image, Calendar } from 'lucide-react';
 import { extractPDFContent } from '@/lib/pdf-utils';
 import { marked } from 'marked';
 
@@ -33,6 +33,10 @@ interface AIChatProps {
     investors?: any[];
     mandatarios?: any[];
     iaiSuggestions?: any[];
+    agendaStats?: {
+      overdue?: number;
+      pending?: number;
+    };
   };
   userInfo?: {
     id: string;

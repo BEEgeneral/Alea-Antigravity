@@ -1,55 +1,115 @@
-import { NextResponse, type NextRequest } from 'next/server'
-import { createSupabaseMiddlewareClient } from '@/lib/supabase-server'
-import { env } from '@/lib/env'
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { createServerClient } from '@/lib/insforge-server';
+import { cookies } from 'next/headers';
 
-const PROTECTED_ROUTES = ['/praetorium', '/radar', '/profile', '/admin'];
+const PUBLIC_PATHS = [
+  '/',
+  '/login',
+  '/register',
+  '/auth/verify',
+  '/auth/confirm',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/invite',
+  '/api/auth/register',
+  '/api/auth/login',
+  '/api/auth/forgot-password',
+  '/api/auth/reset-password',
+  '/api/auth/confirm',
+  '/api/auth/invite',
+  '/onboarding',
+  '/aviso-legal',
+  '/terminos',
+  '/privacidad',
+  '/cookies',
+  '/cumplimiento',
+];
 
 export default async function proxy(request: NextRequest) {
-    let supabaseResponse = NextResponse.next({
-        request,
-    })
+  const { pathname } = request.nextUrl;
 
-    const isProtected = PROTECTED_ROUTES.some(route =>
-        request.nextUrl.pathname.startsWith(route)
-    );
+  if (PUBLIC_PATHS.some(path => pathname.startsWith(path))) {
+    return NextResponse.next();
+  }
 
-    const supabase = createSupabaseMiddlewareClient(request, supabaseResponse);
+  if (pathname.startsWith('/_next') || pathname.startsWith('/favicon')) {
+    return NextResponse.next();
+  }
 
-    // IMPORTANT: refreshes the auth token if needed
-    const { data: { user }, error } = await supabase.auth.getUser();
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('insforge_token')?.value;
 
-    if (isProtected) {
-        if (error || !user) {
-            const loginUrl = new URL('/login', request.url);
-            loginUrl.searchParams.set('redirectTo', request.nextUrl.pathname);
-            return NextResponse.redirect(loginUrl);
-        }
-
-        const userRole = user.user_metadata?.role;
-        const userEmail = user.email?.toLowerCase();
-        const isGodMode = env.ADMIN_EMAILS.includes(userEmail || '');
-
-        // /praetorium or /admin → only admin or approved agent (or God Mode)
-        if (request.nextUrl.pathname.startsWith('/praetorium') || request.nextUrl.pathname.startsWith('/admin')) {
-            if (!isGodMode && userRole !== 'admin' && userRole !== 'agent') {
-                // Rígido: inversores y otros a /radar
-                return NextResponse.redirect(new URL('/radar', request.url));
-            }
-        }
+    if (!token) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+      }
+      return NextResponse.redirect(new URL('/login', request.url));
     }
 
-    return supabaseResponse
+    const client = createServerClient();
+    const { data, error } = await client.auth.getCurrentUser();
+
+    if (error || !data.user) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+      }
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+
+    const { data: profile } = await client
+      .database
+      .from('profiles')
+      .select('*')
+      .eq('id', data.user.id)
+      .single();
+
+    if (!profile) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'User profile not found' }, { status: 403 });
+      }
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+
+    if (!profile.is_active) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Account access has been revoked' }, { status: 403 });
+      }
+      return NextResponse.redirect(new URL('/login?error=access-revoked', request.url));
+    }
+
+    if (pathname.startsWith('/praetorium') || pathname.startsWith('/api/admin')) {
+      if (profile.role !== 'admin' && profile.role !== 'agent') {
+        if (pathname.startsWith('/api/')) {
+          return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+        }
+        return NextResponse.redirect(new URL('/radar', request.url));
+      }
+    }
+
+    if (pathname.startsWith('/radar')) {
+      if (profile.role === 'investor' && !profile.is_approved) {
+        if (pathname.startsWith('/api/')) {
+          return NextResponse.json({ error: 'Account pending approval' }, { status: 403 });
+        }
+        return NextResponse.redirect(new URL('/onboarding', request.url));
+      }
+    }
+
+    return NextResponse.next();
+
+  } catch (error) {
+    console.error('Proxy error:', error);
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    }
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
 }
 
 export const config = {
-    matcher: [
-        /*
-         * Match all request paths except for the ones starting with:
-         * - _next/static (static files)
-         * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
-         * - public files (svg, png, etc.)
-         */
-        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-    ],
-}
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+  ],
+};

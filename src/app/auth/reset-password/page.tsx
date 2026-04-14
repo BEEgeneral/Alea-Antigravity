@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { motion } from "framer-motion";
-import { Shield, Lock, ArrowRight, AlertCircle, ChevronLeft, CheckCircle } from "lucide-react";
+import { Shield, Lock, ArrowRight, AlertCircle, ChevronLeft, CheckCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const emailParam = searchParams.get("email") || "";
@@ -326,5 +326,21 @@ export default function ResetPasswordPage() {
                 </div>
             </motion.div>
         </main>
+    );
+}
+
+function LoadingFallback() {
+    return (
+        <main className="min-h-screen bg-background text-foreground selection:bg-primary/30 font-sans flex items-center justify-center">
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </main>
+    );
+}
+
+export default function ResetPasswordPage() {
+    return (
+        <Suspense fallback={<LoadingFallback />}>
+            <ResetPasswordForm />
+        </Suspense>
     );
 }

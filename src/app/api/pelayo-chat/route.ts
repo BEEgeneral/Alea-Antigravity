@@ -252,9 +252,11 @@ export async function POST(req: Request) {
             client.database.from('agenda_actions').select('*, lead:leads(id, investors:investors(full_name))').order('due_date', { ascending: true }).limit(20)
         ]);
 
-        const overdueActions = agendaData.data?.filter((a: any) => 
+        const overdueActions = agendaData?.data?.filter((a: any) => 
             new Date(a.due_date) < new Date() && a.status !== 'completed' && a.status !== 'cancelled'
         ) || [];
+
+        const pendingActions = agendaData?.data?.filter((a: any) => a.status !== 'completed' && a.status !== 'cancelled') || [];
 
         const summary = `
 CRM ALEA SIGNATURE - RESUMEN ACTUAL:
@@ -276,8 +278,8 @@ ${mandatariosData.data.slice(0, 3).map((m: any) => `- ${m.full_name}`).join('\n'
 📅 ALEA AGENDA:
 ${overdueActions.length > 0 ? `⚠️ TIENES ${overdueActions.length} ACCIÓN(ES) VENCIDA(S):
 ${overdueActions.slice(0, 5).map((a: any) => `- ${a.title} (vence hace ${Math.floor((new Date().getTime() - new Date(a.due_date).getTime()) / (1000 * 60 * 60))}h)`).join('\n')}` : '✅ No hay acciones vencidas'}
-${agendaData.data?.filter((a: any) => a.status !== 'completed' && a.status !== 'cancelled').length > 0 ? `📋 ACCIONES PENDIENTES (${agendaData.data?.filter((a: any) => a.status !== 'completed' && a.status !== 'cancelled').length}):
-${agendaData.data?.filter((a: any) => a.status !== 'completed' && a.status !== 'cancelled').slice(0, 5).map((a: any) => `- ${a.title} (${a.action_type}) - ${a.lead?.investors?.full_name || 'sin lead'}`).join('\n')}` : ''}`;
+${pendingActions.length > 0 ? `📋 ACCIONES PENDIENTES (${pendingActions.length}):
+${pendingActions.slice(0, 5).map((a: any) => `- ${a.title} (${a.action_type}) - ${a.lead?.[0]?.investors?.[0]?.full_name || 'sin lead'}`).join('\n')}` : ''}`;
 
         // Check for pending actions that need confirmation
         const pendingAction = await getPendingAction(client, userId);

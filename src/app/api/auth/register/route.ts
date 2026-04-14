@@ -25,15 +25,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!data.user) {
+    if (!data?.user) {
       return NextResponse.json(
         { error: 'Failed to create user' },
         { status: 500 }
       );
     }
 
-    const { error: profileError } = await insforge.from('user_profiles').insert({
-      auth_user_id: data.user.id,
+    const { error: profileError } = await insforge.database.from('profiles').insert({
+      id: data.user.id,
       role: 'investor',
       is_active: true,
       is_approved: false

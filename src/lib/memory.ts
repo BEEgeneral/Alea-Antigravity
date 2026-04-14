@@ -123,22 +123,73 @@ export async function addMemory(
     } = options;
 
     try {
-        // Use RPC function to add memory with auto-creation
-        const { data, error } = await client.rpc('add_memory_drawer', {
-            p_wing_name: wingName,
-            p_room_name: roomName,
-            p_hall_type: hallType,
-            p_content: content,
-            p_source: source,
-            p_metadata: metadata
-        });
+        // Get or create wing
+        let { data: wing } = await client
+            .database
+            .from('memory_wings')
+            .select('id')
+            .eq('name', wingName)
+            .single();
 
-        if (error) {
-            console.error('Error adding memory:', error);
+        if (!wing) {
+            const { data: newWing, error: wingError } = await client
+                .database
+                .from('memory_wings')
+                .insert({ name: wingName, wing_type: wingType, keywords: [] })
+                .select('id')
+                .single();
+            if (wingError || !newWing) {
+                console.error('Error creating wing:', wingError);
+                return null;
+            }
+            wing = newWing;
+        }
+
+        // Get or create room
+        let { data: room } = await client
+            .database
+            .from('memory_rooms')
+            .select('id')
+            .eq('wing_id', wing.id)
+            .eq('name', roomName)
+            .single();
+
+        if (!room) {
+            const { data: newRoom, error: roomError } = await client
+                .database
+                .from('memory_rooms')
+                .insert({ wing_id: wing.id, name: roomName, hall_type: hallType })
+                .select('id')
+                .single();
+            if (roomError || !newRoom) {
+                console.error('Error creating room:', roomError);
+                return null;
+            }
+            room = newRoom;
+        }
+
+        // Create drawer
+        const { data: drawer, error: drawerError } = await client
+            .database
+            .from('memory_drawers')
+            .insert({
+                room_id: room.id,
+                content,
+                content_type: contentType,
+                importance_score: importanceScore,
+                source,
+                source_id: sourceId,
+                metadata
+            })
+            .select('id')
+            .single();
+
+        if (drawerError) {
+            console.error('Error creating drawer:', drawerError);
             return null;
         }
 
-        return { id: data };
+        return { id: drawer?.id || '' };
     } catch (err) {
         console.error('Error in addMemory:', err);
         return null;
@@ -155,17 +206,46 @@ export async function getMemoryContext(
     const client = await createAuthenticatedClient();
 
     try {
-        const { data, error } = await client.rpc('get_memory_context', {
-            p_wing_name: wingName,
-            p_limit: limit
-        });
+        // Get wing by name
+        const { data: wing } = await client
+            .database
+            .from('memory_wings')
+            .select('id')
+            .eq('name', wingName)
+            .single();
 
-        if (error) {
-            console.error('Error getting memory context:', error);
-            return [];
-        }
+        if (!wing) return [];
 
-        return data || [];
+        // Get rooms for this wing
+        const { data: rooms } = await client
+            .database
+            .from('memory_rooms')
+            .select('id, name, hall_type')
+            .eq('wing_id', wing.id);
+
+        if (!rooms || rooms.length === 0) return [];
+
+        const roomIds = rooms.map((r: any) => r.id);
+
+        // Get drawers from all rooms
+        const { data: drawers } = await client
+            .database
+            .from('memory_drawers')
+            .select('*, room:memory_rooms(name, hall_type)')
+            .in('room_id', roomIds)
+            .order('importance_score', { ascending: false })
+            .limit(limit);
+
+        if (!drawers) return [];
+
+        return drawers.map((d: any) => ({
+            id: d.id,
+            content: d.content,
+            hall_type: d.room?.hall_type || 'facts',
+            room_name: d.room?.name || '',
+            importance_score: d.importance_score,
+            created_at: d.created_at
+        }));
     } catch (err) {
         console.error('Error in getMemoryContext:', err);
         return [];
@@ -511,6 +591,7 @@ export async function formatMemoryContextForAI(
         maxItems?: number;
     } = {}
 ): Promise<string> {
+    const client = await createAuthenticatedClient();
     const { includeWing = true, includeTimeline = false, maxItems = 10 } = options;
 
     const contextParts: string[] = [];

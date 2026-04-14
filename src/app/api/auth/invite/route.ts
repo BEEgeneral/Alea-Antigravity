@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: invitation, error: fetchError } = await insforge
+      .database
       .from('pending_invitations')
       .select('*')
       .eq('token', token)
@@ -52,19 +53,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (authData.user) {
+    if (authData?.user) {
       await insforge
+        .database
         .from('pending_invitations')
         .update({ accepted: true })
         .eq('id', invitation.id);
 
-      const { error: profileError } = await insforge.from('user_profiles').insert({
-        auth_user_id: authData.user.id,
+      const { error: profileError } = await insforge.database.from('profiles').insert({
+        id: authData.user.id,
         role: invitation.role,
         is_active: true,
-        is_approved: true,
-        invitation_token: token,
-        invitation_accepted_at: new Date().toISOString()
+        is_approved: true
       });
 
       if (profileError) {
@@ -95,6 +95,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: invitation, error } = await insforge
+      .database
       .from('pending_invitations')
       .select('*')
       .eq('token', token)

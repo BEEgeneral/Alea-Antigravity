@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { 
   Video, VideoOff, Mic, MicOff, Phone, Monitor,
   MoreVertical, MessageSquare, Users, Settings,
-  Maximize, Minimize, Share2, Clock, Recording
+  Maximize, Minimize, Share2, Clock, Circle
 } from 'lucide-react';
 
 interface JitsiRoomProps {
@@ -229,7 +229,7 @@ export default function JitsiRoom({
           {/* Recording Indicator */}
           {isRecording && (
             <div className="px-4 py-2 rounded-full bg-red-500 flex items-center gap-2">
-              <Recording size={16} />
+              <Circle size={16} className="fill-white" />
               <span className="text-sm font-medium">Grabando</span>
             </div>
           )}

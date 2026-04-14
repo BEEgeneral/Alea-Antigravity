@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { insforge, getUserProfile, getRedirectPath } from '@/lib/insforge';
+import { insforge, getRedirectPath } from '@/lib/insforge';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await insforge.auth.getCurrentUser();
 
-    if (error || !data.user) {
+    if (error || !data?.user) {
       const response = NextResponse.json(
         { error: 'Invalid or expired token' },
         { status: 401 }
@@ -23,7 +23,12 @@ export async function GET(request: NextRequest) {
       return response;
     }
 
-    const profile = await getUserProfile(data.user.id);
+    const { data: profile } = await insforge
+      .database
+      .from('profiles')
+      .select('*')
+      .eq('id', data.user.id)
+      .single();
 
     if (!profile) {
       return NextResponse.json(

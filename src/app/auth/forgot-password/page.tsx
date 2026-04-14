@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { motion } from "framer-motion";
-import { Shield, Mail, ArrowRight, AlertCircle, ChevronLeft, CheckCircle } from "lucide-react";
+import { Shield, Mail, ArrowRight, AlertCircle, ChevronLeft, CheckCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const emailParam = searchParams.get("email") || "";
@@ -190,5 +190,21 @@ export default function ForgotPasswordPage() {
                 </div>
             </motion.div>
         </main>
+    );
+}
+
+function LoadingFallback() {
+    return (
+        <main className="min-h-screen flex items-center justify-center">
+            <Loader2 className="w-8 h-8 animate-spin" />
+        </main>
+    );
+}
+
+export default function ForgotPasswordPage() {
+    return (
+        <Suspense fallback={<LoadingFallback />}>
+            <ForgotPasswordContent />
+        </Suspense>
     );
 }

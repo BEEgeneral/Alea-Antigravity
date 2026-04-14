@@ -83,10 +83,10 @@ export async function GET(request: NextRequest) {
       sla_hours: a.sla_hours,
       sla_breached: a.sla_breached,
       pipeline_stage: a.pipeline_stage,
-      lead: a.lead ? {
-        id: a.lead.id,
-        status: a.lead.status,
-        investor_name: a.lead.investors?.full_name || a.lead.investors?.company_name
+      lead: (a.lead as any)?.[0] ? {
+        id: (a.lead as any)[0].id,
+        status: (a.lead as any)[0].status,
+        investor_name: (a.lead as any)[0].investors?.[0]?.full_name || (a.lead as any)[0].investors?.[0]?.company_name
       } : null
     })) || [],
     
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
     today_actions: todayActions || [],
     
     // Natural language summary for Pelayo
-    summary: generateSummary(actions, overdueCount, todayActions)
+    summary: generateSummary(actions || [], overdueCount || 0, todayActions || [])
   };
 
   return NextResponse.json(agendaData);

@@ -52,7 +52,6 @@ export default function InvestmentRadar() {
 
             const userId = user.id;
             const userEmail = user.email;
-            const userRole = user.user_metadata?.role;
 
             // God Mode check for Super Admin
             const normalizedEmail = userEmail?.toLowerCase();
@@ -61,22 +60,19 @@ export default function InvestmentRadar() {
                 return;
             }
 
-            // 1. Admin or agent by auth metadata → instant access
+            // Get user role from profiles table
+            const { data: profile } = await insforge.database
+                .from('profiles')
+                .select('role')
+                .eq('id', userId)
+                .single();
+            
+            const userRole = profile?.role;
+
+            // 1. Admin or agent by profile role → instant access
             if (userRole === 'admin' || userRole === 'agent') {
-                if (userRole === 'agent') {
-                    const { data: agent } = await insforge.database
-                        .from('agents')
-                        .select('is_approved')
-                        .eq('id', userId)
-                        .single();
-                    if (agent?.is_approved) {
-                        setAuthChecked(true);
-                        return;
-                    }
-                } else {
-                    setAuthChecked(true);
-                    return;
-                }
+                setAuthChecked(true);
+                return;
             }
 
             // 2. Check if user is a registered investor (by email match)
@@ -113,7 +109,7 @@ export default function InvestmentRadar() {
                 }
             }
 
-            // 4. Also check user_metadata role = 'investor'
+            // 4. Also check profile role = 'investor'
             if (userRole === 'investor') {
                 setNdaRequired(true);
                 setAuthChecked(true);

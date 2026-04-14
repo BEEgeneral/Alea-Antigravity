@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Shield, Lock, ArrowRight, AlertCircle, ChevronLeft, User, CheckCircle } from "lucide-react";
+import { Shield, Lock, ArrowRight, AlertCircle, ChevronLeft, User, CheckCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function InvitePage() {
+function InviteContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const token = searchParams.get("token") || "";
@@ -313,5 +313,21 @@ export default function InvitePage() {
                 </div>
             </motion.div>
         </main>
+    );
+}
+
+function LoadingFallback() {
+    return (
+        <main className="min-h-screen flex items-center justify-center">
+            <Loader2 className="w-8 h-8 animate-spin" />
+        </main>
+    );
+}
+
+export default function InvitePage() {
+    return (
+        <Suspense fallback={<LoadingFallback />}>
+            <InviteContent />
+        </Suspense>
     );
 }

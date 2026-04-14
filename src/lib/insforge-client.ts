@@ -1,4 +1,4 @@
-import { createClient } from '@insforge/sdk';
+import { createClient, type InsForgeClient } from '@insforge/sdk';
 
 export const INSFORGE_APP_URL = 'https://if8rkq6j.eu-central.insforge.app';
 export const INSFORGE_API_KEY = 'ik_dbb952a6fd01508d4ae7f53b36e23eaf';
@@ -11,18 +11,23 @@ function getTokenFromCookie(): string | undefined {
   return match ? decodeURIComponent(match[2]) : undefined;
 }
 
-export function createInsforgeClient(): ReturnType<typeof createClient> {
+export function createInsforgeClient(): InsForgeClient {
   const token = getTokenFromCookie();
-  return createClient({
+  const client = createClient({
     baseUrl: INSFORGE_APP_URL,
     anonKey: INSFORGE_API_KEY,
-    token
   });
+  
+  if (token) {
+    (client as any).auth?.setSession?.(token);
+  }
+  
+  return client;
 }
 
-let _insforge: ReturnType<typeof createClient> | null = null;
+let _insforge: InsForgeClient | null = null;
 
-export const insforge = new Proxy({} as ReturnType<typeof createClient>, {
+export const insforge = new Proxy({} as InsForgeClient, {
   get(_target, prop) {
     if (!_insforge) {
       _insforge = createInsforgeClient();

@@ -156,33 +156,32 @@ export default function NDAForm() {
   const handleTipoSelect = async (tipo: IntervinienteTipo) => {
     setSelectedTipo(tipo);
     setIsLoadingOptions(true);
-    setShowOptionsDropdown(true);
+    setSelectorOptions([]);
 
     try {
       let options: SelectorOption[] = [];
+      let endpoint = '';
+      let tipoField = tipo;
 
       if (tipo === "agente_alea") {
-        const res = await fetch('/api/admin/agents');
-        if (res.ok) {
-          const data = await res.json();
-          options = (data.agents || []).map((a: any) => ({
-            id: a.id,
-            nombre: a.full_name || a.email,
-            dni: a.dni || "",
-            email: a.email,
-            tipo: "agente_alea" as IntervinienteTipo
-          }));
-        }
+        endpoint = '/api/admin/agents';
+        tipoField = "agente_alea";
       } else if (tipo === "inversor") {
-        const res = await fetch('/api/admin/investors');
+        endpoint = '/api/admin/investors';
+        tipoField = "inversor";
+      }
+
+      if (endpoint) {
+        const res = await fetch(endpoint);
         if (res.ok) {
           const data = await res.json();
-          options = (data.investors || []).map((i: any) => ({
-            id: i.id,
-            nombre: i.full_name || i.email,
-            dni: i.dni || "",
-            email: i.email,
-            tipo: "inversor" as IntervinienteTipo
+          const items = data.agents || data.investors || [];
+          options = items.map((item: any) => ({
+            id: item.id,
+            nombre: item.full_name || item.email || 'Sin nombre',
+            dni: item.dni || "",
+            email: item.email || "",
+            tipo: tipoField
           }));
         }
       }
@@ -422,75 +421,92 @@ export default function NDAForm() {
               </button>
 
               {showTypeSelector && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
-                  <div className="p-3 border-b border-border bg-muted/30">
-                    <p className="text-xs text-muted-foreground font-medium">Selecciona el tipo de interviniente</p>
-                  </div>
-                  <div className="p-2">
-                    {(["agente_alea", "inversor", "mandatario", "colaborador", "otro"] as IntervinienteTipo[]).map((tipo) => (
-                      <button
-                        key={tipo}
-                        onClick={() => handleTipoSelect(tipo)}
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-muted transition-colors text-left"
-                      >
-                        <span className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-                          {tipoIcons[tipo]}
-                        </span>
-                        <div>
-                          <p className="text-sm font-medium">{tipoLabels[tipo]}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {tipo === "agente_alea" && "Seleccionar de agentes Alea Signature"}
-                            {tipo === "inversor" && "Seleccionar de inversores registrados"}
-                            {tipo === "mandatario" && "Seleccionar de mandatarios"}
-                            {tipo === "colaborador" && "Seleccionar de colaboradores"}
-                            {tipo === "otro" && "Introducir datos manualmente"}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-
-                  {selectedTipo && (
-                    <div className="border-t border-border p-3 bg-muted/20">
-                      {isLoadingOptions ? (
-                        <div className="flex items-center justify-center py-4">
-                          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                        </div>
-                      ) : showOptionsDropdown && selectorOptions.length > 0 ? (
-                        <div className="max-h-60 overflow-y-auto space-y-1">
-                          {selectorOptions.map((option) => (
-                            <button
-                              key={option.id}
-                              onClick={() => handleSelectOption(option)}
-                              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-background transition-colors text-left"
-                            >
-                              <User size={14} className="text-muted-foreground" />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{option.nombre}</p>
-                                <p className="text-xs text-muted-foreground truncate">{option.email}</p>
-                              </div>
-                              {option.dni && (
-                                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                                  {option.dni}
-                                </span>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      ) : selectedTipo === "otro" ? (
-                        <button
-                          onClick={() => {
-                            handleSelectOption({ id: "new", nombre: "", dni: "", email: "", tipo: "otro" });
-                          }}
-                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm font-medium"
-                        >
-                          + Añadir manualmente
-                        </button>
-                      ) : (
-                        <p className="text-xs text-muted-foreground text-center py-2">
-                          No hay {tipoLabels[selectedTipo]}s disponibles
+                <div className="absolute right-0 top-full mt-2 w-80 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+                  {!selectedTipo ? (
+                    <>
+                      <div className="p-3 border-b border-border bg-muted/30">
+                        <p className="text-xs text-muted-foreground font-medium">Selecciona el tipo de interviniente</p>
+                      </div>
+                      <div className="p-2 max-h-80 overflow-y-auto">
+                        {(["agente_alea", "inversor", "mandatario", "colaborador", "otro"] as IntervinienteTipo[]).map((tipo) => (
+                          <button
+                            key={tipo}
+                            onClick={() => handleTipoSelect(tipo)}
+                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-muted transition-colors text-left"
+                          >
+                            <span className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                              {tipoIcons[tipo]}
+                            </span>
+                            <div>
+                              <p className="text-sm font-medium">{tipoLabels[tipo]}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {tipo === "agente_alea" && "Seleccionar de agentes Alea Signature"}
+                                {tipo === "inversor" && "Seleccionar de inversores registrados"}
+                                {tipo === "mandatario" && "Seleccionar de mandatarios"}
+                                {tipo === "colaborador" && "Seleccionar de colaboradores"}
+                                {tipo === "otro" && "Introducir datos manualmente"}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col max-h-80">
+                      <div className="p-3 border-b border-border bg-muted/30 flex items-center justify-between">
+                        <p className="text-xs text-muted-foreground font-medium">
+                          {isLoadingOptions ? "Cargando..." : `${tipoLabels[selectedTipo]}s disponibles (${selectorOptions.length})`}
                         </p>
-                      )}
+                        <button
+                          onClick={() => { setSelectedTipo(null); setSelectorOptions([]); }}
+                          className="text-xs text-primary hover:text-primary/80"
+                        >
+                          ← Volver
+                        </button>
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-2">
+                        {isLoadingOptions ? (
+                          <div className="flex items-center justify-center py-8">
+                            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                          </div>
+                        ) : selectorOptions.length > 0 ? (
+                          <div className="space-y-1">
+                            {selectorOptions.map((option) => (
+                              <button
+                                key={option.id}
+                                onClick={() => handleSelectOption(option)}
+                                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-muted transition-colors text-left border border-transparent hover:border-border"
+                              >
+                                <User size={16} className="text-muted-foreground" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{option.nombre}</p>
+                                  <p className="text-xs text-muted-foreground truncate">{option.email}</p>
+                                </div>
+                                {option.dni && (
+                                  <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                                    {option.dni}
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        ) : selectedTipo === "otro" ? (
+                          <div className="p-4 text-center">
+                            <button
+                              onClick={() => {
+                                handleSelectOption({ id: "new", nombre: "", dni: "", email: "", tipo: "otro" });
+                              }}
+                              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm font-medium"
+                            >
+                              + Añadir manualmente
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="p-4 text-center text-muted-foreground text-sm">
+                            No hay {tipoLabels[selectedTipo]}s disponibles
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Download, FileText, Users, Calendar, Loader2, FileCheck, Send, ExternalLink, Copy, CheckCircle, Link2 } from "lucide-react";
+import { Download, FileText, Users, Calendar, Loader2, FileCheck, Send, ExternalLink, Copy, CheckCircle, Link2, ChevronDown, User, ShieldCheck, Share2, Briefcase } from "lucide-react";
 import { generateNdaPDF } from "@/lib/ndaGenerator";
 
 interface Interviniente {
@@ -21,6 +21,16 @@ interface NDA {
   nda_intervinientes?: Interviniente[];
 }
 
+type IntervinienteTipo = "agente_alea" | "inversor" | "mandatario" | "colaborador" | "otro";
+
+interface SelectorOption {
+  id: string;
+  nombre: string;
+  dni: string;
+  email: string;
+  tipo: IntervinienteTipo;
+}
+
 export default function NDAForm() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [ndas, setNdas] = useState<NDA[]>([]);
@@ -35,12 +45,39 @@ export default function NDAForm() {
     { nombre: "Alicia Hernández Ruiz", dni: "09192093M", email: "alicia@aleasignature.com", rol: "Representante Alea Signature" },
     { nombre: "Alberto Hernández Gala", dni: "14301422E", email: "albertogala@aleasignature.com", rol: "Representante Alea Signature" },
   ]);
+  const [showTypeSelector, setShowTypeSelector] = useState(false);
+  const [selectedTipo, setSelectedTipo] = useState<IntervinienteTipo | null>(null);
+  const [selectorOptions, setSelectorOptions] = useState<SelectorOption[]>([]);
+  const [isLoadingOptions, setIsLoadingOptions] = useState(false);
+  const [showOptionsDropdown, setShowOptionsDropdown] = useState(false);
+  const [agents, setAgents] = useState<any[]>([]);
+  const [investors, setInvestors] = useState<any[]>([]);
 
   useEffect(() => {
     fetchNdas();
     checkAdobeConnection();
     checkAdobeCallback();
+    fetchAgentsAndInvestors();
   }, []);
+
+  const fetchAgentsAndInvestors = async () => {
+    try {
+      const [agentsRes, investorsRes] = await Promise.all([
+        fetch('/api/admin/agents'),
+        fetch('/api/admin/investors')
+      ]);
+      if (agentsRes.ok) {
+        const data = await agentsRes.json();
+        setAgents(data.agents || []);
+      }
+      if (investorsRes.ok) {
+        const data = await investorsRes.json();
+        setInvestors(data.investors || []);
+      }
+    } catch (error) {
+      console.error("Error fetching agents/investors:", error);
+    }
+  };
 
   const checkAdobeConnection = async () => {
     try {
@@ -114,6 +151,71 @@ export default function NDAForm() {
     const updated = [...intervinientes];
     updated[index][field] = value;
     setIntervinientes(updated);
+  };
+
+  const handleTipoSelect = async (tipo: IntervinienteTipo) => {
+    setSelectedTipo(tipo);
+    setIsLoadingOptions(true);
+    setShowOptionsDropdown(true);
+
+    try {
+      let options: SelectorOption[] = [];
+
+      if (tipo === "agente_alea") {
+        const res = await fetch('/api/admin/agents');
+        if (res.ok) {
+          const data = await res.json();
+          options = (data.agents || []).map((a: any) => ({
+            id: a.id,
+            nombre: a.full_name || a.email,
+            dni: a.dni || "",
+            email: a.email,
+            tipo: "agente_alea" as IntervinienteTipo
+          }));
+        }
+      } else if (tipo === "inversor") {
+        const res = await fetch('/api/admin/investors');
+        if (res.ok) {
+          const data = await res.json();
+          options = (data.investors || []).map((i: any) => ({
+            id: i.id,
+            nombre: i.full_name || i.email,
+            dni: i.dni || "",
+            email: i.email,
+            tipo: "inversor" as IntervinienteTipo
+          }));
+        }
+      }
+
+      setSelectorOptions(options);
+    } catch (error) {
+      console.error("Error fetching options:", error);
+    } finally {
+      setIsLoadingOptions(false);
+    }
+  };
+
+  const handleSelectOption = (option: SelectorOption) => {
+    const rolMap: Record<IntervinienteTipo, string> = {
+      agente_alea: "Representante Alea Signature",
+      inversor: "Inversor",
+      mandatario: "Mandatario",
+      colaborador: "Colaborador",
+      otro: "Otro"
+    };
+
+    const newInterviniente: Interviniente = {
+      nombre: option.nombre,
+      dni: option.dni,
+      email: option.email,
+      rol: rolMap[option.tipo]
+    };
+
+    setIntervinientes([...intervinientes, newInterviniente]);
+    setShowTypeSelector(false);
+    setShowOptionsDropdown(false);
+    setSelectedTipo(null);
+    setSelectorOptions([]);
   };
 
   const downloadPdf = (base64: string, fileName: string) => {
@@ -231,6 +333,22 @@ export default function NDAForm() {
     }
   };
 
+  const tipoIcons: Record<IntervinienteTipo, React.ReactNode> = {
+    agente_alea: <Briefcase size={16} />,
+    inversor: <User size={16} />,
+    mandatario: <ShieldCheck size={16} />,
+    colaborador: <Share2 size={16} />,
+    otro: <Users size={16} />
+  };
+
+  const tipoLabels: Record<IntervinienteTipo, string> = {
+    agente_alea: "Agente Alea",
+    inversor: "Inversor",
+    mandatario: "Mandatario",
+    colaborador: "Colaborador",
+    otro: "Otro"
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-card border border-border rounded-3xl p-6 space-y-6">
@@ -294,12 +412,90 @@ export default function NDAForm() {
               <Users className="w-4 h-4" />
               Intervinientes ({intervinientes.length})
             </label>
-            <button
-              onClick={handleAddInterviniente}
-              className="text-xs px-3 py-1 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors"
-            >
-              + Añadir
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowTypeSelector(!showTypeSelector)}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
+              >
+                <span>+ Añadir Interviniente</span>
+                <ChevronDown size={16} className={`transition-transform ${showTypeSelector ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showTypeSelector && (
+                <div className="absolute right-0 top-full mt-2 w-72 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+                  <div className="p-3 border-b border-border bg-muted/30">
+                    <p className="text-xs text-muted-foreground font-medium">Selecciona el tipo de interviniente</p>
+                  </div>
+                  <div className="p-2">
+                    {(["agente_alea", "inversor", "mandatario", "colaborador", "otro"] as IntervinienteTipo[]).map((tipo) => (
+                      <button
+                        key={tipo}
+                        onClick={() => handleTipoSelect(tipo)}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-muted transition-colors text-left"
+                      >
+                        <span className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                          {tipoIcons[tipo]}
+                        </span>
+                        <div>
+                          <p className="text-sm font-medium">{tipoLabels[tipo]}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {tipo === "agente_alea" && "Seleccionar de agentes Alea Signature"}
+                            {tipo === "inversor" && "Seleccionar de inversores registrados"}
+                            {tipo === "mandatario" && "Seleccionar de mandatarios"}
+                            {tipo === "colaborador" && "Seleccionar de colaboradores"}
+                            {tipo === "otro" && "Introducir datos manualmente"}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {selectedTipo && (
+                    <div className="border-t border-border p-3 bg-muted/20">
+                      {isLoadingOptions ? (
+                        <div className="flex items-center justify-center py-4">
+                          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : showOptionsDropdown && selectorOptions.length > 0 ? (
+                        <div className="max-h-60 overflow-y-auto space-y-1">
+                          {selectorOptions.map((option) => (
+                            <button
+                              key={option.id}
+                              onClick={() => handleSelectOption(option)}
+                              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-background transition-colors text-left"
+                            >
+                              <User size={14} className="text-muted-foreground" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{option.nombre}</p>
+                                <p className="text-xs text-muted-foreground truncate">{option.email}</p>
+                              </div>
+                              {option.dni && (
+                                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                                  {option.dni}
+                                </span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      ) : selectedTipo === "otro" ? (
+                        <button
+                          onClick={() => {
+                            handleSelectOption({ id: "new", nombre: "", dni: "", email: "", tipo: "otro" });
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm font-medium"
+                        >
+                          + Añadir manualmente
+                        </button>
+                      ) : (
+                        <p className="text-xs text-muted-foreground text-center py-2">
+                          No hay {tipoLabels[selectedTipo]}s disponibles
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {intervinientes.map((interviniente, index) => (

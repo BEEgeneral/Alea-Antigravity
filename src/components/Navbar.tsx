@@ -6,7 +6,6 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, ArrowRight, User } from "lucide-react";
-import { insforge } from "@/lib/insforge-client";
 
 export default function Navbar() {
     const [isScrolled, setIsScrolled] = useState(false);
@@ -19,35 +18,22 @@ export default function Navbar() {
     const isLanding = pathname === "/";
 
     useEffect(() => {
-        const fetchUserProfile = async (userId: string, email?: string) => {
-            const normalizedEmail = email?.toLowerCase();
-            if (normalizedEmail === 'beenocode@gmail.com' || normalizedEmail === 'albertogala@beenocode.com') {
-                setUserRole('admin');
-                setIsVerified(true);
-                return;
-            }
-
-            const { data: profile } = await insforge.database
-                .from('user_profiles')
-                .select('role, is_approved')
-                .eq('auth_user_id', userId)
-                .single();
-
-            if (profile) {
-                setUserRole(profile.role);
-                setIsVerified(profile.is_approved);
-            }
-        };
-
-        insforge.auth.getCurrentUser().then(({ data: { user: currentUser }, error }) => {
-            if (error || !currentUser) {
+        fetch('/api/auth/me')
+            .then(res => {
+                if (!res.ok) throw new Error('Not authenticated');
+                return res.json();
+            })
+            .then(data => {
+                setUser({ id: data.user.id, email: data.user.email });
+                setUserRole(data.profile.role);
+                setIsVerified(data.profile.is_approved);
+            })
+            .catch(() => {
                 setUser(null);
-                setLoadingAuth(false);
-                return;
-            }
-            setUser({ id: currentUser.id, email: currentUser.email });
-            fetchUserProfile(currentUser.id, currentUser.email).finally(() => setLoadingAuth(false));
-        });
+                setUserRole(null);
+                setIsVerified(false);
+            })
+            .finally(() => setLoadingAuth(false));
 
         const handleScroll = () => {
             setIsScrolled(window.scrollY > 20);

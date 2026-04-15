@@ -1,4 +1,4 @@
-import { insforge } from "@/lib/insforge-client";
+import { createAuthenticatedClient } from "@/lib/insforge-server";
 import { NextRequest, NextResponse } from "next/server";
 import { uploadTransientDocument, createAgreement, getAgreementStatus, getSigningUrl } from "@/lib/adobeSign";
 import { getValidAccessToken, isAdobeConnected } from "@/lib/adobeTokenManager";
@@ -48,7 +48,9 @@ async function handleCreateAndSave(fecha: string, intervinientes: any[], pdfBase
         }
     }
 
-    const { data: nda, error: ndaError } = await insforge.database
+    const client = await createAuthenticatedClient();
+
+    const { data: nda, error: ndaError } = await client.database
         .from("nda_agreements")
         .insert({
             fecha,
@@ -75,7 +77,7 @@ async function handleCreateAndSave(fecha: string, intervinientes: any[], pdfBase
         orden: index + 1,
     }));
 
-    const { error: interError } = await insforge.database
+    const { error: interError } = await client.database
         .from("nda_intervinientes")
         .insert(intervinientesData);
 
@@ -138,7 +140,8 @@ async function handleSendForSignature(ndaId: string, intervinientes: any[], pdfB
             })
         );
 
-        await insforge.database
+        const client = await createAuthenticatedClient();
+        await client.database
             .from("nda_agreements")
             .update({
                 estado: "enviado",
@@ -163,7 +166,8 @@ async function handleSendForSignature(ndaId: string, intervinientes: any[], pdfB
 
 export async function GET() {
     try {
-        const { data: ndas, error } = await insforge.database
+        const client = await createAuthenticatedClient();
+        const { data: ndas, error } = await client.database
             .from("nda_agreements")
             .select(`
                 *,
@@ -200,7 +204,8 @@ export async function PATCH(request: NextRequest) {
             );
         }
 
-        const { data, error } = await insforge.database
+        const client = await createAuthenticatedClient();
+        const { data, error } = await client.database
             .from("nda_agreements")
             .update({ estado, updated_at: new Date().toISOString() })
             .eq("id", id)

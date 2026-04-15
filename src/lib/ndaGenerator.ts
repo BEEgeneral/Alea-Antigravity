@@ -7,6 +7,8 @@ interface Interviniente {
   rol: string;
 }
 
+const LOGO_URL = "https://if8rkq6j.insforge.site/api/storage/buckets/nda/objects/logo-alea.png";
+
 export async function generateNdaPDF(
   intervinientes: Interviniente[],
   fecha: string
@@ -21,6 +23,17 @@ export async function generateNdaPDF(
   const margin = 20;
   const contentWidth = pageWidth - 2 * margin;
   let y = 25;
+
+  try {
+    const logoResponse = await fetch(LOGO_URL);
+    if (logoResponse.ok) {
+      const logoBuffer = await logoResponse.arrayBuffer();
+      doc.addImage(new Uint8Array(logoBuffer), "PNG", margin, 10, 30, 15);
+      y = 35;
+    }
+  } catch (e) {
+    console.warn("Could not load logo:", e);
+  }
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);

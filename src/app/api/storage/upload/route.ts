@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthenticatedClient } from '@/lib/insforge-server';
 
+const INSFORGE_URL = process.env.NEXT_PUBLIC_INSFORGE_URL || 'https://if8rkq6j.insforge.app';
+
 export async function POST(req: NextRequest) {
     try {
         const client = await createAuthenticatedClient();
@@ -30,7 +32,9 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        return NextResponse.json({ success: true, path: data?.key });
+        const url = `${INSFORGE_URL}/api/storage/buckets/${bucket}/objects/${fileName}`;
+
+        return NextResponse.json({ success: true, url, path: data?.key });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }

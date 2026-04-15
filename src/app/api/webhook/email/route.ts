@@ -71,7 +71,7 @@ export async function POST(req: Request) {
             fullText += '\n\n--- CONTENIDO DE ADJUNTOS ---\n' + attachmentText.substring(0, 10000);
         }
 
-        // Guardar adjuntos en Supabase Storage
+        // Guardar adjuntos en InsForge Storage
         let savedAttachments: any[] = [];
         if (attachmentData && attachmentData.length > 0) {
             for (const att of attachmentData) {
@@ -79,24 +79,70 @@ export async function POST(req: Request) {
                     const buffer = Buffer.from(att.data, 'base64');
                     const fileName = `${Date.now()}_${att.filename}`;
                     
-                    const uploadRes = await fetch(
-                        `${env.SUPABASE_URL}/storage/v1/objects/email-attachments/${fileName}`,
+                    // Get upload strategy
+                    const strategyRes = await fetch(
+                        'https://if8rkq6j.eu-central.insforge.app/api/storage/buckets/email-attachments/upload-strategy',
                         {
                             method: 'POST',
-                            headers: new Headers({
-                                'Content-Type': att.content_type || 'application/octet-stream',
-                                'apikey': env.SUPABASE_ANON_KEY || '',
-                                'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-                                'x-upsert': 'true'
-                            }),
-                            body: buffer
+                            headers: {
+                                'Authorization': 'Bearer ik_dbb952a6fd01508d4ae7f53b36e23eaf',
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                filename: att.filename,
+                                contentType: att.content_type || 'application/octet-stream',
+                                size: buffer.length
+                            })
                         }
                     );
                     
-                    if (uploadRes.ok) {
+                    if (!strategyRes.ok) continue;
+                    
+                    const strategy = await strategyRes.json();
+                    
+                    if (strategy.method === 'direct') {
+                        // Direct upload to InsForge
+                        const formData = new FormData();
+                        formData.append('file', new Blob([buffer], { type: att.content_type || 'application/octet-stream' }), att.filename);
+                        
+                        const uploadRes = await fetch(
+                            `https://if8rkq6j.eu-central.insforge.app${strategy.uploadUrl}`,
+                            { method: 'PUT', body: formData }
+                        );
+                        
+                        if (uploadRes.ok) {
+                            savedAttachments.push({
+                                filename: att.filename,
+                                url: `https://if8rkq6j.eu-central.insforge.app/api/storage/buckets/email-attachments/objects/${fileName}`
+                            });
+                        }
+                    } else {
+                        // S3 presigned URL upload
+                        const formData = new FormData();
+                        for (const [field, value] of Object.entries(strategy.fields)) {
+                            formData.append(field, value as string);
+                        }
+                        formData.append('file', new Blob([buffer], { type: att.content_type || 'application/octet-stream' }), att.filename);
+                        
+                        const uploadRes = await fetch(strategy.uploadUrl, { method: 'POST', body: formData });
+                        
+                        if (uploadRes.ok && strategy.confirmRequired) {
+                            await fetch(
+                                `https://if8rkq6j.eu-central.insforge.app${strategy.confirmUrl}`,
+                                {
+                                    method: 'POST',
+                                    headers: {
+                                        'Authorization': 'Bearer ik_dbb952a6fd01508d4ae7f53b36e23eaf',
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({ size: buffer.length, contentType: att.content_type })
+                                }
+                            );
+                        }
+                        
                         savedAttachments.push({
                             filename: att.filename,
-                            url: `${env.SUPABASE_URL}/storage/v1/object/public/email-attachments/${fileName}`
+                            url: `https://if8rkq6j.eu-central.insforge.app/api/storage/buckets/email-attachments/objects/${fileName}`
                         });
                     }
                 } catch (e) {

@@ -26,15 +26,6 @@ export const env = {
 
   // --- Project Specific Variables (Custom) ---
 
-  /** Supabase Project URL */
-  SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  
-  /** Supabase Anon Key */
-  SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  
-  /** Supabase Service Role Key (Server side ONLY - never expose to client) */
-  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-  
   /** Gemini API Key (Server side only) */
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   
@@ -76,8 +67,7 @@ export const env = {
  */
 export const validateEnv = () => {
   const required = [
-    'NEXT_PUBLIC_SUPABASE_URL',
-    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    'GEMINI_API_KEY',
   ];
 
   const missing = required.filter(key => !process.env[key]);

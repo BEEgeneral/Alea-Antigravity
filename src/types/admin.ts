@@ -8,9 +8,11 @@ export interface Agent {
     id: string;
     full_name: string;
     email: string;
-    role: "admin" | "agent";
-    is_approved: boolean;
+    role: "admin" | "agent" | string;
+    is_approved?: boolean;
     created_at?: string;
+    has_centurion_access?: boolean;
+    [key: string]: any;
 }
 
 export interface Investor {
@@ -28,13 +30,18 @@ export interface Investor {
     status?: string;
     interests?: string[];
     created_at?: string;
+    investor?: string;
+    budget_min?: number;
+    budget_max?: number;
+    labels?: string[];
+    [key: string]: any;
 }
 
 export interface Property {
     id: string;
     title: string;
-    address: string;
-    price: number;
+    address?: string;
+    price?: number;
     type?: string;
     status?: string;
     description?: string;
@@ -47,18 +54,18 @@ export interface Property {
     image?: string;
     thumbnail_url?: string;
     created_at?: string;
-    // Financial Details
     monthly_rent?: number;
     community_fee?: number;
     insurance?: number;
     maintenance?: number;
     ibi_tax?: number;
-    // Features
     features?: string[];
     year_built?: number;
     floor?: string;
     orientation?: string;
     energy_rating?: string;
+    vendor_name?: string;
+    [key: string]: any;
 }
 
 export interface Lead {
@@ -67,17 +74,17 @@ export interface Lead {
     match_score?: number;
     created_at?: string;
     updated_at?: string;
-    // Inline fields (from legacy mock data)
     investor?: string;
     property?: string;
+    property_id?: string;
     type?: string;
     ticket?: string;
     email?: string;
     agent?: string;
     matchScore?: number;
-    // Joined Supabase relations
     investors?: Investor;
     properties?: Property;
+    [key: string]: any;
 }
 
 export interface Interaction {
@@ -95,21 +102,82 @@ export interface ActivityLog {
     time: string;
 }
 
-export interface DocumentTemplate {
+export interface ActivityLog {
     id: string;
-    name: string;
+    action: string;
+    detail: string;
+    time: string;
 }
 
-export type AdminTab = "crm" | "investors" | "templates" | "assets" | "audit" | "agents";
+export const MOCK_ACTIVITY: ActivityLog[] = [
+    { id: "a1", action: "DOWNLOADED_DOCUMENT", detail: "Alberto Gala downloaded 'Nota Simple - Palacio Gran Vía'", time: "10 mins ago" },
+    { id: "a2", action: "LEAD_UPDATED", detail: "Lead 'Familia Ortiz' moved to Due Diligence", time: "1 hour ago" },
+    { id: "a3", action: "NEW_INVESTOR", detail: "New KYC submitted by 'Capital Ibérico S.L.'", time: "3 hours ago" },
+];
 
-export interface InvestorFormData {
+export interface Mandatario {
+    id?: string;
     full_name: string;
-    company_name: string;
-    email: string;
-    phone: string;
-    investor_type: string;
-    min_ticket_eur: number;
-    max_ticket_eur: number;
+    company_name?: string;
+    email?: string;
+    phone?: string;
+    labels?: string[];
+    propietario_type?: string;
+    Mandatario_type?: string;
+    created_at?: string;
+    [key: string]: any;
+}
+
+export interface Collaborator {
+    id?: string;
+    full_name: string;
+    company_name?: string;
+    email?: string;
+    phone?: string;
+    specialty?: string;
+    created_at?: string;
+    [key: string]: any;
+}
+
+export interface IAISuggestion {
+    id: string;
+    suggestion_type: 'property' | 'investor' | 'lead' | 'mandatario' | 'collaborator';
+    status: 'pending' | 'approved' | 'rejected';
+    original_email_subject: string;
+    original_email_body?: string;
+    sender_email: string;
+    ai_interpretation?: string;
+    extracted_data?: Record<string, any>;
+    created_at?: string;
+}
+
+export interface PropertyFormData {
+    title: string;
+    description: string;
+    type: string;
+    price: number;
+    meters: number;
+    address: string;
+    vendor_name: string;
+}
+
+export interface MandatarioFormData {
+    full_name: string;
+    company_name?: string;
+    email?: string;
+    phone?: string;
+    labels?: string[];
+    Mandatario_type?: string;
+    [key: string]: any;
+}
+
+export interface CollaboratorFormData {
+    full_name: string;
+    company_name?: string;
+    email?: string;
+    phone?: string;
+    specialty?: string;
+    [key: string]: any;
 }
 
 export interface AgentFormData {
@@ -118,7 +186,6 @@ export interface AgentFormData {
     role: string;
 }
 
-// Pipeline stage definition
 export interface PipelineStage {
     id: string;
     label: string;
@@ -135,12 +202,10 @@ export const PIPELINE_STAGES: PipelineStage[] = [
 
 export const VALID_STAGES = new Set(PIPELINE_STAGES.map(s => s.id));
 
-// Mock data
-export const MOCK_ACTIVITY: ActivityLog[] = [
-    { id: "a1", action: "DOWNLOADED_DOCUMENT", detail: "Alberto Gala downloaded 'Nota Simple - Palacio Gran Vía'", time: "10 mins ago" },
-    { id: "a2", action: "LEAD_UPDATED", detail: "Lead 'Familia Ortiz' moved to Due Diligence", time: "1 hour ago" },
-    { id: "a3", action: "NEW_INVESTOR", detail: "New KYC submitted by 'Capital Ibérico S.L.'", time: "3 hours ago" },
-];
+export interface DocumentTemplate {
+    id: string;
+    name: string;
+}
 
 export const MOCK_TEMPLATES: DocumentTemplate[] = [
     { id: "t1", name: "NDA Premium" },

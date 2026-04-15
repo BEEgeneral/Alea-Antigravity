@@ -1,15 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { MapPin, Building, Star, Maximize2, Bed, Bath, Search, Edit2, Trash2 } from "lucide-react";
+import { MapPin, Building, Star, Maximize2, Bed, Bath, Search, Edit2, Trash2, Upload, Loader2 } from "lucide-react";
 import { Property } from "@/types/admin";
 
 interface AssetPortfolioProps {
     properties: Property[];
     onSelectProperty: (property: Property) => void;
+    isUploadingPdf?: boolean;
+    onUploadPdf?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
-export default function AssetPortfolio({ properties, onSelectProperty }: AssetPortfolioProps) {
+export default function AssetPortfolio({ properties, onSelectProperty, isUploadingPdf, onUploadPdf }: AssetPortfolioProps) {
     return (
         <div className="bg-card border border-border rounded-[3rem] shadow-xl p-10 mt-10 max-w-5xl mx-auto overflow-hidden">
             <div className="flex justify-between items-center mb-10 px-6">
@@ -17,7 +19,32 @@ export default function AssetPortfolio({ properties, onSelectProperty }: AssetPo
                     <h2 className="text-2xl font-serif font-medium">Asset Portfolio</h2>
                     <p className="text-muted-foreground text-xs uppercase tracking-widest font-bold mt-1">Activos</p>
                 </div>
-                <button className="px-6 py-2 bg-primary text-white rounded-xl text-xs font-bold uppercase tracking-widest">Publicar Activo</button>
+                <div className="flex items-center space-x-4">
+                    {onUploadPdf && (
+                        <div className="relative">
+                            <input
+                                type="file"
+                                accept="application/pdf"
+                                onChange={onUploadPdf}
+                                disabled={isUploadingPdf}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                                title="Subir Dossier (PDF)"
+                            />
+                            <button
+                                disabled={isUploadingPdf}
+                                className="px-6 py-2 bg-muted/60 text-foreground border border-border/60 hover:border-foreground/20 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center shadow-sm disabled:opacity-50"
+                            >
+                                {isUploadingPdf ? (
+                                    <Loader2 size={16} className="mr-2 animate-spin" />
+                                ) : (
+                                    <Upload size={16} className="mr-2" />
+                                )}
+                                Procesar PDF
+                            </button>
+                        </div>
+                    )}
+                    <button className="px-6 py-2 bg-primary text-white rounded-xl text-xs font-bold uppercase tracking-widest hidden md:block">Publicar Activo</button>
+                </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {properties.map((asset) => (

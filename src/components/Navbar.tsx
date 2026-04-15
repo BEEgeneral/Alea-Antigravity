@@ -6,13 +6,12 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, ArrowRight, User } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import type { Session } from "@supabase/supabase-js";
+import { insforge } from "@/lib/insforge-client";
 
 export default function Navbar() {
     const [isScrolled, setIsScrolled] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [user, setUser] = useState<Session['user'] | null>(null);
+    const [user, setUser] = useState<{ id: string; email?: string } | null>(null);
     const [userRole, setUserRole] = useState<string | null>(null);
     const [isVerified, setIsVerified] = useState<boolean>(false);
     const [loadingAuth, setLoadingAuth] = useState(true);
@@ -21,7 +20,6 @@ export default function Navbar() {
 
     useEffect(() => {
         const fetchUserProfile = async (userId: string, email?: string) => {
-            // God Mode check for Super Admin
             const normalizedEmail = email?.toLowerCase();
             if (normalizedEmail === 'beenocode@gmail.com' || normalizedEmail === 'albertogala@beenocode.com') {
                 setUserRole('admin');
@@ -29,53 +27,26 @@ export default function Navbar() {
                 return;
             }
 
-            // Check agents first
-            const { data: agent } = await supabase
-                .from('agents')
-                .select('role')
-                .eq('id', userId)
+            const { data: profile } = await insforge.database
+                .from('user_profiles')
+                .select('role, is_approved')
+                .eq('auth_user_id', userId)
                 .single();
 
-            if (agent) {
-                setUserRole(agent.role); // 'admin' or 'agent'
-                setIsVerified(true); // Agents are always verified
-                return;
-            }
-
-            // Check investors
-            const { data: investor } = await supabase
-                .from('investors')
-                .select('is_verified')
-                .eq('id', userId)
-                .single();
-
-            if (investor) {
-                setUserRole('investor');
-                setIsVerified(!!investor.is_verified);
+            if (profile) {
+                setUserRole(profile.role);
+                setIsVerified(profile.is_approved);
             }
         };
 
-        // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
-            const currentUser = session?.user ?? null;
-            setUser(currentUser);
-            if (currentUser) {
-                fetchUserProfile(currentUser.id, currentUser.email).finally(() => setLoadingAuth(false));
-            } else {
+        insforge.auth.getCurrentUser().then(({ data: { user: currentUser }, error }) => {
+            if (error || !currentUser) {
+                setUser(null);
                 setLoadingAuth(false);
+                return;
             }
-        });
-
-        // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: string, session: Session | null) => {
-            const currentUser = session?.user ?? null;
-            setUser(currentUser);
-            if (currentUser) {
-                fetchUserProfile(currentUser.id, currentUser.email);
-            } else {
-                setUserRole(null);
-                setIsVerified(false);
-            }
+            setUser({ id: currentUser.id, email: currentUser.email });
+            fetchUserProfile(currentUser.id, currentUser.email).finally(() => setLoadingAuth(false));
         });
 
         const handleScroll = () => {
@@ -85,7 +56,6 @@ export default function Navbar() {
 
         return () => {
             window.removeEventListener("scroll", handleScroll);
-            subscription.unsubscribe();
         };
     }, []);
 

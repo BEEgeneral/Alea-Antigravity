@@ -1,8 +1,8 @@
 import { createClient, type InsForgeClient } from '@insforge/sdk';
 import { cookies } from 'next/headers';
+import { INSFORGE_APP_URL, INSFORGE_API_KEY } from './insforge-constants';
 
-export const INSFORGE_APP_URL = 'https://if8rkq6j.eu-central.insforge.app';
-export const INSFORGE_API_KEY = 'ik_dbb952a6fd01508d4ae7f53b36e23eaf';
+export { INSFORGE_APP_URL, INSFORGE_API_KEY } from './insforge-constants';
 
 export function createServerClient(): InsForgeClient {
   return createClient({

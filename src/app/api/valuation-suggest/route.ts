@@ -1,12 +1,20 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { env } from '@/lib/env';
+import { createAuthenticatedClient } from '@/lib/insforge-server';
 
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
 const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
 export async function POST(req: Request) {
     try {
+        const client = await createAuthenticatedClient();
+        const { data: { user }, error: authError } = await client.auth.getCurrentUser();
+
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { location, assetType } = await req.json();
 
         if (!location || !assetType) {

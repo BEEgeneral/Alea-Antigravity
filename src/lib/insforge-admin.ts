@@ -1,8 +1,8 @@
 import { cookies } from 'next/headers';
 import { createClient, type InsForgeClient } from '@insforge/sdk';
+import { INSFORGE_APP_URL, INSFORGE_API_KEY } from './insforge-constants';
 
-const BASE_URL = 'https://if8rkq6j.eu-central.insforge.app';
-const API_KEY = 'ik_dbb952a6fd01508d4ae7f53b36e23eaf';
+export { INSFORGE_APP_URL, INSFORGE_API_KEY } from './insforge-constants';
 
 export async function getAuthToken(): Promise<string | null> {
   const cookieStore = await cookies();
@@ -11,8 +11,8 @@ export async function getAuthToken(): Promise<string | null> {
 
 export function createInsforgeAdmin(): InsForgeClient {
   return createClient({
-    baseUrl: BASE_URL,
-    anonKey: API_KEY,
+    baseUrl: INSFORGE_APP_URL,
+    anonKey: INSFORGE_API_KEY,
     isServerMode: true,
   });
 }
@@ -26,9 +26,9 @@ export async function fetchFromInsForge(table: string, options: {
   body?: any;
 } = {}) {
   const { method = 'GET', token, params, body } = options;
-  const authToken = token || API_KEY;
+  const authToken = token || INSFORGE_API_KEY;
 
-  let url = `${BASE_URL}/api/db/${table}`;
+  let url = `${INSFORGE_APP_URL}/api/database/records/${table}`;
   if (params) {
     const searchParams = new URLSearchParams(params);
     url += `?${searchParams.toString()}`;
@@ -57,6 +57,6 @@ export async function fetchFromInsForge(table: string, options: {
 }
 
 export async function queryTable(table: string, token?: string) {
-  const authToken = token || (await getAuthToken()) || API_KEY;
+  const authToken = token || (await getAuthToken()) || INSFORGE_API_KEY;
   return fetchFromInsForge(table, { token: authToken });
 }

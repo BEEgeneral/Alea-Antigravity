@@ -60,14 +60,15 @@ export default function InvestmentRadar() {
                 return;
             }
 
-            // Get user role from profiles table
+            // Get user role from user_profiles table
             const { data: profile } = await insforge.database
-                .from('profiles')
-                .select('role')
-                .eq('id', userId)
+                .from('user_profiles')
+                .select('role, is_approved')
+                .eq('auth_user_id', userId)
                 .single();
             
             const userRole = profile?.role;
+            const isApproved = profile?.is_approved;
 
             // 1. Admin or agent by profile role → instant access
             if (userRole === 'admin' || userRole === 'agent') {

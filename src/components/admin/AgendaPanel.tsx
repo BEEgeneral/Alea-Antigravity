@@ -8,8 +8,8 @@ import {
   Mail, Phone, FileText, MoreVertical, Filter, X,
   RefreshCw, Link2, ExternalLink, Check
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { insforge } from "@/lib/insforge-client";
 import { AgendaAction, AgendaSuggestion, ActionType, ActionPriority, ActionStatus } from "@/types/admin";
 
 const ACTION_ICONS: Record<string, any> = {
@@ -135,7 +135,7 @@ export default function AgendaPanel({ leadId, isEmbedded }: AgendaPanelProps) {
     let url = "/api/agenda/actions?limit=50";
     if (leadId) url += `&lead_id=${leadId}`;
     
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await insforge.auth.getCurrentUser();
     if (!user) return;
 
     const res = await fetch(url);
@@ -153,7 +153,7 @@ export default function AgendaPanel({ leadId, isEmbedded }: AgendaPanelProps) {
   async function createAction() {
     if (!newAction.title || !newAction.due_date) return;
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await insforge.auth.getCurrentUser();
     if (!user) return;
 
     const res = await fetch("/api/agenda/actions", {

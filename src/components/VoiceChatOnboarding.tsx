@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mic, Square, ArrowRight, ShieldCheck, ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 
 // Simulation of the AI conversational steps
 const STEPS = [
@@ -82,91 +81,26 @@ export function VoiceChatOnboarding() {
                     try {
                         const finalEmail = (userData.email || "").replace(/\s+/g, '').replace(/\.$/, '').toLowerCase();
 
-                        // Robust ticket calculation (supports decimals and explicit 'm' or 'millones')
-                        let ticketBase = userData.ticketSize?.toLowerCase() || "0";
-                        const numericMatch = ticketBase.match(/[\d.]+/);
-                        const ticketValue = numericMatch ? parseFloat(numericMatch[0]) * 1000000 : 0;
-
-                        console.log("Onboarding: [DEBUG] Starting saveInvestor");
-                        console.log("Onboarding: [DEBUG] finalEmail:", finalEmail);
-                        console.log("Onboarding: [DEBUG] userData:", userData);
-
-                        console.log("Onboarding: [DEBUG] Attempting passwordless auth.signUp...");
-                        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-                            email: finalEmail,
-                            password: crypto.randomUUID() + "A1!", // Supabase still requires a password for signUp unless using OTP specific methods, but we'll treat it as internal and never show it.
-                            options: {
-                                data: {
-                                    full_name: userData.name || "Anon Inversor",
-                                    role: 'investor'
-                                },
-                                emailRedirectTo: `${window.location.origin}/radar`
-                            }
+                        const res = await fetch('/api/auth/register', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                email: finalEmail,
+                                password: crypto.randomUUID() + "A1!",
+                                name: userData.name || "Anon Inversor"
+                            })
                         });
 
-                        if (signUpError) {
-                            console.error("Onboarding: [ERROR] signUpError:", signUpError);
-                            console.dir(signUpError);
-                            throw signUpError;
+                        const data = await res.json();
+
+                        if (!res.ok) {
+                            console.error("Registration error:", data.error);
                         }
 
-                        console.log("Onboarding: [DEBUG] signUp Success. Data:", signUpData);
-                        const userId = signUpData.user?.id;
-
-                        if (!userId) {
-                            console.warn("Onboarding: [WARN] No userId returned from signUp. This might happen if the user already exists and confirmation is required.");
-                        }
-
-                        // 2. Create investor record in public.investors using the AUTH ID
-                        if (userId) {
-                            const { error: dbError } = await supabase
-                                .from('investors')
-                                .insert([{
-                                    id: userId, // Match the Auth ID
-                                    full_name: userData.name || "Anon Inversor",
-                                    phone: userData.phone || "",
-                                    source_of_funds: 'hnwi', // Default mapping for now
-                                    max_ticket_eur: ticketValue,
-                                    is_verified: false
-                                }]);
-
-                            if (dbError) console.warn("Database record creation warning:", dbError.message);
-
-                            // 3. Trigger Phase 1: Welcome & Identity Confirmation
-                            await supabase.functions.invoke('send-welcome-email', {
-                                body: {
-                                    email: finalEmail,
-                                    name: userData.name || "Inversor",
-                                    origin: window.location.origin
-                                }
-                            });
-
-                            // 4. Trigger Phase 2: Instant Access (Magic Link)
-                            // Even though they confirm in phase 1, we send the magic link immediately 
-                            // so they have it in their inbox for future one-click access.
-                            await supabase.functions.invoke('send-access-email', {
-                                body: {
-                                    email: finalEmail,
-                                    name: userData.name || "Inversor",
-                                    origin: window.location.origin
-                                }
-                            });
-                        }
-
-                        // Clear local cache for security
                         localStorage.removeItem('alea_investor_name');
-
-                        // After successful signup request, show confirmation step
                         setCurrentStepIndex(STEPS.length - 1);
                     } catch (err) {
                         console.error("Onboarding: [CRITICAL ERROR] Error saving investor lead:", err);
-                        console.dir(err);
-                        if (err && typeof err === 'object' && 'name' in err) {
-                            console.log("Onboarding: Error Name:", (err as any).name);
-                            console.log("Onboarding: Error Message:", (err as any).message);
-                        }
-                        // Even if there's an error (like user already exists), we show the confirmation
-                        // because they likely need to follow the email instructions.
                         setCurrentStepIndex(STEPS.length - 1);
                     }
                 };

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import PageTransition from "@/components/PageTransition";
+import ClientLayout from "@/components/ClientLayout";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -48,9 +49,11 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <body className={`${inter.variable} ${playfair.variable} antialiased`} suppressHydrationWarning>
-        <PageTransition>
-          {children}
-        </PageTransition>
+        <ClientLayout>
+          <PageTransition>
+            {children}
+          </PageTransition>
+        </ClientLayout>
       </body>
     </html>
   );

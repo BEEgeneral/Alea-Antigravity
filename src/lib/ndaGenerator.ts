@@ -186,26 +186,37 @@ export async function generateNdaPDF(
   doc.text("En prueba de conformidad, Las Partes FIRMAN el presente Acuerdo de Confidencialidad.", margin, y);
   y += 15;
 
-  const signatureBoxWidth = (contentWidth - 10) / 2;
-  const signatureBoxHeight = 30;
+  const signatureBoxWidth = contentWidth / Math.min(intervinientes.length, 3);
+  const signatureBoxHeight = 35;
+  const signaturesPerRow = Math.min(intervinientes.length, 3);
+  const rows = Math.ceil(intervinientes.length / signaturesPerRow);
 
   intervinientes.forEach((interviniente, index) => {
-    const xPos = index === 0 ? margin : margin + signatureBoxWidth + 10;
+    const row = Math.floor(index / signaturesPerRow);
+    const col = index % signaturesPerRow;
+    const xPos = margin + col * signatureBoxWidth;
+    const yPos = y + row * (signatureBoxHeight + 10);
+
+    if (yPos + signatureBoxHeight > 280) {
+      doc.addPage();
+    }
 
     doc.setDrawColor(200);
-    doc.rect(xPos, y, signatureBoxWidth, signatureBoxHeight);
+    doc.rect(xPos + 2, yPos, signatureBoxWidth - 4, signatureBoxHeight);
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
-    doc.text(interviniente.nombre, xPos + 5, y + 8);
+    doc.text(interviniente.nombre, xPos + 6, yPos + 8);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
-    doc.text(`DNI: ${interviniente.dni}`, xPos + 5, y + 14);
-    doc.text("Firma:", xPos + 5, y + 22);
-    doc.line(xPos + 15, y + 22, xPos + signatureBoxWidth - 5, y + 22);
-    doc.text("Fecha:", xPos + 5, y + 28);
-    doc.line(xPos + 15, y + 28, xPos + signatureBoxWidth - 5, y + 28);
+    doc.text(`DNI: ${interviniente.dni}`, xPos + 6, yPos + 14);
+    doc.text("Firma:", xPos + 6, yPos + 24);
+    doc.line(xPos + 16, yPos + 24, xPos + signatureBoxWidth - 6, yPos + 24);
+    doc.text("Fecha:", xPos + 6, yPos + 32);
+    doc.line(xPos + 16, yPos + 32, xPos + signatureBoxWidth - 6, yPos + 32);
   });
+
+  y += rows * (signatureBoxHeight + 10);
 
   const fileName = `NDA_AleaSignature_${fecha.replace(/\s/g, "_")}.pdf`;
   const base64 = doc.output("datauristring").split(",")[1];

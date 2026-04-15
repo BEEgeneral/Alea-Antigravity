@@ -32,8 +32,8 @@ export default function NDAForm() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [fecha, setFecha] = useState(new Date().toLocaleDateString("es-ES"));
   const [intervinientes, setIntervinientes] = useState<Interviniente[]>([
-    { nombre: "Alicia Hernández Ruiz", dni: "09192093M", email: "", rol: "Representante Alea Signature" },
-    { nombre: "Alberto Hernández Gala", dni: "14301422E", email: "", rol: "Representante Alea Signature" },
+    { nombre: "Alicia Hernández Ruiz", dni: "09192093M", email: "alicia@aleasignature.com", rol: "Representante Alea Signature" },
+    { nombre: "Alberto Hernández Gala", dni: "14301422E", email: "albertogala@aleasignature.com", rol: "Representante Alea Signature" },
   ]);
 
   useEffect(() => {

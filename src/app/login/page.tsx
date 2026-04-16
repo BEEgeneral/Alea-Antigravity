@@ -27,7 +27,13 @@ function LoginForm() {
     }, [errorParam]);
 
     useEffect(() => {
-        fetch('/api/auth/me')
+        const token = localStorage.getItem('insforge_token');
+        const headers: HeadersInit = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        fetch('/api/auth/me', { headers })
             .then(res => {
                 if (res.ok) return res.json();
                 throw new Error('Not authenticated');
@@ -61,6 +67,7 @@ function LoginForm() {
 
             if (data.accessToken) {
                 setInsforgeToken(data.accessToken);
+                localStorage.setItem('insforge_token', data.accessToken);
             }
 
             if (data.redirectPath) {

@@ -394,19 +394,25 @@ export default function AdminDashboard() {
     useEffect(() => {
         const checkAuth = async () => {
             try {
-                const res = await fetch('/api/auth/me');
+                const token = localStorage.getItem('insforge_token');
+                const headers: HeadersInit = {};
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+
+                const res = await fetch('/api/auth/me', { headers });
                 if (!res.ok) {
                     router.push("/login");
                     return;
                 }
-                
+
                 const { user, profile } = await res.json();
-                
+
                 if (!user || !profile) {
                     router.push("/login");
                     return;
                 }
-                
+
                 const normalizedEmail = user.email?.toLowerCase();
                 const isGodMode = normalizedEmail === 'beenocode@gmail.com' || normalizedEmail === 'albertogala@beenocode.com';
 

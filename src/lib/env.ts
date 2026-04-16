@@ -41,6 +41,15 @@ export const env = {
   /** Default from email for outgoing emails */
   EMAIL_FROM: process.env.EMAIL_FROM || 'Alea Signature <radar@aleasignature.com>',
 
+  /** IMAP Configuration for email polling */
+  IMAP_HOST: process.env.IMAP_HOST || 'mail.aleasignature.com',
+  IMAP_USER: process.env.IMAP_USER || '',
+  IMAP_PASSWORD: process.env.IMAP_PASSWORD || '',
+  IMAP_INTERVAL: parseInt(process.env.IMAP_INTERVAL || '900', 10),
+
+  /** MiniMax API Key */
+  MINIMAX_API_KEY: process.env.MINIMAX_API_KEY || '',
+
   // --- Helper Methods ---
 
   /** Returns true if running in Production */

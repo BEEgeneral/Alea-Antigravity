@@ -1,10 +1,8 @@
 // GEMINI ONLY - NO GROQ - Updated 2026-03-27
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { insforgeAdmin } from '@/lib/insforge-admin';
 import { env } from '@/lib/env';
-
-const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
+import { analyzeWithMinimax } from '@/lib/minimax';
 
 export async function POST(req: Request) {
     try {
@@ -195,36 +193,36 @@ export async function POST(req: Request) {
         ---
         ${fullText.substring(0, 3000)}`;
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-        
-        const extractionResult = await model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: {
-                temperature: 0.1,
-                responseMimeType: 'application/json'
-            }
-        });
+        // Usar MiniMax para análisis
+        const { analysis: extractionData, rawResponse: extractionRaw } = await analyzeWithMinimax(
+            prompt,
+            undefined
+        );
 
-        const interpretationResult = await model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: interpretPrompt }] }],
-            generationConfig: {
-                temperature: 0.2,
-                maxOutputTokens: 800
-            }
-        });
+        const { analysis: interpretationData, rawResponse: interpretationRaw } = await analyzeWithMinimax(
+            interpretPrompt,
+            'Eres un asistente de CRM inmobiliario. Responde de forma clara y estructurada.'
+        );
 
         let extractedData: any = {};
-        let aiInterpretation = null;
+        let aiInterpretation: string | null = null;
 
         try {
-            const extractionText = extractionResult.response.text();
-            extractedData = JSON.parse(extractionText);
+            if (typeof extractionData === 'object' && extractionData !== null) {
+                extractedData = extractionData;
+            } else {
+                extractedData = JSON.parse(extractionRaw);
+            }
         } catch (e) {
             console.error('Error parsing extraction:', e);
         }
 
         try {
-            aiInterpretation = interpretationResult.response.text();
+            if (typeof interpretationData === 'object' && interpretationData !== null) {
+                aiInterpretation = JSON.stringify(interpretationData, null, 2);
+            } else {
+                aiInterpretation = interpretationRaw;
+            }
         } catch (e) {
             console.error('Error parsing interpretation:', e);
         }
@@ -233,6 +231,55 @@ export async function POST(req: Request) {
         let senderEmail = from;
         if (from.includes('<')) {
             senderEmail = from.match(/<(.+)>/)?.[1] || from;
+        }
+
+        // DEDUPLICACIÓN: Verificar si ya existe email similar en las últimas 24h
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { data: existingEmails } = await insforgeAdmin
+            .database
+            .from('iai_inbox_suggestions')
+            .select('id, original_email_subject, sender_email, created_at')
+            .eq('sender_email', senderEmail)
+            .gte('created_at', twentyFourHoursAgo)
+            .limit(5);
+
+        let isDuplicate = false;
+        if (existingEmails && existingEmails.length > 0) {
+            // Verificar si hay coincidencia en subject (ignorando mayúsculas/minúsculas y espacios)
+            const normalizedSubject = subject.toLowerCase().replace(/\s+/g, ' ').trim();
+            for (const existing of existingEmails) {
+                const existingNormalized = existing.original_email_subject?.toLowerCase().replace(/\s+/g, ' ').trim() || '';
+                if (normalizedSubject === existingNormalized || normalizedSubject.includes(existingNormalized) || existingNormalized.includes(normalizedSubject)) {
+                    isDuplicate = true;
+                    break;
+                }
+            }
+        }
+
+        if (isDuplicate) {
+            return NextResponse.json({
+                success: true,
+                duplicate: true,
+                message: 'Email duplicado - ya existe en bandeja de entrada'
+            });
+        }
+
+        // Verificar también por hash del contenido (primeros 500 caracteres)
+        const contentHash = fullText.substring(0, 500).replace(/\s+/g, ' ').trim();
+        const { data: similarEmails } = await insforgeAdmin
+            .database
+            .from('iai_inbox_suggestions')
+            .select('id')
+            .like('original_email_body', `%${contentHash.substring(0, 100)}%`)
+            .gte('created_at', twentyFourHoursAgo)
+            .limit(1);
+
+        if (similarEmails && similarEmails.length > 0) {
+            return NextResponse.json({
+                success: true,
+                duplicate: true,
+                message: 'Email duplicado - contenido similar ya existe'
+            });
         }
 
         const insertData = {

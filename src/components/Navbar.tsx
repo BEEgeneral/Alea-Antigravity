@@ -18,7 +18,13 @@ export default function Navbar() {
     const isLanding = pathname === "/";
 
     useEffect(() => {
-        fetch('/api/auth/me')
+        const token = localStorage.getItem('insforge_token');
+        const headers: HeadersInit = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        fetch('/api/auth/me', { headers })
             .then(res => {
                 if (!res.ok) throw new Error('Not authenticated');
                 return res.json();

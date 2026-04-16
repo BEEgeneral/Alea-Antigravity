@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { insforgeAdmin } from '@/lib/insforge-admin';
-import { env } from '@/lib/env';
-
-const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+import { generateText } from '@/lib/minimax';
 
 export async function POST(req: Request) {
     try {
@@ -58,12 +54,7 @@ Contenido del email:
 ${email_body}
 """`;
 
-        const completionResult = await model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.2, maxOutputTokens: 1000 }
-        });
-
-        const interpretation = completionResult.response.text();
+        const interpretation = await generateText(prompt, { temperature: 0.2, maxTokens: 1000 });
 
         if (!interpretation) {
             throw new Error('No se recibió respuesta de la IA');

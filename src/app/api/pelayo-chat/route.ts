@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createAuthenticatedClient, INSFORGE_APP_URL, INSFORGE_API_KEY } from '@/lib/insforge-server';
 import { env } from '@/lib/env';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -10,9 +9,7 @@ import {
     investorWingName,
     type HallType 
 } from '@/lib/memory';
-
-const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+import { analyzeWithMinimax, generateText } from '@/lib/minimax';
 
 type Tables = 'leads' | 'properties' | 'investors' | 'mandatarios' | 'collaborators';
 
@@ -24,6 +21,39 @@ async function getTableData(client: Awaited<ReturnType<typeof createAuthenticate
 async function createRecord(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, table: Tables, record: any) {
     const { data, error } = await client.database.from(table).insert(record).select().single();
     return { data, error };
+}
+
+async function checkEntityExists(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, entityType: string, searchData: any): Promise<{ exists: boolean; existing?: any; table?: string }> {
+    const tableMap: Record<string, string> = {
+        'investor': 'investors',
+        'property': 'properties',
+        'lead': 'leads',
+        'mandatario': 'mandatarios'
+    };
+
+    const table = tableMap[entityType];
+    if (!table) return { exists: false };
+
+    let query = client.database.from(table).select('*').limit(1);
+
+    if (searchData.email) {
+        query = query.eq('email', searchData.email);
+    } else if (searchData.name) {
+        query = query.ilike('full_name', `%${searchData.name}%`);
+    } else if (searchData.title) {
+        query = query.ilike('title', `%${searchData.title}%`);
+    }
+
+    const { data, error } = await query;
+    if (error || !data || data.length === 0) {
+        return { exists: false };
+    }
+
+    return { exists: true, existing: data[0], table };
+}
+
+async function getExistingEntity(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, entityType: string, searchData: any) {
+    return checkEntityExists(client, entityType, searchData);
 }
 
 async function saveConversation(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, userId: string, role: 'user' | 'assistant', content: string, analysis?: any) {
@@ -322,14 +352,18 @@ Responde en JSON:
   "opportunity_description": "descripción si es oportunidad" | null
 }`;
 
-        const analysisResult = await model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: analysisPrompt }] }],
-            generationConfig: { temperature: 0.1, responseMimeType: 'application/json' }
-        });
+        const analysisResult = await analyzeWithMinimax(
+            analysisPrompt,
+            'Eres un analizador de intenciones. Responde en JSON estricto.'
+        );
 
         let analysis: any = { intent: 'none', entity: 'none', confidence: 0 };
         try {
-            analysis = JSON.parse(analysisResult.response.text());
+            if (typeof analysisResult.analysis === 'object' && analysisResult.analysis !== null) {
+                analysis = analysisResult.analysis;
+            } else {
+                analysis = JSON.parse(analysisResult.rawResponse);
+            }
         } catch (e) {}
 
         // Save user message to history
@@ -423,17 +457,14 @@ ${summary}
 
 El usuario pregunta: ${message}`;
 
-        const chatHistory = [
-            { role: 'user', parts: [{ text: systemPrompt }] },
-            { role: 'user', parts: [{ text: message }] }
-        ];
+        const fullPrompt = `${systemPrompt}\n\n---\nUSER INPUT: ${message}`;
 
-        const completionResult = await model.generateContent({
-            contents: chatHistory,
-            generationConfig: { temperature: 0.5, maxOutputTokens: 1500 }
+        const response = await generateText(fullPrompt, {
+            temperature: 0.5,
+            maxTokens: 1500
         });
 
-        let response = completionResult.response.text() || 'Entendido. ¿Hay algo específico del CRM que te gustaría saber?';
+        let responseText = response || 'Entendido. ¿Hay algo específico del CRM que te gustaría saber?';
 
         // If AI detected a create intent with high confidence, suggest creating
         if (analysis.intent === 'create' && analysis.entity !== 'none' && analysis.data && analysis.confidence > 0.7 && !pendingAction) {
@@ -445,12 +476,12 @@ El usuario pregunta: ${message}`;
             };
             const pendingRecord = await createPendingAction(client, userId, actionType, analysis.entity, dataWithImages);
 
-            response += `\n\n📝 **Vista previa:** Parece que quieres crear un ${analysis.entity}. Datos detectados:\n\`\`\`${JSON.stringify(analysis.data, null, 2)}\`\`\``;
+            responseText += `\n\n📝 **Vista previa:** Parece que quieres crear un ${analysis.entity}. Datos detectados:\n\`\`\`${JSON.stringify(analysis.data, null, 2)}\`\`\``;
             if (uploadedImageUrls.length > 0) {
-                response += `\n📷 ${uploadedImageUrls.length} imagen(es) del dossier adjuntada(s)`;
+                responseText += `\n📷 ${uploadedImageUrls.length} imagen(es) del dossier adjuntada(s)`;
             }
-            response += `\n\nResponde "sí, créalo" para confirmar o "cancelar" para否决ar.`;
-            response += `\n\n[pending_action:${pendingRecord?.id}]`;
+            responseText += `\n\nResponde "sí, créalo" para confirmar o "cancelar" para否决ar.`;
+            responseText += `\n\n[pending_action:${pendingRecord?.id}]`;
         }
 
         // If this is a high-value opportunity, create notification
@@ -462,11 +493,11 @@ El usuario pregunta: ${message}`;
                 '🚨 Oportunidad detectada',
                 analysis.opportunity_description || `Posible ${analysis.entity} de alto valor`
             );
-            response += '\n\n⚠️ He detectado una oportunidad potencialmente importante y te he enviado una notificación.';
+            responseText += '\n\n⚠️ He detectado una oportunidad potencialmente importante y te he enviado una notificación.';
         }
 
         // Save assistant response to history
-        await saveConversation(client, userId, 'assistant', response, analysis);
+        await saveConversation(client, userId, 'assistant', responseText, analysis);
 
         // Store interaction in memory (MemPalace-style)
         try {
@@ -514,7 +545,7 @@ El usuario pregunta: ${message}`;
             .eq('status', 'pending');
 
         return NextResponse.json({
-            response,
+            response: responseText,
             analysis,
             pendingAction: userPendingActions.data?.[0] || null,
             pendingActionsCount: userPendingActions.data?.length || 0,

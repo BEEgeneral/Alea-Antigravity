@@ -11,10 +11,10 @@ export async function POST(request: NextRequest) {
         const { fecha, intervinientes, pdfBase64, fileName, action, ndaId } = body;
 
         if (action === "send_for_signature" && ndaId) {
-            return handleSendForSignature(ndaId, intervinientes, pdfBase64, fileName);
+            return handleSendForSignature(request, ndaId, intervinientes, pdfBase64, fileName);
         }
 
-        return handleCreateAndSave(fecha, intervinientes, pdfBase64, fileName);
+        return handleCreateAndSave(request, fecha, intervinientes, pdfBase64, fileName);
     } catch (error) {
         console.error("Error in NDA API:", error);
         return NextResponse.json(
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     }
 }
 
-async function handleCreateAndSave(fecha: string, intervinientes: any[], pdfBase64: string | null, fileName: string | null) {
+async function handleCreateAndSave(request: NextRequest, fecha: string, intervinientes: any[], pdfBase64: string | null, fileName: string | null) {
     let pdfUrl = null;
 
     if (pdfBase64 && fileName) {
@@ -48,7 +48,7 @@ async function handleCreateAndSave(fecha: string, intervinientes: any[], pdfBase
         }
     }
 
-    const client = await createAuthenticatedClient();
+    const client = await createAuthenticatedClient(request);
 
     const { data: nda, error: ndaError } = await client.database
         .from("nda_agreements")
@@ -92,7 +92,7 @@ async function handleCreateAndSave(fecha: string, intervinientes: any[], pdfBase
     });
 }
 
-async function handleSendForSignature(ndaId: string, intervinientes: any[], pdfBase64: string, fileName: string) {
+async function handleSendForSignature(request: NextRequest, ndaId: string, intervinientes: any[], pdfBase64: string, fileName: string) {
     const connected = await isAdobeConnected();
     if (!connected) {
         return NextResponse.json(
@@ -140,7 +140,7 @@ async function handleSendForSignature(ndaId: string, intervinientes: any[], pdfB
             })
         );
 
-        const client = await createAuthenticatedClient();
+        const client = await createAuthenticatedClient(request);
         await client.database
             .from("nda_agreements")
             .update({
@@ -164,9 +164,9 @@ async function handleSendForSignature(ndaId: string, intervinientes: any[], pdfB
     }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
-        const client = await createAuthenticatedClient();
+        const client = await createAuthenticatedClient(request);
         const { data: ndas, error } = await client.database
             .from("nda_agreements")
             .select(`
@@ -204,7 +204,7 @@ export async function PATCH(request: NextRequest) {
             );
         }
 
-        const client = await createAuthenticatedClient();
+        const client = await createAuthenticatedClient(request);
         const { data, error } = await client.database
             .from("nda_agreements")
             .update({ estado, updated_at: new Date().toISOString() })

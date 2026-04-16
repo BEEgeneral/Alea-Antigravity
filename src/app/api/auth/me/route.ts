@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { insforge, getRedirectPath } from '@/lib/insforge';
+import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get('insforge_token')?.value;
+    let token = request.cookies.get('insforge_token')?.value;
+    const authHeader = request.headers.get('authorization');
+
+    if (!token && authHeader?.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
 
     if (!token) {
       return NextResponse.json(
@@ -12,7 +18,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data, error } = await insforge.auth.getCurrentUser();
+    const client = insforge;
+    (client.auth as any).setAuthToken(token);
+
+    const { data, error } = await client.auth.getCurrentUser();
 
     if (error || !data?.user) {
       const response = NextResponse.json(
@@ -23,7 +32,7 @@ export async function GET(request: NextRequest) {
       return response;
     }
 
-    const { data: profile } = await insforge
+    const { data: profile } = await client
       .database
       .from('user_profiles')
       .select('*')

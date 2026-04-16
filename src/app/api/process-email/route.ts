@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { insforgeAdmin } from '@/lib/insforge-admin';
-import { env } from '@/lib/env';
-
-const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+import { analyzeWithMinimax, generateText } from '@/lib/minimax';
 
 export async function POST(req: Request) {
     try {
@@ -78,27 +74,23 @@ ${text}
 """`;
 
         const [extractionResult, interpretationResult] = await Promise.all([
-            model.generateContent({
-                contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 0.1, responseMimeType: 'application/json' }
-            }),
-            model.generateContent({
-                contents: [{ role: 'user', parts: [{ text: interpretPrompt }] }],
-                generationConfig: { temperature: 0.2, maxOutputTokens: 1000 }
-            })
+            analyzeWithMinimax(prompt, 'Eres un analizador de emails inmobiliarios. Responde en JSON estricto.'),
+            generateText(interpretPrompt, { temperature: 0.2, maxTokens: 1000 })
         ]);
 
         let extractedData: any = {};
         let aiInterpretation = null;
 
         try {
-            extractedData = JSON.parse(extractionResult.response.text());
+            extractedData = typeof extractionResult.analysis === 'object' && extractionResult.analysis !== null
+                ? extractionResult.analysis
+                : JSON.parse(extractionResult.rawResponse);
         } catch (e) {
             console.error('Error parsing extraction:', e);
         }
 
         try {
-            aiInterpretation = interpretationResult.response.text();
+            aiInterpretation = interpretationResult;
         } catch (e) {
             console.error('Error parsing interpretation:', e);
         }

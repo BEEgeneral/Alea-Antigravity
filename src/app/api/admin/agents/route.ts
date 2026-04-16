@@ -1,9 +1,9 @@
 import { createAuthenticatedClient } from "@/lib/insforge-server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
-        const client = await createAuthenticatedClient();
+        const client = await createAuthenticatedClient(request);
 
         const { data: agents, error } = await client.database
             .from("agents")
@@ -11,10 +11,11 @@ export async function GET() {
             .order("full_name");
 
         if (error) {
-            return NextResponse.json({ error: error.message }, { status: 500 });
+            console.error("Error fetching agents:", error);
+            return NextResponse.json({ error: error.message, details: error }, { status: 500 });
         }
 
-        return NextResponse.json({ agents });
+        return NextResponse.json({ agents: agents || [] });
     } catch (error: any) {
         console.error("Error fetching agents:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });

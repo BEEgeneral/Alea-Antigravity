@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { env } from '@/lib/env';
-
-const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+import { analyzeWithMinimax } from '@/lib/minimax';
 
 export async function POST(req: Request) {
     try {
@@ -45,18 +42,19 @@ export async function POST(req: Request) {
         """
         `;
 
-        const completionResult = await model.generateContent({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
-        });
+        const { analysis, rawResponse } = await analyzeWithMinimax(prompt, 'Eres un analizador de documentos inmobiliarios. Responde en JSON estricto.');
 
-        const content = completionResult.response.text();
-
-        if (!content) {
-            throw new Error("No response from Gemini");
+        if (!rawResponse) {
+            throw new Error("No response from MiniMax");
         }
 
-        const result = JSON.parse(content);
+        let result;
+        try {
+            result = typeof analysis === 'object' && analysis !== null ? analysis : JSON.parse(rawResponse);
+        } catch {
+            result = JSON.parse(rawResponse);
+        }
+
         return NextResponse.json(result);
 
     } catch (error: any) {

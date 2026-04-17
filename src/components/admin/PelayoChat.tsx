@@ -168,10 +168,14 @@ export default function PelayoChat({ isOpen, onClose, context, userInfo }: AICha
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 60000);
+      const token = localStorage.getItem('insforge_token') || '';
 
       const response = await fetch('/api/pelayo-chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         signal: controller.signal,
         body: JSON.stringify({
           message: userMessage.content,

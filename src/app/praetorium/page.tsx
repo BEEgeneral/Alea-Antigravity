@@ -26,7 +26,6 @@ import {
     Interaction,
 } from "@/types/admin";
 import AIChat from "@/components/admin/AIChat";
-import PelayoChat from "@/components/admin/PelayoChat";
 import ValuationAgent from "@/components/admin/ValuationAgent";
 import AgendaPanel from "@/components/admin/AgendaPanel";
 import AIDashboard from "@/components/admin/AIDashboard";
@@ -157,7 +156,6 @@ export default function AdminDashboard() {
     const [isSelectingInvestorForLead, setIsSelectingInvestorForLead] = useState(false);
     const [targetPropertyForLead, setTargetPropertyForLead] = useState<any>(null);
     const [agentForm, setAgentForm] = useState({ full_name: "", email: "", role: "agent" });
-    const [showAIChat, setShowAIChat] = useState(false);
     const [investorForm, setInvestorForm] = useState<any>({
         full_name: "",
         company_name: "",
@@ -2974,31 +2972,6 @@ useEffect(() => {
                 />
             </main>
             
-            {/* Botón flotante del Chat IA */}
-            <button
-                onClick={() => setShowAIChat(true)}
-                className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-emerald-500 to-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all z-50 animate-pulse"
-            >
-                <Sparkles size={28} />
-            </button>
-            
-            {/* Chat Pelayo - Asistente Principal */}
-            <PelayoChat 
-                isOpen={showAIChat} 
-                onClose={() => setShowAIChat(false)}
-                context={{
-                    leads,
-                    properties,
-                    investors,
-                    iaiSuggestions,
-                    mandatarios
-                }}
-                userInfo={{
-                    id: currentUser?.id,
-                    email: currentUser?.email || '',
-                    role: currentUser?.role || 'agent'
-                }}
-            />
-        </div>
+            </div>
     );
 }

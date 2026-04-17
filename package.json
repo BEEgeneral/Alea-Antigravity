@@ -21,6 +21,7 @@
     "@vercel/edge": "^1.2.2",
     "abort-controller": "^3.0.0",
     "agentkeepalive": "^4.6.0",
+    "docx": "^9.6.1",
     "formdata-node": "^6.0.3",
     "framer-motion": "^12.34.3",
     "imap": "^0.8.19",

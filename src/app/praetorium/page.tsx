@@ -2,13 +2,13 @@
 "use client";
 
 import {
-    Users, Building, Activity, ShieldAlert, ArrowUpRight, Search,
+    Users, Building, Activity, ShieldAlert, ArrowUpRight, Search, Shield,
     CheckCircle2, CheckCircle, FileText, Download, UserCheck, Mail, GripVertical,
     Clock, MapPin, LayoutDashboard, Plus, MoreHorizontal, Share2,
     ChevronLeft, Maximize2, Bed, Bath, Sparkles, TrendingUp, Wind,
     Trees, ShoppingBag, Umbrella, Tag, Calendar, ShieldCheck, Star,
-    Trash2, Edit2, Upload, Loader2, User, LogOut, Settings, Menu, X, Inbox, BrainCircuit, MessageCircle,
-    Check, Paperclip, Video
+    Trash2, Edit2, Upload, Loader2, User, LogOut, Settings, Menu, X, BrainCircuit, MessageCircle,
+    Check, Paperclip, Video, Inbox
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -2310,24 +2310,6 @@ useEffect(() => {
                         </div>
                     </button>
 
-                    {/* New Line: IAI Inbox */}
-                    {currentUser?.role === 'admin' && (
-                        <button
-                            onClick={() => { setActiveTab("iai_inbox"); setSelectedInvestor(null); setSelectedLead(null); }}
-                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${activeTab === "iai_inbox" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
-                        >
-                            <div className="flex items-center space-x-3">
-                                <Inbox size={18} className={activeTab === "iai_inbox" ? "text-primary" : "text-muted-foreground"} />
-                                <span>Bandeja IAI</span>
-                            </div>
-                            {iaiSuggestions.filter(s => s.status === 'pending').length > 0 && (
-                                <span className="bg-primary text-background text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">
-                                    {iaiSuggestions.filter(s => s.status === 'pending').length}
-                                </span>
-                            )}
-                        </button>
-                    )}
-
                     <button
                         onClick={() => { setActiveTab("investors"); setSelectedInvestor(null); setSelectedLead(null); }}
                         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "investors" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
@@ -2375,81 +2357,6 @@ useEffect(() => {
                         <Building size={18} />
                         <span>Activos</span>
                     </button>
-
-                    <button
-                        onClick={() => { setActiveTab("intelligence"); setSelectedInvestor(null); setSelectedLead(null); }}
-                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "intelligence" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
-                    >
-                        <Sparkles size={18} />
-                        <span>Alea Intelligence</span>
-                    </button>
-
-                    {/* AI Control Center - Admin only */}
-                    {currentUser?.role === 'admin' && (
-                        <button
-                            onClick={() => { setActiveTab("ai"); setSelectedInvestor(null); setSelectedLead(null); }}
-                            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "ai" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
-                        >
-                            <BrainCircuit size={18} />
-                            <span>AI Control Center</span>
-                        </button>
-                    )}
-
-{/* Alea Centurión */}
-                    {currentUser?.role === 'admin' && (
-                        <button
-                            onClick={() => { setActiveTab("centurion"); setSelectedInvestor(null); setSelectedLead(null); }}
-                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${activeTab === "centurion" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
-                        >
-                            <div className="flex items-center space-x-3">
-                                <BrainCircuit size={18} />
-                                <span>Alea Centurión</span>
-                            </div>
-                        </button>
-                    )}
-
-                    {/* Alea Agenda */}
-                    <button
-                        onClick={() => { setActiveTab("agenda"); setSelectedInvestor(null); setSelectedLead(null); }}
-                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${activeTab === "agenda" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
-                    >
-                        <div className="flex items-center space-x-3">
-                            <Calendar size={18} />
-                            <span>Alea Agenda</span>
-                        </div>
-                    </button>
-
-                    {/* Video Llamadas */}
-                    <button
-                        onClick={() => { setActiveTab("video"); setSelectedInvestor(null); setSelectedLead(null); }}
-                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${activeTab === "video" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
-                    >
-                        <div className="flex items-center space-x-3">
-                            <Video size={18} />
-                            <span>Video Llamadas</span>
-                        </div>
-                    </button>
-
-                    {/* Logs del Sistema - Admin only */}
-                    {currentUser?.role === 'admin' && (
-                        <button
-                            onClick={() => { setActiveTab("audit"); setSelectedInvestor(null); setSelectedLead(null); }}
-                            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "audit" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
-                        >
-                            <ShieldAlert size={18} />
-                            <span>Logs del Sistema</span>
-                        </button>
-                    )}
-
-                    {currentUser?.role === 'admin' && (
-                        <button
-                            onClick={() => { setActiveTab("agents"); setSelectedInvestor(null); setSelectedLead(null); }}
-                            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "agents" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
-                        >
-                            <UserCheck size={18} />
-                            <span>Gestión de Agentes</span>
-                        </button>
-                    )}
 
                 </nav>
 
@@ -2507,15 +2414,11 @@ useEffect(() => {
                             <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
                                 {[
                                     { id: "crm", label: "Operaciones Activas", icon: LayoutDashboard },
-                                    ...(currentUser?.role === 'admin' ? [{ id: "iai_inbox", label: "Bandeja IAI", icon: Inbox }] : []),
                                     { id: "investors", label: "Inversores (KYC)", icon: Users },
                                     { id: "mandatarios", label: "Mandatarios", icon: ShieldCheck },
                                     { id: "collaborators", label: "Colaboradores", icon: Share2 },
                                     { id: "templates", label: "Plantillas", icon: FileText },
                                     { id: "assets", label: "Activos", icon: Building },
-                                    { id: "intelligence", label: "Alea Intelligence", icon: Sparkles },
-                                    { id: "audit", label: "Logs del Sistema", icon: ShieldAlert },
-                                    ...(currentUser?.role === 'admin' ? [{ id: "agents", label: "Gestión de Agentes", icon: UserCheck }] : [])
                                 ].map((item) => (
                                     <button
                                         key={item.id}
@@ -2569,22 +2472,15 @@ useEffect(() => {
                         >
                             <Menu size={20} />
                         </button>
-                        <div>
+<div>
                             <h1 className="font-serif text-xl md:text-3xl font-medium tracking-tight">
                                 {activeTab === 'crm' ? 'Operaciones Activas' :
-                                    activeTab === 'iai_inbox' ? 'Bandeja de Inteligencia Artificial (IAI)' :
-                                        activeTab === 'investors' ? 'Directorio de Inversores' :
-                                            activeTab === 'mandatarios' ? 'Directorio de Mandatarios' :
+                                    activeTab === 'investors' ? 'Directorio de Inversores' :
+                                        activeTab === 'mandatarios' ? 'Directorio de Mandatarios' :
+                                            activeTab === 'collaborators' ? 'Colaboradores' :
                                                 activeTab === 'templates' ? 'Document Factory' :
-                                                    activeTab === 'nda' ? 'Acuerdos de Confidencialidad (NDA)' :
-                                                        activeTab === 'assets' ? 'Asset Portfolio' :
-                                                        activeTab === 'intelligence' ? 'Alea Intelligence Core' :
-                                                            activeTab === 'ai' ? 'AI Control Center' :
-                                                                            activeTab === 'centurion' ? 'Alea Centurión - Perfiles de Atención' :
-                                                                            activeTab === 'agenda' ? 'Alea Agenda - Acciones y Recordatorios' :
-                                                                            activeTab === 'video' ? 'Video Llamadas con Jitsi' :
-                                                                            activeTab === 'profile' ? 'Perfil de Usuario' :
-                                                                                activeTab === 'agents' ? 'Control de Agentes' : 'System Logs'}
+                                                    activeTab === 'assets' ? 'Asset Portfolio' :
+                                                        activeTab === 'profile' ? 'Perfil de Usuario' : 'Praetorium'}
                             </h1>
                             <div className="flex items-center space-x-2 mt-1 hidden sm:flex">
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -2596,6 +2492,13 @@ useEffect(() => {
                     </div>
 
                     <div className="flex items-center space-x-3 md:space-x-4">
+                        <Link
+                            href="/centurion"
+                            className="hidden sm:flex items-center space-x-2 px-4 py-2 bg-amber-500/10 text-amber-500 rounded-full hover:bg-amber-500/20 transition-all border border-amber-500/20"
+                        >
+                            <Shield size={16} />
+                            <span className="text-xs font-bold uppercase tracking-wider">Centurión</span>
+                        </Link>
                         <div className="bg-card border border-border px-4 py-2 rounded-full hidden sm:flex items-center space-x-2 focus-within:border-primary/50 transition-all shadow-sm">
                             <Search size={16} className="text-muted-foreground" />
                             <input type="text" placeholder="Buscar..." className="bg-transparent border-none focus:outline-none text-sm w-24 md:w-48" />
@@ -2895,129 +2798,6 @@ useEffect(() => {
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {activeTab === "intelligence" && (
-                                    <ValuationAgent />
-                                )}
-
-                                {activeTab === "ai" && (
-                                    <AIDashboard />
-                                )}
-
-                                {activeTab === "centurion" && (
-                                    <div className="max-w-6xl mx-auto w-full py-8">
-                                        <div className="bg-card border border-border rounded-[2.5rem] p-10 text-center">
-                                            <BrainCircuit size={48} className="mx-auto text-muted-foreground mb-4" />
-                                            <h2 className="font-serif text-2xl font-bold mb-2">Alea Centurión</h2>
-                                            <p className="text-muted-foreground">Sistema de perfiles OSINT para análisis de counterparts.</p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {activeTab === "agenda" && (
-                                    <div className="pb-20">
-                                        <AgendaPanel />
-                                    </div>
-                                )}
-
-                                {activeTab === "video" && (
-                                    <div className="pb-20">
-                                        <VideoCallPanel />
-                                    </div>
-                                )}
-
-                                {activeTab === "audit" && (
-                                    <div className="max-w-4xl mx-auto w-full space-y-6 mt-10">
-                                        <div className="bg-card border border-border rounded-[2.5rem] shadow-sm p-10">
-                                            <h2 className="font-serif text-xl font-medium mb-8">System Audit Trail</h2>
-                                            <div className="space-y-6">
-                                                {MOCK_ACTIVITY.map((log: any) => (
-                                                    <div key={log.id} className="flex space-x-6 items-start">
-                                                        <div className="mt-1 p-2 bg-primary/5 rounded-xl text-primary">
-                                                            <CheckCircle2 size={16} />
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-sm font-bold leading-tight">{log.detail}</p>
-                                                            <p className="text-xs text-muted-foreground mt-2 font-medium">{log.time} — Operativa Validada</p>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {activeTab === "agents" && (
-                                    <div className="max-w-4xl mx-auto w-full space-y-6 mt-10 pb-20">
-                                        <div className="bg-card border border-border rounded-[2.5rem] shadow-sm p-10">
-                                            <div className="flex justify-between items-center mb-8">
-                                                <div>
-                                                    <h2 className="font-serif text-xl font-medium">Control de Agentes</h2>
-                                                    <p className="text-xs text-muted-foreground mt-1">Gestión de accesos y roles del equipo.</p>
-                                                </div>
-                                                <div className="flex items-center space-x-4">
-                                                    <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-full uppercase tracking-widest">
-                                                        {agents.filter((a: Agent) => !a.is_approved).length} Pendientes
-                                                    </span>
-                                                    <button
-                                                        onClick={() => setIsAddingAgent(true)}
-                                                        className="flex items-center space-x-2 px-4 py-2 bg-primary text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:opacity-90 transition-all"
-                                                    >
-                                                        <Plus size={14} />
-                                                        <span>Dar de Alta</span>
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-4">
-                                                {agents.map((agent: Agent) => (
-                                                    <div key={agent.id} className="p-6 border border-border rounded-3xl flex items-center justify-between hover:bg-muted/30 transition-all group">
-                                                        <div className="flex items-center space-x-4">
-                                                            <div className="w-12 h-12 bg-primary/5 rounded-2xl flex items-center justify-center text-primary font-serif border border-primary/10">
-                                                                {agent.full_name?.charAt(0) || 'A'}
-                                                            </div>
-                                                            <div>
-                                                                <div className="flex items-center space-x-2">
-                                                                    <p className="text-sm font-bold">{agent.full_name}</p>
-                                                                    <span className={`text-[8px] ${agent.role === 'admin' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'} px-2 py-0.5 rounded-md font-bold uppercase tracking-widest`}>
-                                                                        {agent.role}
-                                                                    </span>
-                                                                </div>
-                                                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{agent.email}</p>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center space-x-3">
-                                                            <button
-                                                                onClick={() => setSelectedAgentToEdit(agent)}
-                                                                className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
-                                                            >
-                                                                <Edit2 size={16} />
-                                                            </button>
-                                                            {agent.is_approved ? (
-                                                                <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest px-4">Activo</span>
-                                                            ) : (
-                                                                <>
-                                                                    <button
-                                                                        onClick={() => handleRejectAgent(agent.id)}
-                                                                        className="px-4 py-2 border border-border rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-500/10 hover:text-red-500 transition-all"
-                                                                    >
-                                                                        Rechazar
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleApproveAgent(agent.id)}
-                                                                        className="px-4 py-2 bg-primary text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-primary/90 transition-all font-bold"
-                                                                    >
-                                                                        Aprobar
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ))}
                                             </div>
                                         </div>
                                     </div>

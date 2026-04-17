@@ -10,10 +10,11 @@ export function createServerClient(): InsForgeClient {
   });
 }
 
-export function createAuthenticatedClient(_token?: string): InsForgeClient {
+export function createAuthenticatedClient(token?: string): InsForgeClient {
   return createClient({
     baseUrl: INSFORGE_APP_URL,
     anonKey: INSFORGE_API_KEY,
+    edgeFunctionToken: token,
   });
 }
 

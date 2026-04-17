@@ -215,10 +215,7 @@ function LoginForm() {
 
                     <div className="mt-8 pt-8 border-t border-border/50 text-center">
                         <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60 leading-relaxed max-w-[200px] mx-auto font-medium">
-                            ¿No tienes cuenta? 
-                            <Link href="/register" className="text-primary hover:underline ml-1">
-                                Regístrate
-                            </Link>
+                            ¿No tienes cuenta? Contacta con un administrador.
                         </p>
                     </div>
                 </div>

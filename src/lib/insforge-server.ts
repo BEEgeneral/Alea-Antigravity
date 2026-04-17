@@ -28,17 +28,12 @@ export async function createAuthenticatedClient(request?: NextRequest): Promise<
     token = cookieStore.get('insforge_token')?.value;
   }
 
-  const client = createClient({
+  return createClient({
     baseUrl: INSFORGE_APP_URL,
     anonKey: INSFORGE_API_KEY,
     isServerMode: true,
+    edgeFunctionToken: token,
   });
-
-  if (token) {
-    (client.auth as any).setAuthToken(token);
-  }
-
-  return client;
 }
 
 export const insforge = createServerClient();

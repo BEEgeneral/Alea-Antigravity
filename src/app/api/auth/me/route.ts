@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { insforge, getRedirectPath } from '@/lib/insforge';
+import { createAuthenticatedClient, getRedirectPath } from '@/lib/insforge';
 import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
@@ -18,8 +18,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const client = insforge;
-    (client.auth as any).setAuthToken(token);
+    const client = createAuthenticatedClient(token);
 
     const { data, error } = await client.auth.getCurrentUser();
 

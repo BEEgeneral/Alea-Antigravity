@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAuthenticatedClient, INSFORGE_APP_URL, INSFORGE_API_KEY } from '@/lib/insforge-server';
+import { NextRequest } from 'next/server';
 import { env } from '@/lib/env';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { 
@@ -180,12 +181,12 @@ async function uploadImageToStorage(base64Data: string, fileName: string): Promi
     }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
     try {
         const rateLimitResponse = checkRateLimit(req);
         if (rateLimitResponse) return rateLimitResponse;
 
-        const client = await createAuthenticatedClient();
+        const client = await createAuthenticatedClient(req);
         const { data: { user } } = await client.auth.getCurrentUser();
         
         const { message, user: chatUser, action: userAction, pendingActionId, file, extractedContent } = await req.json();
@@ -568,8 +569,8 @@ El usuario pregunta: ${message}`;
     }
 }
 
-export async function GET(req: Request) {
-    const client = await createAuthenticatedClient();
+export async function GET(req: NextRequest) {
+    const client = await createAuthenticatedClient(req);
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get('userId');
     const type = searchParams.get('type') || 'notifications';

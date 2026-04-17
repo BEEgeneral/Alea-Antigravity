@@ -554,7 +554,17 @@ El usuario pregunta: ${message}`;
 
     } catch (error: any) {
         console.error('Pelayo error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error('MINIMAX_API_KEY set:', !!process.env.MINIMAX_API_KEY);
+        console.error('Error stack:', error.stack);
+        
+        return NextResponse.json({ 
+            error: error.message,
+            errorType: error.constructor.name,
+            envCheck: {
+                minimaxKeySet: !!process.env.MINIMAX_API_KEY,
+                minimaxKeyLength: process.env.MINIMAX_API_KEY?.length || 0
+            }
+        }, { status: 500 });
     }
 }
 

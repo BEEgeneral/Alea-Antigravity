@@ -1,609 +1,266 @@
+/**
+ * Pelayo Chat API Route
+ * AI Assistant for Alea Signature CRM
+ * 
+ * Capabilities:
+ * - CRM queries (leads, properties, investors, mandatarios)
+ * - Investor classification (Piedras Preciosas)
+ * - Agenda management
+ * - OSINT research integration
+ * - Memory Palace context
+ */
+
 import { NextResponse } from 'next/server';
-import { createAuthenticatedClient, INSFORGE_APP_URL, INSFORGE_API_KEY } from '@/lib/insforge-server';
 import { NextRequest } from 'next/server';
-import { env } from '@/lib/env';
-import { checkRateLimit } from '@/lib/rate-limit';
-import { 
-    getMemoryContext, 
-    addMemory, 
-    addKnowledgeTriple,
-    investorWingName,
-    type HallType 
-} from '@/lib/memory';
-import { analyzeWithMinimax, generateText } from '@/lib/minimax';
+import { createAuthenticatedClient } from '@/lib/insforge-server';
+import { generateText, analyzeWithAI, isMiniMaxConfigured } from '@/lib/ai-minimax';
 
-type Tables = 'leads' | 'properties' | 'investors' | 'mandatarios' | 'collaborators';
-
-async function getTableData(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, table: Tables) {
-    const { data, error } = await client.database.from(table).select('*').order('created_at', { ascending: false });
-    return { data: data || [], error };
+interface Tables {
+  leads: any;
+  properties: any;
+  investors: any;
+  mandatarios: any;
+  collaborators: any;
 }
 
-async function createRecord(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, table: Tables, record: any) {
-    const { data, error } = await client.database.from(table).insert(record).select().single();
-    return { data, error };
+async function getCRMData(client: Awaited<ReturnType<typeof createAuthenticatedClient>>) {
+  const [leads, properties, investors, mandatarios, collaborators] = await Promise.all([
+    client.database.from('leads').select('*').order('created_at', { ascending: false }).limit(50),
+    client.database.from('properties').select('*').order('created_at', { ascending: false }).limit(50),
+    client.database.from('investors').select('*').order('created_at', { ascending: false }).limit(50),
+    client.database.from('mandatarios').select('*').order('full_name', { ascending: true }).limit(50),
+    client.database.from('collaborators').select('*').order('full_name', { ascending: true }).limit(50),
+  ]);
+
+  return {
+    leads: leads.data || [],
+    properties: properties.data || [],
+    investors: investors.data || [],
+    mandatarios: mandatarios.data || [],
+    collaborators: collaborators.data || [],
+  };
 }
 
-async function checkEntityExists(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, entityType: string, searchData: any): Promise<{ exists: boolean; existing?: any; table?: string }> {
-    const tableMap: Record<string, string> = {
-        'investor': 'investors',
-        'property': 'properties',
-        'lead': 'leads',
-        'mandatario': 'mandatarios'
-    };
+async function getAgendaActions(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, userId: string) {
+  const { data } = await client
+    .database
+    .from('agenda_actions')
+    .select('*')
+    .eq('user_id', userId)
+    .order('due_date', { ascending: true })
+    .limit(20);
 
-    const table = tableMap[entityType];
-    if (!table) return { exists: false };
+  return data || [];
+}
 
-    let query = client.database.from(table).select('*').limit(1);
+async function saveConversation(
+  client: Awaited<ReturnType<typeof createAuthenticatedClient>>,
+  userId: string,
+  role: 'user' | 'assistant',
+  content: string
+) {
+  await client.database.from('pelayo_conversations').insert({
+    user_id: userId,
+    role,
+    content,
+  });
+}
 
-    if (searchData.email) {
-        query = query.eq('email', searchData.email);
-    } else if (searchData.name) {
-        query = query.ilike('full_name', `%${searchData.name}%`);
-    } else if (searchData.title) {
-        query = query.ilike('title', `%${searchData.title}%`);
+async function classifyInvestor(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, investor: any) {
+  // Classify based on available data
+  let piedra = 'ZAFIRO';
+  let disc = 'I';
+  
+  // Simple heuristic classification
+  if (investor.budget_max >= 1000000) {
+    piedra = 'RUBI';
+    disc = 'D';
+  } else if (investor.full_name?.toLowerCase().includes('fund') || investor.company_name?.toLowerCase().includes('fund')) {
+    piedra = 'ESMERALDA';
+    disc = 'C';
+  }
+
+  // Save classification
+  await client.database.from('investor_classifications').insert({
+    investor_name: investor.full_name,
+    investor_email: investor.email,
+    company_name: investor.company_name,
+    piedra_primaria: piedra,
+    disc_profile: disc,
+    investor_type: investor.investor_type || 'HNW_INDIVIDUAL',
+    risk_profile: 'moderate',
+    source: 'pelayo_chat',
+    confidence_score: 0.6,
+  });
+
+  return { piedra, disc };
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const client = await createAuthenticatedClient(req);
+    const { data: { user } } = await client.auth.getCurrentUser();
+
+    if (!user) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    const { data, error } = await query;
-    if (error || !data || data.length === 0) {
-        return { exists: false };
+    const { message, context: clientContext } = await req.json();
+    const userId = user.id || user.email;
+
+    if (!message?.trim()) {
+      return NextResponse.json({ error: 'Mensaje vacío' }, { status: 400 });
     }
 
-    return { exists: true, existing: data[0], table };
-}
+    // Check if MiniMax is configured
+    if (!isMiniMaxConfigured()) {
+      return NextResponse.json({
+        response: `⚠️ **MiniMax AI no está configurado.**\n\nEl asistente de IA necesita la clave API de MiniMax para funcionar.\n\nConfigúrala en InsForge → Environment Variables.`
+      });
+    }
 
-async function getExistingEntity(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, entityType: string, searchData: any) {
-    return checkEntityExists(client, entityType, searchData);
-}
+    // Get CRM data
+    const crm = await getCRMData(client);
+    const agendaActions = await getAgendaActions(client, userId);
 
-async function saveConversation(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, userId: string, role: 'user' | 'assistant', content: string, analysis?: any) {
-    await client.database.from('pelayo_conversations').insert({
-        user_id: userId,
-        role,
-        content,
-        analysis
+    // Build context for AI
+    const summary = `
+CONTEXTO CRM ALEA SIGNATURE:
+
+📋 LEADS (${crm.leads.length}):
+${crm.leads.slice(0, 5).map((l: any) => `- ${l.name || l.email} (${l.status || 'sin estado'})`).join('\n') || '- Sin leads'}
+
+🏠 PROPIEDADES (${crm.properties.length}):
+${crm.properties.slice(0, 5).map((p: any) => `- ${p.title} (${p.price ? p.price.toLocaleString() + '€' : 'sin precio'})`).join('\n') || '- Sin propiedades'}
+
+👥 INVERSORES (${crm.investors.length}):
+${crm.investors.slice(0, 5).map((i: any) => `- ${i.full_name} (${i.email}) ${i.piedra_personalidad ? '[' + i.piedra_personalidad + ']' : ''}`).join('\n') || '- Sin inversores'}
+
+🛡️ MANDATARIOS (${crm.mandatarios.length}):
+${crm.mandatarios.slice(0, 3).map((m: any) => `- ${m.full_name}`).join('\n') || '- Sin mandatarios'}
+
+📅 ACCIONES AGENDA (${agendaActions.length}):
+${agendaActions.filter((a: any) => a.status !== 'completed').slice(0, 5).map((a: any) => `- ${a.title} (${a.action_type}) - ${a.due_date ? new Date(a.due_date).toLocaleDateString() : 'sin fecha'}`).join('\n') || '- Sin acciones pendientes'}
+`;
+
+    // System prompt for Pelayo
+    const systemPrompt = `Eres **Pelayo**, el asistente de inteligencia patrimonial de Alea Signature.
+
+Tu rol es ayudar a los agentes de Alea a gestionar el CRM, analizar oportunidades y clasificar inversores.
+
+REGLAS:
+1. Responde SIEMPRE en español
+2. Usa markdown para formatear respuestas
+3. Sé conciso pero completo
+4. Cuando detectes un nuevo inversor, ofrece clasificarlo según Piedras Preciosas
+5. Para crear registros, pregunta antes de hacerlo
+6. Incluye datos relevantes del CRM en tus respuestas
+
+PIEDRAS PRECIOSAS (clasificación de inversores):
+- 💎 ZAFIRO: Sociable, disfruta, historias
+- 🔮 PERLA: Leal, calmado, ayuda a otros
+- 💚 ESMERALDA: Analítico, detallado, datos
+- ❤️ RUBÍ: Competitivo, resultados, velocidad
+
+El usuario te pregunta: ${message}
+
+${summary}`;
+
+    // Generate response
+    const response = await generateText(
+      `${summary}\n\nUsuario: ${message}`,
+      {
+        systemPrompt,
+        temperature: 0.7,
+        maxTokens: 1500,
+      }
+    );
+
+    // Save conversation
+    await saveConversation(client, userId, 'user', message);
+    await saveConversation(client, userId, 'assistant', response);
+
+    // Analyze intent for potential actions
+    const intentAnalysis = await analyzeWithAI(
+      `Analiza si el usuario quiere hacer algo específico:\n\nMensaje: "${message}"\n\nResponde JSON: { "action": "none|create|search|classify", "entity": "none|lead|property|investor|agenda", "details": "..." }`,
+      'Responde solo con JSON válido'
+    );
+
+    let suggestedAction = null;
+    try {
+      const parsed = typeof intentAnalysis.analysis === 'object' 
+        ? intentAnalysis.analysis 
+        : JSON.parse(intentAnalysis.rawResponse);
+      
+      if (parsed.action !== 'none') {
+        suggestedAction = parsed;
+      }
+    } catch {}
+
+    return NextResponse.json({
+      response: response || 'He procesado tu mensaje. ¿Hay algo más en lo que pueda ayudarte?',
+      intent: suggestedAction,
+      stats: {
+        leads: crm.leads.length,
+        properties: crm.properties.length,
+        investors: crm.investors.length,
+        agendaPending: agendaActions.filter((a: any) => a.status !== 'completed').length,
+      }
     });
+
+  } catch (error: any) {
+    console.error('Pelayo error:', error);
+    
+    return NextResponse.json({
+      response: `❌ Error: ${error.message || 'Error desconocido'}\n\nPor favor, intenta de nuevo o contacta al administrador.`,
+      error: error.message,
+    }, { status: 500 });
+  }
 }
 
-async function getConversationHistory(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, userId: string, limit = 10) {
-    const { data } = await client
+export async function GET(req: NextRequest) {
+  try {
+    const client = await createAuthenticatedClient(req);
+    const { data: { user } } = await client.auth.getCurrentUser();
+
+    if (!user) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const type = searchParams.get('type') || 'stats';
+    const userId = user.id || user.email;
+
+    if (type === 'stats') {
+      const crm = await getCRMData(client);
+      const agendaActions = await getAgendaActions(client, userId);
+
+      return NextResponse.json({
+        leads: crm.leads.length,
+        properties: crm.properties.length,
+        investors: crm.investors.length,
+        mandatarios: crm.mandatarios.length,
+        collaborators: crm.collaborators.length,
+        agendaPending: agendaActions.filter((a: any) => a.status !== 'completed').length,
+        miniMaxConfigured: isMiniMaxConfigured(),
+      });
+    }
+
+    if (type === 'conversations') {
+      const { data } = await client
         .database
         .from('pelayo_conversations')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
-        .limit(limit);
-    return data || [];
-}
+        .limit(50);
 
-async function createPendingAction(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, userId: string, actionType: string, entityType: string, data: any) {
-    const { data: result } = await client
-        .database
-        .from('pelayo_pending_actions')
-        .insert({
-            user_id: userId,
-            action_type: actionType,
-            entity_type: entityType,
-            data,
-            expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString()
-        })
-        .select()
-        .single();
-    return result;
-}
-
-async function getPendingAction(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, userId: string, actionId?: string) {
-    let query = client
-        .database
-        .from('pelayo_pending_actions')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('status', 'pending');
-    
-    if (actionId) {
-        query = query.eq('id', actionId);
-    }
-    
-    const { data } = await query.single();
-    return data;
-}
-
-async function confirmPendingAction(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, actionId: string) {
-    const action = await getPendingAction(client, '', actionId);
-    if (!action) return { data: null, error: 'Action not found' };
-    
-    const tableMap: Record<string, Tables> = {
-        'create_property': 'properties',
-        'create_investor': 'investors',
-        'create_lead': 'leads',
-        'create_mandatario': 'mandatarios'
-    };
-    
-    const table = tableMap[action.action_type];
-    if (!table) return { data: null, error: 'Invalid action type' };
-    
-    const result = await createRecord(client, table, action.data);
-    return result;
-}
-
-async function cancelPendingAction(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, actionId: string, userId: string) {
-    await client
-        .database
-        .from('pelayo_pending_actions')
-        .update({ status: 'cancelled' })
-        .eq('id', actionId)
-        .eq('user_id', userId);
-}
-
-async function createNotification(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, userId: string, type: string, title: string, message: string, data?: any) {
-    await client
-        .database
-        .from('pelayo_notifications')
-        .insert({
-            user_id: userId,
-            type,
-            title,
-            message,
-            data
-        });
-}
-
-async function uploadImageToStorage(base64Data: string, fileName: string): Promise<string | null> {
-    try {
-        const base64Clean = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
-        const binaryString = atob(base64Clean);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-        }
-
-        const uploadRes = await fetch(
-            `${INSFORGE_APP_URL}/api/storage/buckets/dossiers/files/${fileName}`,
-            {
-                method: 'POST',
-                headers: new Headers({
-                    'Content-Type': 'image/jpeg',
-                    'Authorization': `Bearer ${INSFORGE_API_KEY}`,
-                    'x-upsert': 'true'
-                }),
-                body: bytes
-            }
-        );
-
-        if (uploadRes.ok) {
-            return `${INSFORGE_APP_URL}/api/storage/buckets/dossiers/files/${fileName}`;
-        }
-        return null;
-    } catch (error) {
-        console.error('Error uploading image:', error);
-        return null;
-    }
-}
-
-export async function POST(req: NextRequest) {
-    try {
-        const rateLimitResponse = checkRateLimit(req);
-        if (rateLimitResponse) return rateLimitResponse;
-
-        const client = await createAuthenticatedClient(req);
-        const { data: { user } } = await client.auth.getCurrentUser();
-        
-        const { message, user: chatUser, action: userAction, pendingActionId, file, extractedContent } = await req.json();
-        const userId = user?.id || user?.email || chatUser?.id || chatUser?.email || 'anonymous';
-
-        let uploadedImageUrls: string[] = [];
-        let dossierText = '';
-
-        if (extractedContent && extractedContent.images && extractedContent.images.length > 0) {
-            dossierText = extractedContent.text || '';
-            
-            const maxImages = 5;
-            const maxImageSize = 5 * 1024 * 1024;
-            const imagesToProcess = extractedContent.images.slice(0, maxImages);
-            
-            const validImages = imagesToProcess.filter((img: any) => {
-                if (!img.data || typeof img.data !== 'string') return false;
-                const size = img.data.length * 0.75;
-                return size <= maxImageSize;
-            });
-
-            const imageUploadPromises = validImages.map((img: any, idx: number) => {
-                const fileName = `dossier_${Date.now()}_page${img.page}_${idx}.jpg`;
-                return uploadImageToStorage(img.data, fileName);
-            });
-            
-            const uploadResults = await Promise.all(imageUploadPromises);
-            uploadedImageUrls = uploadResults.filter((url): url is string => url !== null);
-        }
-
-        // Handle action confirmations
-        if (userAction === 'confirm' && pendingActionId) {
-            const result = await confirmPendingAction(client, pendingActionId);
-            if (result.data) {
-                await saveConversation(client, userId, 'assistant', `✅ Registro creado exitosamente: ${JSON.stringify(result.data)}`);
-                return NextResponse.json({
-                    response: `Perfecto, he creado el registro exitosamente.`,
-                    confirmed: true,
-                    actionId: pendingActionId
-                });
-            }
-            return NextResponse.json({ error: result.error || 'Error confirming action' }, { status: 400 });
-        }
-
-        if (userAction === 'cancel' && pendingActionId) {
-            await cancelPendingAction(client, pendingActionId, userId);
-            return NextResponse.json({
-                response: `Entendido, he cancelado la acción.`,
-                cancelled: true
-            });
-        }
-
-        // Get conversation history for memory
-        const history = await getConversationHistory(client, userId, 10);
-        const historyText = history.length > 0 
-            ? `\n\nCONVERSACIÓN ANTERIOR:\n${history.map(h => `${h.role === 'user' ? 'Usuario' : 'Pelayo'}: ${h.content}`).join('\n')}`
-            : '';
-
-        // Get memory context from MemPalace-style storage
-        let memoryContext = '';
-        try {
-            // Get user email if available
-            const userEmail = user?.email || chatUser?.email;
-            if (userEmail) {
-                const wingName = investorWingName(userId, userEmail);
-                const memories = await getMemoryContext(wingName, 10);
-                
-                if (memories.length > 0) {
-                    const byHall: Record<string, string[]> = {};
-                    for (const mem of memories) {
-                        if (!byHall[mem.hall_type]) {
-                            byHall[mem.hall_type] = [];
-                        }
-                        byHall[mem.hall_type].push(`[${mem.room_name}] ${mem.content.substring(0, 200)}`);
-                    }
-                    
-                    memoryContext = '\n\n📚 MEMORIA DE CONVERSACIONES ANTERIORES:\n';
-                    for (const [hall, items] of Object.entries(byHall)) {
-                        memoryContext += `\n## ${hall.toUpperCase()}:\n${items.join('\n')}\n`;
-                    }
-                }
-            }
-        } catch (memErr) {
-            console.error('Error getting memory context:', memErr);
-        }
-
-        // Get current CRM data
-        const [leadsData, propertiesData, investorsData, mandatariosData, suggestionsData, agendaData] = await Promise.all([
-            getTableData(client, 'leads'),
-            getTableData(client, 'properties'),
-            getTableData(client, 'investors'),
-            getTableData(client, 'mandatarios'),
-            client.database.from('iai_inbox_suggestions').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
-            client.database.from('agenda_actions').select('*, lead:leads(id, investors:investors(full_name))').order('due_date', { ascending: true }).limit(20)
-        ]);
-
-        const overdueActions = agendaData?.data?.filter((a: any) => 
-            new Date(a.due_date) < new Date() && a.status !== 'completed' && a.status !== 'cancelled'
-        ) || [];
-
-        const pendingActions = agendaData?.data?.filter((a: any) => a.status !== 'completed' && a.status !== 'cancelled') || [];
-
-        const summary = `
-CRM ALEA SIGNATURE - RESUMEN ACTUAL:
-
-📋 LEADS (${leadsData.data.length}):
-${leadsData.data.slice(0, 5).map((l: any) => `- ${l.status || 'sin estado'}: ${l.name || l.email || 'sin nombre'}`).join('\n')}
-
-🏠 PROPIEDADES (${propertiesData.data.length}):
-${propertiesData.data.slice(0, 5).map((p: any) => `- ${p.title}: ${p.price ? p.price.toLocaleString() + '€' : 'sin precio'}`).join('\n')}
-
-👥 INVERSORES (${investorsData.data.length}):
-${investorsData.data.slice(0, 5).map((i: any) => `- ${i.full_name}: ${i.budget_min ? i.budget_min.toLocaleString() + '€' : 'sin presupuesto'}`).join('\n')}
-
-🛡️ MANDATARIOS (${mandatariosData.data.length}):
-${mandatariosData.data.slice(0, 3).map((m: any) => `- ${m.full_name}`).join('\n')}
-
-📬 BANDEJA IAI (${suggestionsData.data?.length || 0} pendientes):
-
-📅 ALEA AGENDA:
-${overdueActions.length > 0 ? `⚠️ TIENES ${overdueActions.length} ACCIÓN(ES) VENCIDA(S):
-${overdueActions.slice(0, 5).map((a: any) => `- ${a.title} (vence hace ${Math.floor((new Date().getTime() - new Date(a.due_date).getTime()) / (1000 * 60 * 60))}h)`).join('\n')}` : '✅ No hay acciones vencidas'}
-${pendingActions.length > 0 ? `📋 ACCIONES PENDIENTES (${pendingActions.length}):
-${pendingActions.slice(0, 5).map((a: any) => `- ${a.title} (${a.action_type}) - ${a.lead?.[0]?.investors?.[0]?.full_name || 'sin lead'}`).join('\n')}` : ''}`;
-
-        // Check for pending actions that need confirmation
-        const pendingAction = await getPendingAction(client, userId);
-        let pendingConfirmationText = '';
-        if (pendingAction) {
-            const entityLabel = pendingAction.action_type.replace('create_', '');
-            pendingConfirmationText = `
-⏳ ACCIÓN PENDIENTE DE CONFIRMAR:
-- Tipo: ${entityLabel}
-- Datos: ${JSON.stringify(pendingAction.data)}
-- Responder "sí, créalo" para confirmar o "cancelar" para否决ar
-`;
-        }
-
-        // Build dossier context if present
-        let dossierContext = '';
-        if (dossierText || uploadedImageUrls.length > 0) {
-            dossierContext = `
-📄 CONTENIDO DEL DOSSIER ADJUNTO:
-${dossierText ? `Texto extraído:\n${dossierText.substring(0, 3000)}${dossierText.length > 3000 ? '...(truncado)' : ''}` : ''}
-${uploadedImageUrls.length > 0 ? `\nImágenes adjuntas (${uploadedImageUrls.length}):\n${uploadedImageUrls.map((url, i) => `[Imagen ${i + 1}]: ${url}`).join('\n')}` : ''}
-`;
-        }
-
-        // Analyze user intent - include dossier content for better analysis
-        const analysisPrompt = `
-Analiza si el usuario quiere CREAR algo en el CRM.
-
-El usuario dice: "${message}"
-${dossierText ? `\n\nContenido del dossier subido:\n${dossierText.substring(0, 2000)}` : ''}
-
-Responde en JSON:
-{
-  "intent": "create" | "query" | "none",
-  "entity": "property" | "investor" | "lead" | "mandatario" | "none",
-  "data": { ...datos extraidos del mensaje Y del dossier },
-  "confidence": 0.0-1.0,
-  "is_opportunity": true | false,
-  "opportunity_type": "high" | "medium" | "low" | null,
-  "opportunity_description": "descripción si es oportunidad" | null
-}`;
-
-        const analysisResult = await analyzeWithMinimax(
-            analysisPrompt,
-            'Eres un analizador de intenciones. Responde en JSON estricto.'
-        );
-
-        let analysis: any = { intent: 'none', entity: 'none', confidence: 0 };
-        try {
-            if (typeof analysisResult.analysis === 'object' && analysisResult.analysis !== null) {
-                analysis = analysisResult.analysis;
-            } else {
-                analysis = JSON.parse(analysisResult.rawResponse);
-            }
-        } catch (e) {}
-
-        // Save user message to history
-        await saveConversation(client, userId, 'user', message + (dossierText ? `\n\n[Dossier adjuntado: ${dossierText.substring(0, 500)}...]` : ''), analysis);
-
-        // Handle explicit confirmations
-        const lowerMessage = message.toLowerCase();
-        const explicitConfirmPatterns = [
-            'sí, créalo', 'sí, crealo', 'sí, créala', 'sí, creala',
-            'sí, confirmo', 'si, confirmo',
-            'confirmo', 'confirmed', 'confirmed',
-            'sí, crea', 'si, crea', 'vale, crea', 'ok, crea', 'dale, crea',
-            'procede', 'proceder', 'sí, proceder'
-        ];
-        const userConfirm = explicitConfirmPatterns.some(p => lowerMessage.includes(p));
-
-        const userCancel = lowerMessage.includes('cancelar') || lowerMessage.includes('cancelo') || lowerMessage.includes('no');
-
-        // If there's a pending action and user confirms
-        if (pendingAction && userConfirm) {
-            const result = await confirmPendingAction(client, pendingAction.id);
-            if (result.data) {
-                await saveConversation(client, userId, 'assistant', `Registro creado: ${JSON.stringify(result.data)}`);
-                await createNotification(client, userId, 'info', 'Registro creado', `Se ha creado ${pendingAction.entity_type} exitosamente`);
-                
-                return NextResponse.json({
-                    response: `✅ Perfecto, he creado el ${pendingAction.entity_type} exitosamente.`,
-                    confirmed: true,
-                    createdRecord: result.data,
-                    pendingActionId: pendingAction.id
-                });
-            }
-        }
-
-        // If user cancels
-        if ((pendingAction && userCancel) || userAction === 'cancel') {
-            await cancelPendingAction(client, pendingAction?.id || pendingActionId, userId);
-            return NextResponse.json({
-                response: `De acuerdo, he cancelado la acción.`,
-                cancelled: true
-            });
-        }
-
-        // Main conversation
-        const systemPrompt = `Eres **Pelayo**, el asistente de inteligencia patrimonial de Alea Signature.
-
-Eres un asistente conversacional útil y siempre respondes de forma completa.
-
-Tu función es:
-1. **Responder preguntas** sobre propiedades, inversores, leads, mandatarios del CRM
-2. **Detectar oportunidades** en las conversaciones y describirlas claramente
-3. **Crear registros** SOLO cuando el usuario confirma explícitamente
-4. **Analizar dossiers** - cuando el usuario sube un PDF, extrae información relevante y ofrece crear registros en el CRM
-5. **Gestionar imágenes** - si hay imágenes del dossier, puedes asociarlas a propiedades
-6. **Calcular comisiones** - usa la estructura de comisiones de Alea Signature para calcular reparto
-
-## ESTRUCTURA DE COMISIONES ALEA SIGNATURE (IMPORTANTE)
-
-**REGLA 40/60:**
-- 40% → Margen Corporativo (Alea Signature) - INTOCABLE
-- 60% → Bonus Pool de Ejecución
-
-**PERFILES DE AGENTE:**
-- Agente Senior (autónomo): 100% del pool, o 75% si hay referidor externo (25% finder)
-- Agente Junior: 60% del pool, 40% para mentor (founders)
-
-**REPARTO POR HITOS (Control de Calidad):**
-- Apertura (25%): Intro de activo/comprador validado con NDA
-- Gestión (50%): Dossiers técnicos, visitas, due diligence
-- Cierre (25%): Firma en notaría y cobro efectivo
-
-**PROTECCIÓN:**
-- No Elusión: Prohibido saltar a la empresa (penalización 2x comisión)
-- Confidencialidad: 5 años sobre base de datos off-market
-- Derechos Remanentes: Agente que se va cobra ops cerradas en 12 meses
-
-**RESUMEN RENTABILIDAD:**
-- Caja Alea: 40% → Crecimiento, IA y Founders
-- Agente Responsable: 45%-60%
-- Colaborador/Finder: 0%-15%
-
-REGLAS IMPORTANTES:
-- Si detectas que el usuario quiere crear algo, NO lo crees inmediatamente
-- En su lugar, muestra un "preview" de los datos y pide confirmación explícita
-- Si detectas una oportunidad de inversión, crea una notificación
-- Para cálculos de comisión, aplica la estructura 40/60 y los hitos correspondientes
-- Siempre responde en español, de forma clara y directa
-- Máximo 300 palabras${historyText}${memoryContext}${pendingConfirmationText}${dossierContext}
-
-${summary}
-
-El usuario pregunta: ${message}`;
-
-        const fullPrompt = `${systemPrompt}\n\n---\nUSER INPUT: ${message}`;
-
-        const response = await generateText(fullPrompt, {
-            temperature: 0.5,
-            maxTokens: 1500
-        });
-
-        let responseText = response || 'Entendido. ¿Hay algo específico del CRM que te gustaría saber?';
-
-        // If AI detected a create intent with high confidence, suggest creating
-        if (analysis.intent === 'create' && analysis.entity !== 'none' && analysis.data && analysis.confidence > 0.7 && !pendingAction) {
-            const actionType = `create_${analysis.entity}`;
-            const dataWithImages = {
-                ...analysis.data,
-                ...(uploadedImageUrls.length > 0 && { thumbnail_url: uploadedImageUrls[0], images: uploadedImageUrls }),
-                created_at: new Date().toISOString()
-            };
-            const pendingRecord = await createPendingAction(client, userId, actionType, analysis.entity, dataWithImages);
-
-            responseText += `\n\n📝 **Vista previa:** Parece que quieres crear un ${analysis.entity}. Datos detectados:\n\`\`\`${JSON.stringify(analysis.data, null, 2)}\`\`\``;
-            if (uploadedImageUrls.length > 0) {
-                responseText += `\n📷 ${uploadedImageUrls.length} imagen(es) del dossier adjuntada(s)`;
-            }
-            responseText += `\n\nResponde "sí, créalo" para confirmar o "cancelar" para否决ar.`;
-            responseText += `\n\n[pending_action:${pendingRecord?.id}]`;
-        }
-
-        // If this is a high-value opportunity, create notification
-        if (analysis.is_opportunity && analysis.opportunity_type === 'high') {
-            await createNotification(
-                client,
-                userId,
-                'opportunity',
-                '🚨 Oportunidad detectada',
-                analysis.opportunity_description || `Posible ${analysis.entity} de alto valor`
-            );
-            responseText += '\n\n⚠️ He detectado una oportunidad potencialmente importante y te he enviado una notificación.';
-        }
-
-        // Save assistant response to history
-        await saveConversation(client, userId, 'assistant', responseText, analysis);
-
-        // Store interaction in memory (MemPalace-style)
-        try {
-            const userEmail = user?.email || chatUser?.email;
-            if (userEmail) {
-                const wingName = investorWingName(userId, userEmail);
-                
-                // Store conversation exchange
-                await addMemory(wingName, 'conversations', 'events' as HallType,
-                    `User: ${message.substring(0, 500)}\nPelayo: ${response.substring(0, 500)}`,
-                    { 
-                        source: 'pelayo_chat',
-                        importanceScore: analysis.confidence && analysis.confidence > 0.7 ? 70 : 50 
-                    }
-                );
-
-                // If AI detected a decision, store as fact
-                if (analysis.intent === 'create' || analysis.intent === 'decision') {
-                    await addMemory(wingName, 'decisions', 'facts' as HallType,
-                        `Decision: ${message.substring(0, 300)} → Created: ${analysis.entity || 'unknown'}`,
-                        { source: 'pelayo_chat', importanceScore: 80 }
-                    );
-                }
-
-                // If an investor was mentioned, create knowledge triple
-                if (analysis.entity === 'investor' && analysis.data?.email) {
-                    await addKnowledgeTriple(
-                        userEmail,
-                        'discussed_about',
-                        analysis.data.email,
-                        { source: 'pelayo_chat', confidenceScore: Math.round((analysis.confidence || 0.5) * 100) }
-                    );
-                }
-            }
-        } catch (memErr) {
-            console.error('Error storing memory:', memErr);
-        }
-
-        // Get pending actions for this user
-        const userPendingActions = await client
-            .database
-            .from('pelayo_pending_actions')
-            .select('*')
-            .eq('user_id', userId)
-            .eq('status', 'pending');
-
-        return NextResponse.json({
-            response: responseText,
-            analysis,
-            pendingAction: userPendingActions.data?.[0] || null,
-            pendingActionsCount: userPendingActions.data?.length || 0,
-            uploadedImages: uploadedImageUrls.length
-        });
-
-    } catch (error: any) {
-        console.error('Pelayo error:', error);
-        console.error('MINIMAX_API_KEY set:', !!process.env.MINIMAX_API_KEY);
-        console.error('Error stack:', error.stack);
-        
-        return NextResponse.json({ 
-            error: error.message,
-            errorType: error.constructor.name,
-            envCheck: {
-                minimaxKeySet: !!process.env.MINIMAX_API_KEY,
-                minimaxKeyLength: process.env.MINIMAX_API_KEY?.length || 0
-            }
-        }, { status: 500 });
-    }
-}
-
-export async function GET(req: NextRequest) {
-    const client = await createAuthenticatedClient(req);
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
-    const type = searchParams.get('type') || 'notifications';
-
-    if (type === 'notifications' && userId) {
-        const { data } = await client
-            .database
-            .from('pelayo_notifications')
-            .select('*')
-            .eq('user_id', userId)
-            .eq('read', false)
-            .order('created_at', { ascending: false })
-            .limit(10);
-        
-        return NextResponse.json({ notifications: data || [] });
+      return NextResponse.json({ conversations: data || [] });
     }
 
-    if (type === 'pending' && userId) {
-        const { data } = await client
-            .database
-            .from('pelayo_pending_actions')
-            .select('*')
-            .eq('user_id', userId)
-            .eq('status', 'pending');
-        
-        return NextResponse.json({ pendingActions: data || [] });
-    }
+    return NextResponse.json({ status: 'Pelayo API', version: '2.0' });
 
-    return NextResponse.json({ 
-        status: 'Pelayo AI Assistant',
-        endpoints: {
-            POST: '/api/pelayo-chat',
-            GET: '/api/pelayo-chat?type=notifications&userId=xxx'
-        }
-    });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }

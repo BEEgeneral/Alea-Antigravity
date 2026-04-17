@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { MessageSquare, Search, RefreshCw, Loader2, Trash2, Eye, Download, Bell, AlertTriangle, CheckCircle } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { MessageSquare, Search, RefreshCw, Loader2, Trash2, Send, User, Bot, ExternalLink } from "lucide-react";
 
 interface ChatMessage {
     id: string;
@@ -20,63 +20,148 @@ interface Notification {
     created_at: string;
 }
 
-interface Conversation {
-    id: string;
-    user_id: string;
-    last_message: string;
-    message_count: number;
-    created_at: string;
-    updated_at: string;
-}
-
 export default function PelayoPage() {
-    const [conversations, setConversations] = useState<Conversation[]>([]);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'conversations' | 'notifications' | 'analytics'>('conversations');
-    const [searchTerm, setSearchTerm] = useState("");
-    const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+    const [sending, setSending] = useState(false);
+    const [inputMessage, setInputMessage] = useState("");
+    const [currentUser, setCurrentUser] = useState<any>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        setConversations([
-            { id: '1', user_id: 'beenocode@gmail.com', last_message: 'Quiero ver propiedades en Madrid', message_count: 23, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-            { id: '2', user_id: 'admin@aleasignature.com', last_message: 'Muestra los inversores de Madrid', message_count: 45, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-        ]);
-        
-        setMessages([
-            { id: '1', conversation_id: '1', role: 'user', content: 'Quiero ver propiedades en Madrid', created_at: new Date().toISOString() },
-            { id: '2', conversation_id: '1', role: 'assistant', content: 'He encontrado 15 propiedades en Madrid. Aquí están las más relevantes para inversión:', created_at: new Date().toISOString() },
-            { id: '3', conversation_id: '1', role: 'user', content: '¿Cuál tiene mejor rentabilidad?', created_at: new Date().toISOString() },
-            { id: '4', conversation_id: '1', role: 'assistant', content: 'Basándome en el análisis, el edificio en Chueca tiene una rentabilidad estimada del 8.5% anual.', created_at: new Date().toISOString() },
-        ]);
-
-        setNotifications([
-            { id: '1', type: 'opportunity', title: 'Oportunidad detectada', message: 'Nuevo lead de inversor interesado en hotels', read: false, created_at: new Date().toISOString() },
-            { id: '2', type: 'alert', title: 'Alerta de precio', message: ' propiedad reducida un 10%', read: false, created_at: new Date().toISOString() },
-            { id: '3', type: 'system', title: 'Informe generado', message: 'Reporte semanal de actividad listo', read: true, created_at: new Date().toISOString() },
-        ]);
-
-        setLoading(false);
+        const checkAuth = async () => {
+            try {
+                const token = localStorage.getItem('insforge_token');
+                if (!token) return;
+                
+                const res = await fetch('/api/auth/me', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setCurrentUser(data.profile);
+                    loadData(token, data.profile?.id || data.profile?.email);
+                }
+            } catch (error) {
+                console.error('Auth check error:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        checkAuth();
     }, []);
 
-    const filteredConversations = conversations.filter(c => 
-        c.user_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.last_message?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const loadData = async (token: string, userId: string) => {
+        try {
+            // Load conversations/messages from pelayo_conversations
+            const convRes = await fetch(`/api/pelayo-chat?type=conversations&userId=${userId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            // Load notifications
+            const notifRes = await fetch(`/api/pelayo-chat?type=notifications&userId=${userId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
 
-    const filteredNotifications = notifications.filter(n => 
-        n.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        n.message?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+            if (convRes.ok) {
+                const convData = await convRes.json();
+                setMessages(convData.messages || []);
+            }
 
-    const handleMarkAsRead = (id: string) => {
-        setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+            if (notifRes.ok) {
+                const notifData = await notifRes.json();
+                setNotifications(notifData.notifications || []);
+            }
+        } catch (error) {
+            console.error('Load data error:', error);
+        }
     };
 
-    const handleDeleteNotification = (id: string) => {
-        setNotifications(prev => prev.filter(n => n.id !== id));
+    const handleSendMessage = async () => {
+        if (!inputMessage.trim() || sending) return;
+
+        const token = localStorage.getItem('insforge_token');
+        if (!token) return;
+
+        setSending(true);
+        const userMessage = inputMessage;
+        setInputMessage("");
+
+        // Add user message to UI immediately
+        setMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            conversation_id: 'current',
+            role: 'user',
+            content: userMessage,
+            created_at: new Date().toISOString()
+        }]);
+
+        try {
+            const res = await fetch('/api/pelayo-chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    message: userMessage,
+                    user: { id: currentUser?.id || currentUser?.email }
+                })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                
+                // Add assistant response
+                if (data.response) {
+                    setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        conversation_id: 'current',
+                        role: 'assistant',
+                        content: data.response,
+                        created_at: new Date().toISOString()
+                    }]);
+                }
+
+                // Reload notifications
+                if (data.pendingAction) {
+                    loadData(token, currentUser?.id || currentUser?.email);
+                }
+            } else {
+                const error = await res.json();
+                setMessages(prev => [...prev, {
+                    id: (Date.now() + 1).toString(),
+                    conversation_id: 'current',
+                    role: 'assistant',
+                    content: `Error: ${error.error || 'No pude procesar tu mensaje'}`,
+                    created_at: new Date().toISOString()
+                }]);
+            }
+        } catch (error: any) {
+            console.error('Send message error:', error);
+            setMessages(prev => [...prev, {
+                id: (Date.now() + 1).toString(),
+                conversation_id: 'current',
+                role: 'assistant',
+                content: 'Error de conexión. Intenta de nuevo.',
+                created_at: new Date().toISOString()
+            }]);
+        } finally {
+            setSending(false);
+        }
     };
+
+    const handleRefresh = () => {
+        const token = localStorage.getItem('insforge_token');
+        if (token) {
+            loadData(token, currentUser?.id || currentUser?.email);
+        }
+    };
+
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
 
     if (loading) {
         return (
@@ -87,200 +172,114 @@ export default function PelayoPage() {
     }
 
     return (
-        <div className="p-8">
+        <div className="p-8 h-[calc(100vh-120px)] flex flex-col">
             {/* Header */}
-            <div className="flex justify-between items-center mb-8">
+            <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h1 className="text-2xl font-serif font-medium">Pelayo Chat Logs</h1>
-                    <p className="text-sm text-muted-foreground mt-1">Historial de conversaciones y notificaciones</p>
+                    <h1 className="text-2xl font-serif font-medium">Pelayo AI Assistant</h1>
+                    <p className="text-sm text-muted-foreground mt-1">Asistente de inteligencia artificial para Alea Signature</p>
                 </div>
-                <button className="flex items-center space-x-2 px-4 py-2 bg-muted rounded-xl hover:bg-muted/80 transition-all">
+                <button 
+                    onClick={handleRefresh}
+                    className="flex items-center space-x-2 px-4 py-2 bg-muted rounded-xl hover:bg-muted/80 transition-all"
+                >
                     <RefreshCw size={18} />
                     <span className="text-sm">Actualizar</span>
                 </button>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-4 gap-4 mb-8">
-                <div className="p-4 bg-card border border-border rounded-xl">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Conversaciones</p>
-                    <p className="text-2xl font-serif">{conversations.length}</p>
-                </div>
-                <div className="p-4 bg-card border border-border rounded-xl">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Mensajes</p>
-                    <p className="text-2xl font-serif">{messages.length}</p>
-                </div>
-                <div className="p-4 bg-card border border-border rounded-xl">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Notificaciones</p>
-                    <p className="text-2xl font-serif text-amber-500">{notifications.filter(n => !n.read).length} sin leer</p>
-                </div>
-                <div className="p-4 bg-card border border-border rounded-xl">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Hoy</p>
-                    <p className="text-2xl font-serif">{conversations.filter(c => new Date(c.created_at).toDateString() === new Date().toDateString()).length}</p>
-                </div>
-            </div>
-
-            {/* Tabs */}
-            <div className="flex items-center space-x-4 mb-6">
-                <button 
-                    onClick={() => setActiveTab('conversations')}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeTab === 'conversations' ? 'bg-primary text-white' : 'bg-muted hover:bg-muted/80'}`}
-                >
-                    Conversaciones
-                </button>
-                <button 
-                    onClick={() => setActiveTab('notifications')}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeTab === 'notifications' ? 'bg-primary text-white' : 'bg-muted hover:bg-muted/80'}`}
-                >
-                    Notificaciones ({notifications.filter(n => !n.read).length})
-                </button>
-                <button 
-                    onClick={() => setActiveTab('analytics')}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeTab === 'analytics' ? 'bg-primary text-white' : 'bg-muted hover:bg-muted/80'}`}
-                >
-                    Analytics
-                </button>
-            </div>
-
-            {/* Search */}
-            <div className="flex items-center space-x-4 mb-6">
-                <div className="flex-1 max-w-md flex items-center space-x-2 bg-card border border-border rounded-xl px-4 py-2">
-                    <Search size={18} className="text-muted-foreground" />
-                    <input 
-                        type="text" 
-                        placeholder={activeTab === 'conversations' ? "Buscar conversaciones..." : "Buscar notificaciones..."}
-                        className="flex-1 bg-transparent border-none focus:outline-none text-sm"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-            </div>
-
-            {/* Content */}
-            {activeTab === 'conversations' && (
-                <div className="grid grid-cols-3 gap-6">
-                    {/* Conversation List */}
-                    <div className="col-span-1 space-y-3">
-                        {filteredConversations.map(conv => (
+            {/* Chat Interface */}
+            <div className="flex-1 flex flex-col bg-card border border-border rounded-2xl overflow-hidden">
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                    {messages.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full text-center">
+                            <Bot className="w-16 h-16 text-muted-foreground mb-4" />
+                            <h3 className="text-lg font-medium mb-2">Bienvenido a Pelayo</h3>
+                            <p className="text-sm text-muted-foreground max-w-md">
+                                Soy tu asistente de inteligencia artificial. Puedo ayudarte a gestionar inversores, 
+                                propiedades, y analizar oportunidades de inversión. ¿En qué puedo ayudarte?
+                            </p>
+                        </div>
+                    ) : (
+                        messages.map((msg) => (
                             <div 
-                                key={conv.id}
-                                onClick={() => setSelectedConversation(conv.id)}
-                                className={`p-4 bg-card border rounded-xl cursor-pointer hover:border-primary/50 transition-all ${selectedConversation === conv.id ? 'border-primary' : 'border-border'}`}
+                                key={msg.id}
+                                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                             >
-                                <div className="flex items-center justify-between mb-2">
-                                    <p className="text-sm font-medium truncate">{conv.user_id}</p>
-                                    <span className="text-xs text-muted-foreground">
-                                        {new Date(conv.updated_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
+                                <div className={`flex items-start space-x-3 max-w-[70%] ${msg.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                                        msg.role === 'user' ? 'bg-primary text-white' : 'bg-amber-500/20 text-amber-500'
+                                    }`}>
+                                        {msg.role === 'user' ? <User size={16} /> : <Bot size={16} />}
+                                    </div>
+                                    <div className={`rounded-2xl px-4 py-3 ${
+                                        msg.role === 'user' 
+                                            ? 'bg-primary text-white rounded-tr-none' 
+                                            : 'bg-muted rounded-tl-none'
+                                    }`}>
+                                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                        <p className={`text-[10px] mt-1 ${
+                                            msg.role === 'user' ? 'text-primary-foreground/60' : 'text-muted-foreground'
+                                        }`}>
+                                            {new Date(msg.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                                        </p>
+                                    </div>
                                 </div>
-                                <p className="text-xs text-muted-foreground truncate">{conv.last_message}</p>
-                                <p className="text-[10px] text-muted-foreground mt-2">{conv.message_count} mensajes</p>
+                            </div>
+                        ))
+                    )}
+                    <div ref={messagesEndRef} />
+                </div>
+
+                {/* Input */}
+                <div className="p-4 border-t border-border">
+                    <div className="flex items-center space-x-4">
+                        <input
+                            type="text"
+                            value={inputMessage}
+                            onChange={(e) => setInputMessage(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                            placeholder="Escribe tu mensaje..."
+                            className="flex-1 bg-background border border-border rounded-xl px-4 py-3 focus:outline-none focus:border-primary"
+                            disabled={sending}
+                        />
+                        <button
+                            onClick={handleSendMessage}
+                            disabled={!inputMessage.trim() || sending}
+                            className="p-3 bg-primary text-white rounded-xl hover:opacity-90 transition-all disabled:opacity-50"
+                        >
+                            {sending ? (
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                                <Send className="w-5 h-5" />
+                            )}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Notifications Sidebar */}
+            {notifications.length > 0 && (
+                <div className="mt-6">
+                    <h3 className="text-sm font-medium mb-3">Notificaciones Recientes</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {notifications.slice(0, 3).map((notif) => (
+                            <div 
+                                key={notif.id}
+                                className={`p-4 rounded-xl border ${
+                                    notif.type === 'opportunity' ? 'bg-emerald-500/5 border-emerald-500/20' :
+                                    notif.type === 'alert' ? 'bg-red-500/5 border-red-500/20' :
+                                    'bg-blue-500/5 border-blue-500/20'
+                                }`}
+                            >
+                                <p className="text-sm font-medium">{notif.title}</p>
+                                <p className="text-xs text-muted-foreground mt-1">{notif.message}</p>
+                                <p className="text-[10px] text-muted-foreground mt-2">
+                                    {new Date(notif.created_at).toLocaleDateString('es-ES')}
+                                </p>
                             </div>
                         ))}
-                    </div>
-
-                    {/* Message Thread */}
-                    <div className="col-span-2 bg-card border border-border rounded-2xl p-6">
-                        {selectedConversation ? (
-                            <div className="space-y-4">
-                                {messages.filter(m => m.conversation_id === selectedConversation).map(msg => (
-                                    <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[70%] p-4 rounded-2xl ${msg.role === 'user' ? 'bg-primary text-white' : 'bg-muted'}`}>
-                                            <div className="flex items-center space-x-2 mb-1">
-                                                {msg.role === 'assistant' ? <MessageSquare size={14} /> : <span className="text-xs opacity-60">{msg.role}</span>}
-                                            </div>
-                                            <p className="text-sm">{msg.content}</p>
-                                            <p className="text-[10px] opacity-60 mt-2">{new Date(msg.created_at).toLocaleTimeString('es-ES')}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center py-12">
-                                <MessageSquare size={48} className="mx-auto text-muted-foreground/30 mb-4" />
-                                <p className="text-muted-foreground">Selecciona una conversación</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {activeTab === 'notifications' && (
-                <div className="space-y-4">
-                    {filteredNotifications.map(notif => (
-                        <div key={notif.id} className={`p-6 bg-card border rounded-2xl ${notif.read ? 'border-border' : 'border-amber-500/50'}`}>
-                            <div className="flex items-start justify-between">
-                                <div className="flex items-start space-x-4">
-                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${notif.type === 'opportunity' ? 'bg-green-500/10' : notif.type === 'alert' ? 'bg-red-500/10' : 'bg-blue-500/10'}`}>
-                                        {notif.type === 'opportunity' ? <CheckCircle size={20} className="text-green-500" /> :
-                                         notif.type === 'alert' ? <AlertTriangle size={20} className="text-red-500" /> :
-                                         <Bell size={20} className="text-blue-500" />}
-                                    </div>
-                                    <div>
-                                        <h3 className="font-medium mb-1">{notif.title}</h3>
-                                        <p className="text-sm text-muted-foreground">{notif.message}</p>
-                                        <p className="text-xs text-muted-foreground mt-2">{new Date(notif.created_at).toLocaleString('es-ES')}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    {!notif.read && (
-                                        <button 
-                                            onClick={() => handleMarkAsRead(notif.id)}
-                                            className="px-3 py-1 bg-muted rounded-lg text-xs hover:bg-muted/80 transition-all"
-                                        >
-                                            Marcar leída
-                                        </button>
-                                    )}
-                                    <button 
-                                        onClick={() => handleDeleteNotification(notif.id)}
-                                        className="p-2 hover:bg-muted rounded-lg transition-colors text-red-500"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-
-                    {filteredNotifications.length === 0 && (
-                        <div className="text-center py-12">
-                            <Bell size={48} className="mx-auto text-muted-foreground/30 mb-4" />
-                            <p className="text-muted-foreground">No se encontraron notificaciones</p>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {activeTab === 'analytics' && (
-                <div className="grid grid-cols-2 gap-6">
-                    <div className="p-6 bg-card border border-border rounded-2xl">
-                        <h3 className="font-medium mb-4">Mensajes por día</h3>
-                        <div className="h-40 flex items-end space-x-2">
-                            {[12, 19, 15, 22, 28, 24, 18].map((val, i) => (
-                                <div key={i} className="flex-1 bg-primary/20 rounded-t" style={{ height: `${val * 3}%` }}>
-                                    <p className="text-[10px] text-center mt-2">{val}</p>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                            <span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span>
-                        </div>
-                    </div>
-                    <div className="p-6 bg-card border border-border rounded-2xl">
-                        <h3 className="font-medium mb-4">Intents más comunes</h3>
-                        <div className="space-y-3">
-                            {['Crear lead', 'Buscar propiedad', 'Ver inversores', 'Consultar precio', 'Generar reporte'].map((intent, i) => (
-                                <div key={intent} className="flex items-center justify-between">
-                                    <span className="text-sm">{intent}</span>
-                                    <div className="flex items-center space-x-2">
-                                        <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
-                                            <div className="h-full bg-primary" style={{ width: `${100 - i * 15}%` }} />
-                                        </div>
-                                        <span className="text-xs text-muted-foreground">{100 - i * 15}%</span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
                     </div>
                 </div>
             )}

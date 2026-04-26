@@ -1,11 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAuthenticatedClient } from '@/lib/insforge-server';
-import OpenAI from 'openai';
-
-const minimax = new OpenAI({
-  apiKey: process.env.MINIMAX_API_KEY || '',
-  baseURL: 'https://api.minimax.io/v1',
-});
+import { AleaAIClient } from '@/lib/alea-ai';
 
 // Known Alea Signature team members to exclude from profiles
 const KNOWN_TEAM = [
@@ -58,14 +53,13 @@ export async function POST(req: Request) {
     Devuelve null si no encuentras personas.
     `;
 
-    const result = await minimax.chat.completions.create({
-      model: 'MiniMax-M2.7',
-      messages: [{ role: 'user', content: prompt }],
+    const aleaClient = new AleaAIClient();
+    const result = await aleaClient.generateText(prompt, {
       temperature: 0.1,
-      max_tokens: 2000,
+      maxTokens: 2000,
     });
 
-    const responseText = result.choices[0]?.message?.content?.trim() || '';
+    const responseText = (result || '').trim();
     let extractedPeople: any[] = [];
 
     try {

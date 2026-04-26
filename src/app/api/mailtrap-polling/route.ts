@@ -389,12 +389,12 @@ export async function GET() {
     };
 
     try {
-        console.log('Starting Mailtrap POP3 polling...');
+        // Mailtrap polling start debug removed
 
         const client = createServerClient();
 
         const emails = await fetchEmailsFromMailtrap();
-        console.log(`Fetched ${emails.length} emails from Mailtrap`);
+        // Mailtrap emails fetched debug removed
 
         for (const email of emails) {
             try {

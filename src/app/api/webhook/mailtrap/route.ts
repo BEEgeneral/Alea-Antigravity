@@ -6,11 +6,7 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
 
-        console.log('Mailtrap webhook received:', {
-            subject: body.subject,
-            from: body.from,
-            attachments: body.attachments?.length || 0
-        });
+        // Mailtrap webhook received debug removed
 
         const fromEmail = body.from?.email || body.sender || body.from_address || 'unknown';
         const subject = body.subject || 'Sin asunto';

@@ -1,0 +1,33 @@
+# Next.js build output
+.next/
+out/
+
+# Dependencies
+node_modules/
+
+# Git
+.git/
+.gitignore
+
+# Environment files (already in InsForge secrets)
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Debug logs
+*.log
+npm-debug.log*
+
+# Graphify cache
+graphify-out/
+
+# Local docs/plans
+docs/plans/

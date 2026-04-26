@@ -1,12 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Next.js 16: Turbopack is default; webpack config kept for canvas polyfill
+  turbopack: {},
   serverExternalPackages: ["pdfjs-dist", "canvas"],
   webpack: (config) => {
     config.resolve.alias.canvas = false;
     return config;
   },
-  turbopack: {},
+
   images: {
     remotePatterns: [
       {

@@ -10,6 +10,7 @@ export interface Agent {
     email: string;
     role: "admin" | "agent" | string;
     is_approved?: boolean;
+    is_admin?: boolean;
     created_at?: string;
     has_centurion_access?: boolean;
     [key: string]: any;

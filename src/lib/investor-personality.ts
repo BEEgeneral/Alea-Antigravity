@@ -294,7 +294,7 @@ export function classifyInvestor(data: {
   if (investorTypeData?.preferredStone) {
     const preferred = investorTypeData.preferredStone;
     if (preferred.includes(piedraPrimaria) && preferred.length > 1) {
-      piedraSecundaria = preferred.find(s => s !== piedraPrimaria);
+      piedraSecundaria = preferred.find(s => s !== piedraPrimaria) as typeof piedraSecundaria;
     }
   }
 

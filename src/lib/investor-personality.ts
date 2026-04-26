@@ -198,6 +198,7 @@ export interface InvestorClassification {
   followUpPriority: 'high' | 'medium' | 'low';
   budgetRange: { min: number; max: number };
   estimatedDecisionTime: string;
+  confidence?: number;
 }
 
 export function classifyInvestor(data: {
@@ -211,46 +212,67 @@ export function classifyInvestor(data: {
 }): InvestorClassification {
   // Default classification based on available data
   let piedraPrimaria: keyof typeof PIEDRAS_PRECIOSAS = 'ZAFIRO';
+  let piedraSecundaria: keyof typeof PIEDRAS_PRECIOSAS | undefined = undefined;
   let discProfile: 'D' | 'I' | 'S' | 'C' = 'I';
   let riskProfile: 'conservative' | 'moderate' | 'aggressive' = 'moderate';
   let investorType: keyof typeof INVESTOR_TYPES = 'HNW_INDIVIDUAL';
   let followUpPriority: 'high' | 'medium' | 'low' = 'medium';
   let budgetRange = { min: 250000, max: 1000000 };
+  let confidence = 0.5;
 
-  // Analyze budget for type
+  // Analyze budget for type (use if-else to avoid overlap)
   if (data.budgetMax) {
     if (data.budgetMax >= 5000000) {
       investorType = 'FAMILY_OFFICE';
       riskProfile = 'conservative';
       budgetRange = { min: 5000000, max: 50000000 };
       followUpPriority = 'high';
+      confidence = 0.7;
     } else if (data.budgetMax >= 1000000) {
       investorType = 'HNW_INDIVIDUAL';
       riskProfile = 'moderate';
       budgetRange = { min: 1000000, max: 5000000 };
       followUpPriority = 'high';
-    } else {
+      confidence = 0.7;
+    } else if (data.budgetMax >= 100000) {
       investorType = 'REGIONAL_INVESTOR';
       budgetRange = { min: 100000, max: 1000000 };
+      confidence = 0.6;
+    } else {
+      // < 100K - minimum ticket
+      investorType = 'REGIONAL_INVESTOR';
+      budgetRange = { min: 50000, max: 100000 };
+      followUpPriority = 'low';
+      confidence = 0.5;
     }
   }
 
-  // Get investor type info for decision time
-  const investorTypeData = INVESTOR_TYPES[investorType];
+  // If we have company name, potentially institutional
+  if (data.company) {
+    const companyLower = data.company.toLowerCase();
+    if (companyLower.includes('fund') || companyLower.includes('capital') || 
+        companyLower.includes('asset management') || companyLower.includes('family office')) {
+      investorType = 'REAL_ESTATE_FUND';
+      riskProfile = 'conservative';
+      piedraPrimaria = 'ESMERALDA';
+      discProfile = 'C';
+      confidence = 0.8;
+    }
+  }
 
   // Analyze communication style for piedra
   if (data.communicationStyle) {
     const style = data.communicationStyle.toLowerCase();
-    if (style.includes('rápido') || style.includes('resultado') || style.includes('ganar')) {
+    if (style.includes('rápido') || style.includes('resultado') || style.includes('ganar') || style.includes('迫不及待')) {
       piedraPrimaria = 'RUBI';
       discProfile = 'D';
-    } else if (style.includes('detalle') || style.includes('claro') || style.includes('datos')) {
+    } else if (style.includes('detalle') || style.includes('claro') || style.includes('datos') || style.includes('pormenor')) {
       piedraPrimaria = 'ESMERALDA';
       discProfile = 'C';
-    } else if (style.includes('ayudar') || style.includes('familia') || style.includes('tranquilo')) {
+    } else if (style.includes('ayudar') || style.includes('familia') || style.includes('tranquilo') || style.includes('relajado')) {
       piedraPrimaria = 'PERLA';
       discProfile = 'S';
-    } else if (style.includes('sociable') || style.includes('amistad') || style.includes('evento')) {
+    } else if (style.includes('sociable') || style.includes('amistad') || style.includes('evento') || style.includes('reunión')) {
       piedraPrimaria = 'ZAFIRO';
       discProfile = 'I';
     }
@@ -263,6 +285,16 @@ export function classifyInvestor(data: {
       investorType = 'INSTITUTIONAL';
       piedraPrimaria = 'ESMERALDA';
       discProfile = 'C';
+      confidence = 0.85;
+    }
+  }
+
+  // Determine piedra secondary based on investor type
+  const investorTypeData = INVESTOR_TYPES[investorType];
+  if (investorTypeData?.preferredStone) {
+    const preferred = investorTypeData.preferredStone;
+    if (preferred.includes(piedraPrimaria) && preferred.length > 1) {
+      piedraSecundaria = preferred.find(s => s !== piedraPrimaria);
     }
   }
 
@@ -270,7 +302,7 @@ export function classifyInvestor(data: {
 
   return {
     piedraPrimaria,
-    piedraSecundaria: undefined,
+    piedraSecundaria,
     discProfile,
     investorType,
     riskProfile,
@@ -278,8 +310,9 @@ export function classifyInvestor(data: {
     closingStrategy: piedraInfo.closingStrategy,
     followUpPriority,
     budgetRange,
-    estimatedDecisionTime: investorTypeData?.decisionTime || '1-3 meses'
-  };
+    estimatedDecisionTime: investorTypeData?.decisionTime || '1-3 meses',
+    confidence
+  } as InvestorClassification;
 }
 
 export function getClassificationPrompt(investorData: {

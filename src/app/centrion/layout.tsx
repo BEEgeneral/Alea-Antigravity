@@ -5,7 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
     Shield, Users, Database, Settings, FileText, Activity, Bell, Webhook, 
-    AlertTriangle, ArrowLeft, Crown, Home, ArrowRight, Brain, Zap, Calendar, Video
+    AlertTriangle, ArrowLeft, Crown, Home, ArrowRight, Brain, Zap, Calendar, Video,
+    UserCheck, Search
 } from "lucide-react";
 
 interface NavItem {
@@ -55,14 +56,16 @@ export default function CenturionLayout({ children }: { children: React.ReactNod
         checkAuth();
     }, []);
 
-    const navItems: NavItem[] = [
-        { name: "Overview", href: "/centurion", icon: <Home size={20} /> },
+const navItems: NavItem[] = [
+        { name: "Overview", href: "/centrion", icon: <Home size={20} /> },
+        { name: "Clasificación Inversores", href: "/centrion/investors", icon: <UserCheck size={20} /> },
+        { name: "OSINT", href: "/centrion/osint", icon: <Search size={20} /> },
         { name: "Control de Agentes", href: "/centrion/agents", icon: <Users size={20} /> },
         { name: "Base de Datos", href: "/centrion/logs", icon: <Database size={20} /> },
         { name: "Configuración", href: "/centrion/settings", icon: <Settings size={20} /> },
         { name: "Dossier Manager", href: "/centrion/dossiers", icon: <FileText size={20} /> },
         { name: "AI Control Center", href: "/centrion/ai", icon: <Activity size={20} /> },
-        { name: "Email Intelligence", href: "/centrion/emails", icon: <Bell size={20} /> },
+        { name: "IAI Inbox", href: "/centrion/inbox", icon: <Bell size={20} />, badge: "AI" },
         { name: "Webhooks", href: "/centrion/webhooks", icon: <Webhook size={20} />, badge: "Admin" },
         { name: "Pelayo Chat Logs", href: "/centrion/pelayo", icon: <AlertTriangle size={20} /> },
         { name: "Paperclip", href: "/centrion/paperclip", icon: <Zap size={20} /> },

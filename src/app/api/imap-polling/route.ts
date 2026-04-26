@@ -69,7 +69,7 @@ function shouldExcludeEmail(filters: EmailFilter[], from: string, subject: strin
 
 async function connectToIMAP(): Promise<Imap> {
     return new Promise((resolve, reject) => {
-        console.log('Connecting to IMAP:', IMAP_HOST, 'user:', IMAP_USER);
+        // IMAP connection debug removed for production
         const imap = new Imap({
             user: IMAP_USER,
             password: IMAP_PASSWORD,
@@ -366,18 +366,18 @@ export async function GET() {
     };
 
     try {
-        console.log('Starting IMAP polling...');
+        // IMAP polling start debug removed
 
         const client = createServerClient();
 
         const filters = await getFilters(client);
-        console.log(`Loaded ${filters.length} filters`);
+        // filters loaded debug removed
 
         const imap = await connectToIMAP();
-        console.log('Connected to IMAP');
+        // IMAP connected debug removed
 
         const emails = await fetchAllEmails(imap);
-        console.log(`Fetched ${emails.length} emails from INBOX`);
+        // emails fetched debug removed
 
         imap.end();
 
@@ -433,7 +433,7 @@ export async function GET() {
         }
 
         const duration = Date.now() - startTime;
-        console.log(`IMAP polling completed in ${duration}ms. Saved: ${results.saved}, Skipped: ${results.skipped}, Errors: ${results.errors}`);
+        // IMAP polling completed debug removed
 
         return NextResponse.json({
             success: true,

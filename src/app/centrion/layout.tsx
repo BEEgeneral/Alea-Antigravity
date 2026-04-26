@@ -60,6 +60,7 @@ const navItems: NavItem[] = [
         { name: "Overview", href: "/centrion", icon: <Home size={20} /> },
         { name: "Clasificación Inversores", href: "/centrion/investors", icon: <UserCheck size={20} /> },
         { name: "OSINT", href: "/centrion/osint", icon: <Search size={20} /> },
+        { name: "Patrones", href: "/centrion/patterns", icon: <Brain size={20} /> },
         { name: "Control de Agentes", href: "/centrion/agents", icon: <Users size={20} /> },
         { name: "Base de Datos", href: "/centrion/logs", icon: <Database size={20} /> },
         { name: "Configuración", href: "/centrion/settings", icon: <Settings size={20} /> },

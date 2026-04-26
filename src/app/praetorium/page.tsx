@@ -31,6 +31,7 @@ import ValuationAgent from "@/components/admin/ValuationAgent";
 import AgendaPanel from "@/components/admin/AgendaPanel";
 import AIDashboard from "@/components/admin/AIDashboard";
 import VideoCallPanel from "@/components/admin/video/VideoCallPanel";
+import FinancialReportModal from "@/components/admin/FinancialReportModal";
 import {
     EditAgentModal,
     AddAgentModal,
@@ -200,6 +201,9 @@ export default function AdminDashboard() {
         vendor_name: "",
         description: ""
     });
+
+    // Financial Report State
+    const [financialReportProperty, setFinancialReportProperty] = useState<any>(null);
 
     // IAI Inbox Suggestions
     const [iaiSuggestions, setIaiSuggestions] = useState<IAISuggestion[]>([]);
@@ -1328,6 +1332,26 @@ useEffect(() => {
                             <FileText size={16} />
                             <span>Generar PDF</span>
                         </button>
+                        <button
+                            onClick={async () => {
+                                // Check if user is admin first
+                                const token = localStorage.getItem('insforge_token');
+                                if (!token) return;
+                                try {
+                                    const meRes = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } });
+                                    const meData = await meRes.json();
+                                    if (meData.profile?.is_admin || meData.profile?.role === 'admin') {
+                                        setFinancialReportProperty(property);
+                                    } else {
+                                        alert('Solo los agentes Admin pueden acceder al informe financiero.');
+                                    }
+                                } catch { alert('No se pudo verificar el acceso.'); }
+                            }}
+                            className="flex items-center space-x-2 px-6 py-3 bg-amber-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-amber-700 transition-all shadow-lg shadow-amber-600/20"
+                        >
+                            <TrendingUp size={16} />
+                            <span>Informe Financiero</span>
+                        </button>
                         <button className="flex items-center space-x-2 px-6 py-3 bg-white border border-border rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-muted transition-all text-foreground">
                             <Share2 size={16} />
                             <span>Compartir</span>
@@ -2418,6 +2442,7 @@ useEffect(() => {
                                     { id: "mandatarios", label: "Mandatarios", icon: ShieldCheck },
                                     { id: "collaborators", label: "Colaboradores", icon: Share2 },
                                     { id: "templates", label: "Plantillas", icon: FileText },
+                                    { id: "nda", label: "Acuerdos NDA", icon: ShieldCheck },
                                     { id: "assets", label: "Activos", icon: Building },
                                 ].map((item) => (
                                     <button
@@ -2479,8 +2504,9 @@ useEffect(() => {
                                         activeTab === 'mandatarios' ? 'Directorio de Mandatarios' :
                                             activeTab === 'collaborators' ? 'Colaboradores' :
                                                 activeTab === 'templates' ? 'Document Factory' :
-                                                    activeTab === 'assets' ? 'Asset Portfolio' :
-                                                        activeTab === 'profile' ? 'Perfil de Usuario' : 'Praetorium'}
+                                                    activeTab === 'nda' ? 'Acuerdos NDA' :
+                                                        activeTab === 'assets' ? 'Asset Portfolio' :
+                                                            activeTab === 'profile' ? 'Perfil de Usuario' : 'Praetorium'}
                             </h1>
                             <div className="flex items-center space-x-2 mt-1 hidden sm:flex">
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -2813,6 +2839,14 @@ useEffect(() => {
                         <div key="property-modal" className="fixed inset-0 z-[60] bg-background overscroll-none overflow-y-auto">
                             {renderPropertyDetail(selectedProperty)}
                         </div>
+                    )}
+
+                    {/* Financial Report Modal (Admin Only) */}
+                    {financialReportProperty && (
+                        <FinancialReportModal
+                            property={financialReportProperty}
+                            onClose={() => setFinancialReportProperty(null)}
+                        />
                     )}
 
                     {/* Edit Agent Modal */}

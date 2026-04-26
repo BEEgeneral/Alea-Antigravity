@@ -121,8 +121,6 @@ export async function POST(req: Request) {
     });
 
   } catch (error: any) {
-    console.error('Setup error:', error);
-    
     // Check if it's a "table does not exist" error
     if (error.message?.includes('relation') && error.message.includes('does not exist')) {
       return NextResponse.json({

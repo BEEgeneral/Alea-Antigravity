@@ -16,7 +16,6 @@ export async function POST(request: NextRequest) {
 
         return handleCreateAndSave(request, fecha, intervinientes, pdfBase64, fileName);
     } catch (error) {
-        console.error("Error in NDA API:", error);
         return NextResponse.json(
             { error: "Error interno del servidor" },
             { status: 500 }
@@ -61,7 +60,6 @@ async function handleCreateAndSave(request: NextRequest, fecha: string, intervin
         .single();
 
     if (ndaError) {
-        console.error("Error creating NDA:", ndaError);
         return NextResponse.json(
             { error: "Error al crear el NDA" },
             { status: 500 }
@@ -82,7 +80,7 @@ async function handleCreateAndSave(request: NextRequest, fecha: string, intervin
         .insert(intervinientesData);
 
     if (interError) {
-        console.error("Error creating intervinientes:", interError);
+        // Silently ignore - NDA was created successfully
     }
 
     return NextResponse.json({
@@ -156,7 +154,6 @@ async function handleSendForSignature(request: NextRequest, ndaId: string, inter
             message: "NDA enviado para firma electrónica",
         });
     } catch (error: any) {
-        console.error("Error sending to Adobe Sign:", error);
         return NextResponse.json(
             { error: `Error enviando a Adobe Sign: ${error.message}` },
             { status: 500 }
@@ -184,7 +181,6 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json({ ndas });
     } catch (error) {
-        console.error("Error fetching NDAs:", error);
         return NextResponse.json(
             { error: "Error interno del servidor" },
             { status: 500 }
@@ -221,7 +217,6 @@ export async function PATCH(request: NextRequest) {
 
         return NextResponse.json({ success: true, nda: data });
     } catch (error) {
-        console.error("Error updating NDA:", error);
         return NextResponse.json(
             { error: "Error interno del servidor" },
             { status: 500 }

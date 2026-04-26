@@ -219,7 +219,7 @@ export async function POST(req: Request) {
       }
 
       // DISC communication preference match
-      const piedraInfo = invPiedra ? PIEDRAS_PRECIOSAS[invPiedra] : null;
+      const piedraInfo = invPiedra ? (PIEDRAS_PRECIOSAS as any)[invPiedra] : null;
       if (piedraInfo && opp.closing_strategy) {
         score += 15;
         reasons.push(`Estrategia de cierre: ${piedraInfo.preferredContactStyle}`);

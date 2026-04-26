@@ -11,9 +11,9 @@ import {
     ExternalLink,
     RefreshCw,
     ChevronRight,
+    X,
     Globe,
-    Linkedin,
-    Twitter,
+    Link,
     Building2,
     User,
     Mail,
@@ -320,12 +320,12 @@ export default function CenturionOSINTPage() {
                                         <div className="flex items-center gap-2 text-xs flex-wrap">
                                             {profile.linkedin_url && (
                                                 <span className="px-2 py-0.5 bg-blue-500/10 text-blue-500 rounded-full flex items-center gap-1">
-                                                    <Linkedin size={10} /> LinkedIn
+                                                    <Link size={10} /> LinkedIn
                                                 </span>
                                             )}
                                             {profile.twitter_url && (
                                                 <span className="px-2 py-0.5 bg-sky-500/10 text-sky-500 rounded-full flex items-center gap-1">
-                                                    <Twitter size={10} /> Twitter
+                                                    <X size={10} /> Twitter
                                                 </span>
                                             )}
                                             {profile.website_url && (
@@ -430,14 +430,14 @@ export default function CenturionOSINTPage() {
                                             {selectedProfile.linkedin_url && (
                                                 <a href={selectedProfile.linkedin_url} target="_blank" rel="noopener noreferrer" 
                                                    className="px-4 py-2 bg-blue-500/10 text-blue-500 rounded-xl text-sm font-medium flex items-center gap-2 hover:bg-blue-500/20 transition-colors">
-                                                    <Linkedin size={14} /> LinkedIn
+                                                    <Link size={14} /> LinkedIn
                                                     <ExternalLink size={12} />
                                                 </a>
                                             )}
                                             {selectedProfile.twitter_url && (
                                                 <a href={selectedProfile.twitter_url} target="_blank" rel="noopener noreferrer"
                                                    className="px-4 py-2 bg-sky-500/10 text-sky-500 rounded-xl text-sm font-medium flex items-center gap-2 hover:bg-sky-500/20 transition-colors">
-                                                    <Twitter size={14} /> Twitter
+                                                    <X size={14} /> Twitter
                                                     <ExternalLink size={12} />
                                                 </a>
                                             )}

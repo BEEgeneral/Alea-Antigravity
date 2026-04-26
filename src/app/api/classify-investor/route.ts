@@ -49,9 +49,9 @@ export async function POST(req: Request) {
         });
 
         const aiResult = await analyzeWithMinimax(prompt);
-        if (aiResult && aiResult.text) {
+        if (aiResult && aiResult.rawResponse) {
           // Try to parse AI response
-          const jsonMatch = aiResult.text.match(/\{[\s\S]*\}/);
+          const jsonMatch = aiResult.rawResponse.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             try {
               const parsed = JSON.parse(jsonMatch[0]);

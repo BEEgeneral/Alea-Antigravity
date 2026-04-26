@@ -442,7 +442,7 @@ export async function GET() {
         }
 
         const duration = Date.now() - startTime;
-        console.log(`Mailtrap polling completed in ${duration}ms. Saved: ${results.saved}, Errors: ${results.errors}`);
+        // Mailtrap polling completed debug removed
 
         return NextResponse.json({
             success: true,

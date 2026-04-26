@@ -28,8 +28,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing investor name' }, { status: 400 });
     }
 
-    // Classify the investor using the personality system
-    const classification = classifyInvestor({
+    // Try AI-powered classification first using MiniMax
+    let classification = classifyInvestor({
       name,
       company,
       documents,
@@ -38,6 +38,41 @@ export async function POST(req: Request) {
       budgetMax,
       source: 'manual_classification'
     });
+
+    // Enhance with AI if communication style is provided
+    if (communicationStyle || email) {
+      try {
+        const prompt = getClassificationPrompt({
+          name,
+          company,
+          source: communicationStyle || email
+        });
+
+        const aiResult = await analyzeWithMinimax(prompt);
+        if (aiResult && aiResult.text) {
+          // Try to parse AI response
+          const jsonMatch = aiResult.text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            try {
+              const parsed = JSON.parse(jsonMatch[0]);
+              if (parsed.piedraPrimaria && parsed.discProfile) {
+                classification = {
+                  ...classification,
+                  piedraPrimaria: parsed.piedraPrimaria,
+                  piedraSecundaria: parsed.piedraSecundaria,
+                  discProfile: parsed.discProfile,
+                  confidence: parsed.confidence || 0.75
+                };
+              }
+            } catch (parseErr) {
+              console.warn('Could not parse AI classification response:', parseErr);
+            }
+          }
+        }
+      } catch (aiErr) {
+        console.warn('AI classification failed, using rule-based:', aiErr);
+      }
+    }
 
     // If we have an investorId, update the existing record
     if (investorId) {

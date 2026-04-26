@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
 const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY || '';
-const MINIMAX_BASE_URL = 'https://api.minimax.chat/v1';
+const MINIMAX_BASE_URL = 'https://api.minimax.io/v1';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
 
     // Call MiniMax
     const response = await minimax.chat.completions.create({
-      model: 'MiniMax-Text-01',
+      model: 'MiniMax-M2.7',
       messages: messages as any,
       temperature: 0.7,
       max_tokens: 1500,

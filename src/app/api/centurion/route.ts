@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createAuthenticatedClient } from '@/lib/insforge-server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { env } from '@/lib/env';
+import OpenAI from 'openai';
 
-const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+const minimax = new OpenAI({
+  apiKey: process.env.MINIMAX_API_KEY || '',
+  baseURL: 'https://api.minimax.io/v1',
+});
 
 // Known Alea Signature team members to exclude from profiles
 const KNOWN_TEAM = [
@@ -57,12 +58,14 @@ export async function POST(req: Request) {
     Devuelve null si no encuentras personas.
     `;
 
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.1 }
+    const result = await minimax.chat.completions.create({
+      model: 'MiniMax-M2.7',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.1,
+      max_tokens: 2000,
     });
 
-    const responseText = result.response.text().trim();
+    const responseText = result.choices[0]?.message?.content?.trim() || '';
     let extractedPeople: any[] = [];
 
     try {

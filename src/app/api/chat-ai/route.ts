@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { env } from '@/lib/env';
+import OpenAI from 'openai';
 
-const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+const minimax = new OpenAI({
+  apiKey: process.env.MINIMAX_API_KEY || '',
+  baseURL: 'https://api.minimax.io/v1',
+});
 
 export async function POST(req: Request) {
     try {
@@ -40,21 +41,23 @@ Formato de respuesta:
 - Usa listas cuando sea necesario
 - Si necesitas ejecutar una acción, explica qué harás y pide confirmación`;
 
-        const chatHistory = [
-            { role: 'user', parts: [{ text: systemPrompt }] },
+        const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+            { role: 'system', content: systemPrompt },
             ...(history || []).slice(-4).map((h: any) => ({ 
-                role: h.role === 'assistant' ? 'model' : 'user', 
-                parts: [{ text: h.content }] 
+                role: h.role === 'assistant' ? 'assistant' : 'user', 
+                content: h.content 
             })),
-            { role: 'user', parts: [{ text: message }] }
+            { role: 'user', content: message }
         ];
 
-        const completionResult = await model.generateContent({
-            contents: chatHistory,
-            generationConfig: { temperature: 0.3, maxOutputTokens: 2000 }
+        const completionResult = await minimax.chat.completions.create({
+            model: 'MiniMax-M2.7',
+            messages,
+            temperature: 0.3,
+            max_tokens: 2000,
         });
 
-        const response = completionResult.response.text();
+        const response = completionResult.choices[0]?.message?.content || '';
 
         if (!response) {
             throw new Error('No se recibió respuesta de la IA');

@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { env } from '@/lib/env';
+import OpenAI from 'openai';
 import { createAuthenticatedClient } from '@/lib/insforge-server';
 
-const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+const minimax = new OpenAI({
+  apiKey: process.env.MINIMAX_API_KEY || '',
+  baseURL: 'https://api.minimax.io/v1',
+});
 
 export async function POST(req: Request) {
     try {
@@ -43,12 +44,14 @@ export async function POST(req: Request) {
         }
         `;
 
-        const completionResult = await model.generateContent({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
+        const completionResult = await minimax.chat.completions.create({
+            model: 'MiniMax-M2.7',
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.1,
+            max_tokens: 1000,
         });
 
-        const content = completionResult.response.text();
+        const content = completionResult.choices[0]?.message?.content || '';
 
         if (!content) {
             throw new Error("No response from AI engine");

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Mail, Bell, Search, Filter, CheckCircle, XCircle, Eye, Loader2, RefreshCw, AlertTriangle, MessageSquare } from "lucide-react";
+import { Mail, Bell, Search, CheckCircle, XCircle, Eye, Loader2, RefreshCw } from "lucide-react";
 
 interface EmailSuggestion {
     id: string;
@@ -16,38 +16,51 @@ interface EmailSuggestion {
 export default function EmailsPage() {
     const [suggestions, setSuggestions] = useState<EmailSuggestion[]>([]);
     const [loading, setLoading] = useState(true);
+    const [syncing, setSyncing] = useState(false);
     const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedSuggestion, setSelectedSuggestion] = useState<EmailSuggestion | null>(null);
 
-    useEffect(() => {
-        const fetchSuggestions = async () => {
-            try {
-                const token = localStorage.getItem('insforge_token');
-                const res = await fetch('/api/iai-inbox', {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+    const fetchSuggestions = async () => {
+        try {
+            const token = localStorage.getItem('insforge_token');
+            const res = await fetch('/api/iai-inbox', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
 
-                if (res.ok) {
-                    const data = await res.json();
-                    setSuggestions(data.suggestions || []);
-                } else {
-                    // Mock data for demo
-                    setSuggestions([
-                        { id: '1', original_email_subject: 'Oportunidad de Inversión - Chueca', sender_email: 'test@example.com', extracted_data: { title: 'Chueca Project', price: 1800000 }, ai_interpretation: 'Inversor interesado en property', status: 'pending', created_at: new Date().toISOString() },
-                        { id: '2', original_email_subject: ' property en venta', sender_email: 'vendor@test.com', extracted_data: { title: 'Palacio Gran Vía', price: 4500000 }, ai_interpretation: 'Nuevo lead property', status: 'approved', created_at: new Date().toISOString() },
-                        { id: '3', original_email_subject: 'Contacto Mandatario', sender_email: 'mandatario@test.com', extracted_data: { title: 'Mandatario Legal', price: 0 }, ai_interpretation: 'Nuevo mandatado', status: 'rejected', created_at: new Date().toISOString() },
-                    ]);
-                }
-            } catch (err) {
-                console.error('Error fetching suggestions:', err);
-            } finally {
-                setLoading(false);
+            if (res.ok) {
+                const data = await res.json();
+                setSuggestions(data.suggestions || []);
+            } else {
+                setSuggestions([
+                    { id: '1', original_email_subject: 'Oportunidad de Inversión - Chueca', sender_email: 'test@example.com', extracted_data: { title: 'Chueca Project', price: 1800000 }, ai_interpretation: 'Inversor interesado en property', status: 'pending', created_at: new Date().toISOString() },
+                    { id: '2', original_email_subject: ' property en venta', sender_email: 'vendor@test.com', extracted_data: { title: 'Palacio Gran Vía', price: 4500000 }, ai_interpretation: 'Nuevo lead property', status: 'approved', created_at: new Date().toISOString() },
+                    { id: '3', original_email_subject: 'Contacto Mandatario', sender_email: 'mandatario@test.com', extracted_data: { title: 'Mandatario Legal', price: 0 }, ai_interpretation: 'Nuevo mandatado', status: 'rejected', created_at: new Date().toISOString() },
+                ]);
             }
-        };
+        } catch (err) {
+            console.error('Error fetching suggestions:', err);
+        } finally {
+            setLoading(false);
+            setSyncing(false);
+        }
+    };
 
+    useEffect(() => {
         fetchSuggestions();
     }, []);
+
+    const handleSync = async () => {
+        setSyncing(true);
+        try {
+            await fetch('/api/imap-polling');
+            await fetchSuggestions();
+        } catch (err) {
+            console.error('Error syncing:', err);
+        } finally {
+            setSyncing(false);
+        }
+    };
 
     const handleApprove = async (id: string) => {
         try {
@@ -98,19 +111,21 @@ export default function EmailsPage() {
 
     return (
         <div className="p-8">
-            {/* Header */}
             <div className="flex justify-between items-center mb-8">
                 <div>
                     <h1 className="text-2xl font-serif font-medium">Email Intelligence (IAI)</h1>
                     <p className="text-sm text-muted-foreground mt-1">Bandeja de entrada de sugerencias de IA</p>
                 </div>
-                <button className="flex items-center space-x-2 px-4 py-2 bg-muted rounded-xl hover:bg-muted/80 transition-all">
-                    <RefreshCw size={18} />
-                    <span className="text-sm">Sincronizar</span>
+                <button 
+                    onClick={handleSync}
+                    disabled={syncing}
+                    className="flex items-center space-x-2 px-4 py-2 bg-muted rounded-xl hover:bg-muted/80 transition-all disabled:opacity-50"
+                >
+                    <RefreshCw size={18} className={syncing ? 'animate-spin' : ''} />
+                    <span className="text-sm">{syncing ? 'Sincronizando...' : 'Sincronizar'}</span>
                 </button>
             </div>
 
-            {/* Stats */}
             <div className="grid grid-cols-4 gap-4 mb-8">
                 <div className="p-4 bg-card border border-border rounded-xl">
                     <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Total</p>
@@ -130,7 +145,6 @@ export default function EmailsPage() {
                 </div>
             </div>
 
-            {/* Filters */}
             <div className="flex items-center space-x-4 mb-6">
                 <div className="flex-1 max-w-md flex items-center space-x-2 bg-card border border-border rounded-xl px-4 py-2">
                     <Search size={18} className="text-muted-foreground" />
@@ -155,7 +169,6 @@ export default function EmailsPage() {
                 </div>
             </div>
 
-            {/* Suggestions List */}
             <div className="space-y-4">
                 {filteredSuggestions.map(suggestion => (
                     <div key={suggestion.id} className="p-6 bg-card border border-border rounded-2xl hover:border-primary/30 transition-all">
@@ -237,7 +250,6 @@ export default function EmailsPage() {
                 </div>
             )}
 
-            {/* Modal */}
             {selectedSuggestion && (
                 <div className="fixed inset-0 bg-background/80 backdrop-blur-xl z-50 flex items-center justify-center p-8">
                     <div className="bg-card border border-border rounded-3xl p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">

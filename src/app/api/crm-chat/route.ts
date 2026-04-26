@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { createAuthenticatedClient } from '@/lib/insforge-server';
-import { env } from '@/lib/env';
 
-const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+const minimax = new OpenAI({
+  apiKey: process.env.MINIMAX_API_KEY || '',
+  baseURL: 'https://api.minimax.io/v1',
+});
 
 type Tables = 'leads' | 'properties' | 'investors' | 'mandatarios' | 'collaborators';
 
@@ -120,23 +121,20 @@ Cuando detectes que el usuario quiere ver algo, responde con la información rel
 Cuando detectes que el usuario quiere MODIFICAR algo, responde:
 "Voy a modificar [qué]. ¿Qué datos quieres cambiar?"`;
 
-        const messages = [
+        const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
             { role: 'system', content: systemPrompt },
-            ...(history || []).slice(-4).map((h: any) => ({ role: h.role, content: h.content })),
+            ...(history || []).slice(-4).map((h: any) => ({ role: h.role === 'assistant' ? 'assistant' : 'user', content: h.content })),
             { role: 'user', content: message }
         ];
 
-        const chatHistory = messages.map((m: any) => ({
-            role: m.role === 'system' ? 'user' : m.role,
-            parts: [{ text: m.content }]
-        }));
-
-        const completionResult = await model.generateContent({
-            contents: chatHistory,
-            generationConfig: { temperature: 0.3, maxOutputTokens: 1500 }
+        const completionResult = await minimax.chat.completions.create({
+            model: 'MiniMax-M2.7',
+            messages,
+            temperature: 0.3,
+            max_tokens: 1500,
         });
 
-        const response = completionResult.response.text();
+        const response = completionResult.choices[0]?.message?.content || '';
 
         return NextResponse.json({ response });
 

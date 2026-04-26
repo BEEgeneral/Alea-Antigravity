@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
-      console.error('Email confirmation error:', error);
+      
       return NextResponse.json(
         { error: error.message || 'Failed to verify email' },
         { status: 400 }
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('Confirm email error:', error);
+    
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

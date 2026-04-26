@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       redirectPath: getRedirectPath(profile.role)
     });
   } catch (error: any) {
-    console.error('Get user error:', error);
+    
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

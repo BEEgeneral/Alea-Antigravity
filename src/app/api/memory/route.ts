@@ -138,7 +138,6 @@ export async function GET(req: Request) {
         }
 
     } catch (error: any) {
-        console.error('Memory API error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
@@ -317,7 +316,6 @@ export async function POST(req: Request) {
         }
 
     } catch (error: any) {
-        console.error('Memory API POST error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
@@ -357,7 +355,6 @@ export async function DELETE(req: Request) {
         return NextResponse.json({ error: 'drawerId or kgId required' }, { status: 400 });
 
     } catch (error: any) {
-        console.error('Memory API DELETE error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

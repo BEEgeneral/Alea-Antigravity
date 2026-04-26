@@ -66,7 +66,6 @@ Formato de respuesta:
         return NextResponse.json({ response });
 
     } catch (error: any) {
-        console.error('Chat AI error:', error);
         return NextResponse.json(
             { error: error.message || 'Error al procesar el mensaje' },
             { status: 500 }

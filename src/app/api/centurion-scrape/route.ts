@@ -35,7 +35,7 @@ async function searchGoogle(name: string, company?: string): Promise<string> {
     
     return relevantUrls.join('\n');
   } catch (error: any) {
-    console.error('Google search error:', error);
+    
     return '';
   }
 }
@@ -66,7 +66,7 @@ async function scrapeWebsite(url: string): Promise<string> {
     
     return `Title: ${title}\nDescription: ${description}\nEmails: ${uniqueEmails.join(', ')}`;
   } catch (error: any) {
-    console.error('Website scrape error:', error);
+    
     return '';
   }
 }
@@ -110,7 +110,7 @@ async function analyzeWithAI(name: string, company: string, scrapedData: string)
       return {};
     }
   } catch (error: any) {
-    console.error('AI analysis error:', error);
+    
     return {};
   }
 }
@@ -193,7 +193,7 @@ export async function POST(req: Request) {
     });
 
   } catch (error: any) {
-    console.error('OSINT scrape error:', error);
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -230,7 +230,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ profile, jobs });
   } catch (error: any) {
-    console.error('OSINT scrape error:', error);
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

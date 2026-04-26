@@ -75,7 +75,7 @@ export async function POST(request: Request) {
                     }
                 }
             } catch (e) {
-                console.error('Error saving attachment:', e);
+                
             }
         }
 
@@ -153,7 +153,7 @@ ${text.substring(0, 2000)}`;
         });
 
     } catch (error: any) {
-        console.error('Mailtrap webhook error:', error);
+        
         return NextResponse.json(
             { success: false, error: error.message },
             { status: 500 }

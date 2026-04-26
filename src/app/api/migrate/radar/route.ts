@@ -200,7 +200,7 @@ ALTER TABLE leads ADD COLUMN IF NOT EXISTS pipeline_stage TEXT DEFAULT 'prospect
     }, { status: 400 });
 
   } catch (error: any) {
-    console.error('RADAR Migration error:', error);
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

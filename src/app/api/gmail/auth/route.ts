@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ authUrl });
 
   } catch (error: any) {
-    console.error('Gmail auth error:', error);
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

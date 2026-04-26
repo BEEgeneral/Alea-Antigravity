@@ -61,7 +61,7 @@ export async function POST(req: Request) {
         return NextResponse.json(result);
 
     } catch (error: any) {
-        console.error("Error in AI Valuation Suggestion:", error);
+        
         return NextResponse.json({ error: error.message || 'Error processing valuation' }, { status: 500 });
     }
 }

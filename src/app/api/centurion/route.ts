@@ -135,7 +135,6 @@ export async function POST(req: Request) {
     });
 
   } catch (error: any) {
-    console.error('Catfish analysis error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -178,7 +177,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ profiles: profiles || [] });
 
   } catch (error: any) {
-    console.error('Catfish GET error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -244,7 +242,6 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ success: true, profile: updated });
 
   } catch (error: any) {
-    console.error('Catfish PATCH error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

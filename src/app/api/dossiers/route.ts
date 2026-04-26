@@ -22,7 +22,7 @@ export async function GET(req: Request) {
       .limit(limit);
 
     if (profilesError) {
-      console.error('Profiles error:', profilesError);
+      ;
       return NextResponse.json({ error: profilesError.message }, { status: 500 });
     }
 
@@ -35,7 +35,7 @@ export async function GET(req: Request) {
       .limit(limit);
 
     if (classError) {
-      console.error('Classifications error:', classError);
+      ;
     }
 
     // Get investors with classification data
@@ -47,7 +47,7 @@ export async function GET(req: Request) {
       .limit(limit);
 
     if (investorsError) {
-      console.error('Investors error:', investorsError);
+      ;
     }
 
     return NextResponse.json({
@@ -57,7 +57,7 @@ export async function GET(req: Request) {
     });
 
   } catch (error: any) {
-    console.error('Dossiers GET error:', error);
+    ;
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

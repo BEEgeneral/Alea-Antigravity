@@ -80,7 +80,7 @@ export async function GET(req: Request) {
       .single();
 
     if (profileError) {
-      console.error('Profile error:', profileError);
+      
       return NextResponse.json({ error: profileError.message }, { status: 500 });
     }
 
@@ -107,7 +107,7 @@ export async function GET(req: Request) {
       .single();
 
     if (classError) {
-      console.error('Classification error:', classError);
+      
     }
 
     // Also create investor record
@@ -129,7 +129,7 @@ export async function GET(req: Request) {
       .single();
 
     if (investorError) {
-      console.error('Investor error:', investorError);
+      
     }
 
     return NextResponse.json({
@@ -151,7 +151,7 @@ export async function GET(req: Request) {
     });
 
   } catch (error: any) {
-    console.error('Save Enric Llorens error:', error);
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

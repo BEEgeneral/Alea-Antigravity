@@ -60,7 +60,7 @@ export async function GET(
     });
 
   } catch (error: any) {
-    console.error('Error:', error);
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

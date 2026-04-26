@@ -37,14 +37,14 @@ export async function POST(req: Request) {
       .single();
 
     if (error) {
-      console.error('Track behavior error:', error);
+      
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, behavior: data }, { status: 201 });
 
   } catch (error: any) {
-    console.error('Error:', error);
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

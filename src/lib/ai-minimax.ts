@@ -1,20 +1,19 @@
 /**
  * MiniMax AI Integration
- * Uses MiniMax-Text-01 for text generation
+ * Uses Anthropic-compatible API for MiniMax Plus plans
  */
 
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 
 const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY || '';
-const MINIMAX_BASE_URL = 'https://api.minimax.chat/v1';
 
 if (!MINIMAX_API_KEY) {
   console.warn('⚠️ MINIMAX_API_KEY not configured. AI features will not work.');
 }
 
-export const minimax = new OpenAI({
+const anthropic = new Anthropic({
   apiKey: MINIMAX_API_KEY,
-  baseURL: MINIMAX_BASE_URL,
+  baseURL: 'https://api.minimax.io/v1',
 });
 
 export async function generateText(
@@ -31,29 +30,24 @@ export async function generateText(
   }
 
   const {
-    model = 'MiniMax-Text-01',
+    model = 'MiniMax-M2.7',
     temperature = 0.7,
     maxTokens = 1500,
     systemPrompt
   } = options;
 
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
-  
-  if (systemPrompt) {
-    messages.push({ role: 'system', content: systemPrompt });
-  }
-  
-  messages.push({ role: 'user', content: prompt });
-
   try {
-    const response = await minimax.chat.completions.create({
+    const message = await anthropic.messages.create({
       model,
-      messages,
-      temperature,
       max_tokens: maxTokens,
+      temperature,
+      system: systemPrompt || 'You are a helpful assistant.',
+      messages: [
+        { role: 'user', content: [{ type: 'text', text: prompt }] }
+      ],
     });
 
-    return response.choices[0]?.message?.content || '';
+    return message.content[0].type === 'text' ? message.content[0].text : '';
   } catch (error: any) {
     console.error('MiniMax error:', error);
     throw error;
@@ -68,23 +62,18 @@ export async function analyzeWithAI(
     throw new Error('MINIMAX_API_KEY not configured');
   }
 
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
-  
-  if (systemPrompt) {
-    messages.push({ role: 'system', content: systemPrompt });
-  }
-  
-  messages.push({ role: 'user', content: prompt });
-
   try {
-    const response = await minimax.chat.completions.create({
-      model: 'MiniMax-Text-01',
-      messages,
-      temperature: 0.1,
+    const message = await anthropic.messages.create({
+      model: 'MiniMax-M2.7',
       max_tokens: 2000,
+      temperature: 0.1,
+      system: systemPrompt || 'You are a helpful assistant.',
+      messages: [
+        { role: 'user', content: [{ type: 'text', text: prompt }] }
+      ],
     });
 
-    const rawResponse = response.choices[0]?.message?.content || '';
+    const rawResponse = message.content[0].type === 'text' ? message.content[0].text : '';
     let analysis = {};
 
     try {

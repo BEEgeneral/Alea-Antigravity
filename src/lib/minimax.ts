@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 
 const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY || '';
-const MINIMAX_BASE_URL = 'https://api.minimax.chat/v1';
+const MINIMAX_BASE_URL = 'https://api.minimax.io/v1';
 
 export const minimax = new OpenAI({
     apiKey: MINIMAX_API_KEY,
@@ -18,7 +18,7 @@ export async function generateText(
     } = {}
 ): Promise<string> {
     const {
-        model = 'MiniMax-Text-01',
+        model = 'MiniMax-M2.7',
         temperature = 0.7,
         maxTokens = 1000,
         responseFormat
@@ -60,7 +60,7 @@ export async function analyzeWithMinimax(
     messages.push({ role: 'user', content: prompt });
 
     const response = await minimax.chat.completions.create({
-        model: 'MiniMax-Text-01',
+        model: 'MiniMax-M2.7',
         messages,
         temperature: 0.1,
         max_tokens: 2000,

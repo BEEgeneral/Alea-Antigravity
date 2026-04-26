@@ -316,3 +316,80 @@ export interface AgendaSuggestion {
     hours_until_due?: number;
     pipeline_stage: string;
 }
+
+// ─────────────────────────────────────────────────────────
+// RADAR ALEA Types - Intelligence System
+// ─────────────────────────────────────────────────────────
+
+export type AleaScoreClassification = 'exceptional' | 'high' | 'medium' | 'low';
+export type RadarPhase = 1 | 2 | 3 | 4 | 5;
+export type OpportunityPriority = 'high' | 'medium' | 'low';
+export type SignalSource = 'boe' | 'concursos' | 'boletin_urbanistico' | 'network' | 'architect' | 'international';
+
+export interface AleaScore {
+    value: number;
+    classification: AleaScoreClassification;
+    exclusivity: number;
+    access: number;
+    market_timing: number;
+    source_quality: number;
+    asset_type_score: number;
+}
+
+export interface Signal {
+    id: string;
+    source: SignalSource;
+    asset_type: string;
+    location_hint: string;
+    alea_score: number;
+    score_classification: AleaScoreClassification;
+    status: 'detected' | 'analyzing' | 'qualified' | 'matched' | 'closed' | 'archived';
+    detected_at: string;
+    updated_at?: string;
+    metadata?: Record<string, unknown>;
+}
+
+export interface Opportunity {
+    id: string;
+    property_id?: string;
+    investor_id?: string;
+    signal_id?: string;
+    alea_score: number;
+    priority: OpportunityPriority;
+    status: 'active' | 'matched' | 'in_progress' | 'closing' | 'closed' | 'lost';
+    match_score?: number;
+    pipeline_stage?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface TrendAlert {
+    id: string;
+    alert_type: 'financial_fatigue' | 'hybrid_asset' | 'legal_revaluation' | 'market_shift' | 'new_competition';
+    title: string;
+    description: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    location?: string;
+    affected_assets?: string[];
+    is_active: boolean;
+    created_at?: string;
+}
+
+export interface InvestorMatch {
+    investor_id: string;
+    property_id: string;
+    budget_fit: 'match' | 'expandable' | 'no_match';
+    type_fit: 'match' | 'partial' | 'no_match';
+    location_fit: 'match' | 'partial' | 'no_match';
+    overall_score: number;
+    recommendations?: string[];
+}
+
+export interface RadarStats {
+    signals_detected_today: number;
+    signals_detected_week: number;
+    high_priority_signals: number;
+    active_opportunities: number;
+    pipeline_value_estimate: number;
+    recent_matches: number;
+}

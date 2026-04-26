@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createAuthenticatedClient } from '@/lib/insforge-server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { env } from '@/lib/env';
+import OpenAI from 'openai';
 
-const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+const minimax = new OpenAI({
+  apiKey: process.env.MINIMAX_API_KEY || '',
+  baseURL: 'https://api.minimax.io/v1',
+});
 
 async function searchGoogle(name: string, company?: string): Promise<string> {
   const query = encodeURIComponent(`${name} ${company || ''} LinkedIn OR Twitter OR website`.trim());
@@ -95,12 +96,14 @@ async function analyzeWithAI(name: string, company: string, scrapedData: string)
   `;
 
   try {
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.1 }
+    const result = await minimax.chat.completions.create({
+      model: 'MiniMax-M2.7',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.1,
+      max_tokens: 1000,
     });
 
-    const text = result.response.text().trim();
+    const text = result.choices[0]?.message?.content?.trim() || '';
     try {
       return JSON.parse(text);
     } catch {

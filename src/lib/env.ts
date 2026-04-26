@@ -76,7 +76,7 @@ export const env = {
  */
 export const validateEnv = () => {
   const required = [
-    'GEMINI_API_KEY',
+    'MINIMAX_API_KEY',
   ];
 
   const missing = required.filter(key => !process.env[key]);

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Shield, Users, Settings, Database, Activity, FileText, Webhook, Bell, AlertTriangle, ArrowLeft, Crown } from "lucide-react";
+import { Shield, Users, Settings, Database, Activity, FileText, Webhook, Bell, AlertTriangle, ArrowLeft, Crown, MessageSquare } from "lucide-react";
 
 interface AdminLink {
     name: string;
@@ -102,6 +102,12 @@ export default function CenturionPage() {
             href: "/praetorium?tab=intelligence",
             icon: <AlertTriangle size={24} />,
             description: "Ver conversaciones y notificaciones"
+        },
+        {
+            name: "Pelayo AI (Voice)",
+            href: "/centurion/pelayo",
+            icon: <MessageSquare size={24} />,
+            description: "Chatea con Pelayo usando voz"
         }
     ];
 

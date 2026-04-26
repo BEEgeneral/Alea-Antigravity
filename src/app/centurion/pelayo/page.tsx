@@ -29,28 +29,23 @@ export default function PelayoPage() {
     const [currentUser, setCurrentUser] = useState<any>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // Voice state
+    // Voice state - Web Speech API
     const [isRecording, setIsRecording] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const [voiceEnabled, setVoiceEnabled] = useState(false);
-    const [selectedVoice, setSelectedVoice] = useState('male-qn-qingse');
+    const [selectedVoice, setSelectedVoice] = useState(0);
     const [showVoiceSettings, setShowVoiceSettings] = useState(false);
-    const [voices, setVoices] = useState<{ id: string; name: string }[]>([
-        { id: 'male-qn-qingse', name: 'Qingse (Masculino)' },
-        { id: 'female-tianmei', name: 'Tianmei (Femenino)' },
-        { id: 'female-yunyang', name: 'Yunyang (Femenino)' },
-        { id: 'male-yunfeng', name: 'Yunfeng (Masculino)' },
-    ]);
+    const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
 
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const recognitionRef = useRef<any>(null);
+    const synthRef = useRef<SpeechSynthesisUtterance | null>(null);
 
     useEffect(() => {
         const checkAuth = async () => {
             try {
                 const token = localStorage.getItem('insforge_token');
                 if (!token) return;
-                
+
                 const res = await fetch('/api/auth/me', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
@@ -70,12 +65,10 @@ export default function PelayoPage() {
 
     const loadData = async (token: string, userId: string) => {
         try {
-            // Load conversations/messages from pelayo_conversations
             const convRes = await fetch(`/api/pelayo-chat?type=conversations&userId=${userId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            // Load notifications
             const notifRes = await fetch(`/api/pelayo-chat?type=notifications&userId=${userId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -94,106 +87,93 @@ export default function PelayoPage() {
         }
     };
 
-    // STT: Start recording
-    const startRecording = async () => {
+    // STT: Start recording using Web Speech API
+    const startRecording = () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const mediaRecorder = new MediaRecorder(stream);
-            mediaRecorderRef.current = mediaRecorder;
+            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert('Tu navegador no soporta reconocimiento de voz.');
+                return;
+            }
 
-            const audioChunks: BlobPart[] = [];
+            const recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'es-ES';
 
-            mediaRecorder.ondataavailable = (event) => {
-                audioChunks.push(event.data);
+            recognition.onstart = () => {
+                setIsRecording(true);
             };
 
-            mediaRecorder.onstop = async () => {
-                stream.getTracks().forEach(track => track.stop());
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                await transcribeAudio(audioBlob);
+            recognition.onresult = (event: any) => {
+                const transcript = event.results[0][0].transcript;
+                setInputMessage(prev => prev + transcript);
             };
 
-            mediaRecorder.start();
-            setIsRecording(true);
+            recognition.onerror = (event: any) => {
+                console.error('Speech recognition error:', event.error);
+                setIsRecording(false);
+            };
+
+            recognition.onend = () => {
+                setIsRecording(false);
+            };
+
+            recognitionRef.current = recognition;
+            recognition.start();
         } catch (error) {
             console.error('Error starting recording:', error);
             alert('No se pudo acceder al micrófono. Verifica los permisos.');
         }
     };
 
-    // STT: Transcribe audio
-    const transcribeAudio = async (audioBlob: Blob) => {
-        try {
-            const formData = new FormData();
-            formData.append('file', audioBlob, 'recording.webm');
-
-            const token = localStorage.getItem('insforge_token');
-            const res = await fetch('/api/hermes/speech', {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}` },
-                body: formData,
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                if (data.text) {
-                    setInputMessage(prev => prev + data.text);
-                }
-            }
-        } catch (error) {
-            console.error('Transcription error:', error);
-        }
-    };
-
     // STT: Stop recording
     const stopRecording = () => {
-        if (mediaRecorderRef.current && isRecording) {
-            mediaRecorderRef.current.stop();
+        if (recognitionRef.current) {
+            recognitionRef.current.stop();
             setIsRecording(false);
         }
     };
 
-    // TTS: Play text as speech
-    const playTTS = async (text: string) => {
+    // TTS: Play text as speech using Web Speech API
+    const playTTS = (text: string) => {
         if (isPlaying) {
             stopTTS();
             return;
         }
 
         try {
-            const token = localStorage.getItem('insforge_token');
-            const res = await fetch('/api/hermes/speech?action=tts', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    text,
-                    voice: selectedVoice,
-                    speed: 1.0,
-                    model: 'speech-02',
-                }),
-            });
-
-            if (res.ok) {
-                const audioBlob = await res.blob();
-                const audioUrl = URL.createObjectURL(audioBlob);
-                audioRef.current = new Audio(audioUrl);
-
-                audioRef.current.onended = () => {
-                    setIsPlaying(false);
-                    URL.revokeObjectURL(audioUrl);
-                };
-
-                audioRef.current.onerror = () => {
-                    setIsPlaying(false);
-                    URL.revokeObjectURL(audioUrl);
-                };
-
-                await audioRef.current.play();
-                setIsPlaying(true);
+            const synth = window.speechSynthesis;
+            if (!synth) {
+                alert('Tu navegador no soporta síntesis de voz.');
+                return;
             }
+
+            synth.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'es-ES';
+            utterance.rate = 1.0;
+
+            const voices = synth.getVoices();
+            if (voices.length > 0) {
+                const spanishVoices = voices.filter(v => v.lang.includes('es'));
+                if (spanishVoices.length > 0) {
+                    utterance.voice = spanishVoices[selectedVoice % spanishVoices.length];
+                }
+            }
+
+            utterance.onend = () => {
+                setIsPlaying(false);
+            };
+
+            utterance.onerror = () => {
+                setIsPlaying(false);
+            };
+
+            synthRef.current = utterance;
+            synth.speak(utterance);
+            setIsPlaying(true);
         } catch (error) {
             console.error('TTS error:', error);
         }
@@ -201,12 +181,19 @@ export default function PelayoPage() {
 
     // TTS: Stop playing
     const stopTTS = () => {
-        if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current = null;
-        }
+        window.speechSynthesis.cancel();
         setIsPlaying(false);
     };
+
+    // Load available voices
+    useEffect(() => {
+        const loadVoices = () => {
+            const voices = window.speechSynthesis.getVoices();
+            setAvailableVoices(voices);
+        };
+        loadVoices();
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+    }, []);
 
     const handleSendMessage = async () => {
         if (!inputMessage.trim() || sending) return;
@@ -218,7 +205,6 @@ export default function PelayoPage() {
         const userMessage = inputMessage;
         setInputMessage("");
 
-        // Add user message to UI immediately
         setMessages(prev => [...prev, {
             id: Date.now().toString(),
             conversation_id: 'current',
@@ -242,8 +228,7 @@ export default function PelayoPage() {
 
             if (res.ok) {
                 const data = await res.json();
-                
-                // Add assistant response
+
                 if (data.response) {
                     setMessages(prev => [...prev, {
                         id: (Date.now() + 1).toString(),
@@ -254,7 +239,6 @@ export default function PelayoPage() {
                     }]);
                 }
 
-                // Reload notifications
                 if (data.pendingAction) {
                     loadData(token, currentUser?.id || currentUser?.email);
                 }
@@ -309,7 +293,7 @@ export default function PelayoPage() {
                     <h1 className="text-2xl font-serif font-medium">Pelayo AI Assistant</h1>
                     <p className="text-sm text-muted-foreground mt-1">Asistente de inteligencia artificial para Alea Signature</p>
                 </div>
-                <button 
+                <button
                     onClick={handleRefresh}
                     className="flex items-center space-x-2 px-4 py-2 bg-muted rounded-xl hover:bg-muted/80 transition-all"
                 >
@@ -335,7 +319,7 @@ export default function PelayoPage() {
                         messages.map((msg) => (
                             <div
                                 key={msg.id}
-                                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}}`}
                             >
                                 <div className={`flex items-start space-x-3 max-w-[70%] ${msg.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
                                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
@@ -443,18 +427,22 @@ export default function PelayoPage() {
                     {/* Voice settings panel */}
                     {showVoiceSettings && (
                         <div className="mt-4 p-4 bg-muted rounded-xl">
-                            <p className="text-sm font-medium mb-3">Configuración de Voz</p>
+                            <p className="text-sm font-medium mb-3">Configuración de Voz (Navegador)</p>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-xs text-muted-foreground mb-2 block">Voz</label>
                                     <select
                                         value={selectedVoice}
-                                        onChange={(e) => setSelectedVoice(e.target.value)}
+                                        onChange={(e) => setSelectedVoice(Number(e.target.value))}
                                         className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
                                     >
-                                        {voices.map((v) => (
-                                            <option key={v.id} value={v.id}>{v.name}</option>
-                                        ))}
+                                        {availableVoices
+                                            .filter(v => v.lang.includes('es'))
+                                            .map((voice, index) => (
+                                                <option key={voice.name} value={index}>
+                                                    {voice.name} ({voice.lang})
+                                                </option>
+                                            ))}
                                     </select>
                                 </div>
                                 <div className="flex items-end">
@@ -479,7 +467,7 @@ export default function PelayoPage() {
                     <h3 className="text-sm font-medium mb-3">Notificaciones Recientes</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {notifications.slice(0, 3).map((notif) => (
-                            <div 
+                            <div
                                 key={notif.id}
                                 className={`p-4 rounded-xl border ${
                                     notif.type === 'opportunity' ? 'bg-emerald-500/5 border-emerald-500/20' :

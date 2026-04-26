@@ -11,13 +11,11 @@ export async function GET(request: NextRequest) {
             .order("full_name");
 
         if (error) {
-            console.error("Error fetching investors:", error);
             return NextResponse.json({ error: error.message, details: error }, { status: 500 });
         }
 
         return NextResponse.json({ investors: investors || [] });
     } catch (error: any) {
-        console.error("Error fetching investors:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

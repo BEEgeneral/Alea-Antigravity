@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
               calendarEvent.htmlLink = `https://calendar.google.com/calendar/event?id=${calendarEvent.id}`;
             }
           } catch (calError: any) {
-            console.error('Calendar event creation failed:', calError.message);
+            
           }
         }
       }

@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('Pelayo error:', error);
+    
     
     return NextResponse.json({
       response: `❌ Error: ${error.message || 'Error desconocido'}\n\nPor favor, intenta de nuevo.`,

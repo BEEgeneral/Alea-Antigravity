@@ -33,7 +33,6 @@ export async function POST(req: Request) {
       .single();
 
     if (profileError) {
-      console.error('Profile error:', profileError);
       return NextResponse.json({ error: profileError.message }, { status: 500 });
     }
 
@@ -62,7 +61,6 @@ export async function POST(req: Request) {
       .single();
 
     if (classError) {
-      console.error('Classification error:', classError);
       // Don't fail - profile was created
     }
 
@@ -98,7 +96,6 @@ export async function POST(req: Request) {
     });
 
   } catch (error: any) {
-    console.error('Create investor profile error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

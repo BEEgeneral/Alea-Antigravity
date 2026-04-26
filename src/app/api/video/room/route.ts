@@ -57,7 +57,7 @@ export async function POST(req: Request) {
       .single();
 
     if (meetingError) {
-      console.error('Error creating meeting:', meetingError);
+      
       return NextResponse.json({ error: meetingError.message }, { status: 500 });
     }
 
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
       .eq('id', meeting.id);
 
     if (updateError) {
-      console.error('Error updating meeting URL:', updateError);
+      
     }
 
     return NextResponse.json({
@@ -84,7 +84,7 @@ export async function POST(req: Request) {
     });
 
   } catch (error: any) {
-    console.error('Create room error:', error);
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -152,7 +152,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ meetings: meetingsWithUrls });
 
   } catch (error: any) {
-    console.error('Get meetings error:', error);
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

@@ -120,11 +120,11 @@ Responde SOLO con JSON válido (sin markdown, sin comentarios):
             aiEnhanced = true;
             aiInsight = aiData.insight || '';
           } catch (parseError) {
-            console.warn('Failed to parse AI response:', parseError);
+            ;
           }
         }
       } catch (aiError) {
-        console.warn('AI enhancement failed, using merged patterns:', aiError);
+        ;
       }
     }
 
@@ -149,7 +149,7 @@ Responde SOLO con JSON válido (sin markdown, sin comentarios):
     });
 
   } catch (error: any) {
-    console.error('Error:', error);
+    ;
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

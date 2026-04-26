@@ -152,7 +152,7 @@ async function saveConversation(
       metadata: metadata || null,
     });
   } catch (e) {
-    console.error('Error saving conversation:', e);
+    // silently skip conversation save
   }
 }
 
@@ -204,7 +204,7 @@ export async function POST(req: NextRequest) {
         memoryContext = memories.map(m => `[${m.hall_type}] ${m.content}`).join('\n');
       }
     } catch (e) {
-      console.log('No memory context available');
+      // no memory context available
     }
 
     const systemPrompt = memoryContext
@@ -342,15 +342,12 @@ export async function POST(req: NextRequest) {
               }
             }
 
-            if (reasoningContent) {
-              console.log('💭 Reasoning (preview):', reasoningContent.substring(0, 100) + '...');
-            }
+            // reasoning available
 
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
             controller.close();
 
           } catch (error: any) {
-            console.error('Stream error:', error);
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`));
             controller.close();
           }
@@ -436,7 +433,6 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('Hermes chat error:', error);
     return NextResponse.json({
       response: `❌ Error: ${error.message || 'Error desconocido'}`,
       error: error.message,

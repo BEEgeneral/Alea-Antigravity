@@ -22,7 +22,7 @@ async function getFreshAccessToken(refreshToken: string): Promise<string | null>
     const data = await response.json();
     return data.access_token || null;
   } catch (error) {
-    console.error('Error refreshing token:', error);
+    
     return null;
   }
 }
@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('Gmail emails error:', error);
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('Gmail send error:', error);
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

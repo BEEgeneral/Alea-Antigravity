@@ -49,7 +49,7 @@ export async function POST(
         .single();
 
       if (investorError && !investorError.message.includes('duplicate')) {
-        console.error('Error creating investor:', investorError);
+        
       } else {
         createData = { type: 'investor', id: investor?.id };
       }
@@ -72,7 +72,7 @@ export async function POST(
         .single();
 
       if (propertyError && !propertyError.message.includes('duplicate')) {
-        console.error('Error creating property:', propertyError);
+        
       } else {
         createData = { type: 'property', id: property?.id };
       }

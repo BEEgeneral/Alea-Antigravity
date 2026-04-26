@@ -86,13 +86,13 @@ ${text}
                 ? extractionResult.analysis
                 : JSON.parse(extractionResult.rawResponse);
         } catch (e) {
-            console.error('Error parsing extraction:', e);
+            
         }
 
         try {
             aiInterpretation = interpretationResult;
         } catch (e) {
-            console.error('Error parsing interpretation:', e);
+            
         }
 
         const { data, error } = await insforgeAdmin
@@ -119,7 +119,7 @@ ${text}
         return NextResponse.json({ success: true, data, has_dossier: extractedData.has_dossier });
 
     } catch (error: any) {
-        console.error('Error processing email:', error);
+        
         return NextResponse.json(
             { error: error.message || 'Error al procesar el email' },
             { status: 500 }

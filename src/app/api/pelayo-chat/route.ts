@@ -159,7 +159,7 @@ ${summary}`;
     });
 
   } catch (error: any) {
-    console.error('Pelayo error:', error);
+    
     
     return NextResponse.json({
       response: `❌ Error: ${error.message || 'Error desconocido'}`,

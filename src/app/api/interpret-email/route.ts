@@ -68,13 +68,12 @@ ${email_body}
             .eq('id', suggestion_id);
 
         if (updateError) {
-            console.warn('Could not cache interpretation:', updateError);
+            // silently skip cache update
         }
 
         return NextResponse.json({ interpretation, cached: false });
 
     } catch (error: any) {
-        console.error('Error interpreting email:', error);
         return NextResponse.json(
             { error: error.message || 'Error al interpretar el email' },
             { status: 500 }

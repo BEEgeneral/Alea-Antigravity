@@ -37,7 +37,7 @@ export async function GET(req: Request) {
     const { data: interests, error } = await query;
 
     if (error) {
-      console.error('Error fetching interests:', error);
+      
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
@@ -58,7 +58,7 @@ export async function GET(req: Request) {
     });
 
   } catch (error: any) {
-    console.error('Error:', error);
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -97,7 +97,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ success: true, data });
 
   } catch (error: any) {
-    console.error('Error:', error);
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

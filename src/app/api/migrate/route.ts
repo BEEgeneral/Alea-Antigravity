@@ -97,7 +97,7 @@ ALTER TABLE centurion_profiles ADD COLUMN IF NOT EXISTS scrape_status TEXT DEFAU
     }, { status: 400 });
 
   } catch (error: any) {
-    console.error('Migration error:', error);
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

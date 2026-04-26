@@ -139,7 +139,6 @@ Cuando detectes que el usuario quiere MODIFICAR algo, responde:
         return NextResponse.json({ response });
 
     } catch (error: any) {
-        console.error('Chat AI error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

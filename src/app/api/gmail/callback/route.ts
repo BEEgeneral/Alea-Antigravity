@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     const tokens: TokenResponse = await tokenResponse.json();
 
     if (tokens.error) {
-      console.error('Gmail token error:', tokens.error);
+      
       return NextResponse.redirect(
         new URL(`/praetorium?gmail_error=${encodeURIComponent(tokens.error)}`, request.url)
       );
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
       });
 
     if (upsertError) {
-      console.error('Error saving Gmail tokens:', upsertError);
+      
       return NextResponse.redirect(
         new URL('/praetorium?gmail_error=db_error', request.url)
       );
@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
     );
 
   } catch (err: any) {
-    console.error('Gmail callback error:', err);
+    
     return NextResponse.redirect(
       new URL(`/praetorium?gmail_error=${encodeURIComponent(err.message)}`, request.url)
     );

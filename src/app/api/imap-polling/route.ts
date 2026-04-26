@@ -41,7 +41,7 @@ async function getFilters(client: Awaited<ReturnType<typeof createServerClient>>
         .eq('activo', true);
 
     if (error) {
-        console.error('Error fetching filters:', error);
+        
         return [];
     }
 
@@ -133,7 +133,7 @@ async function fetchAllEmails(imap: Imap): Promise<ProcessedEmail[]> {
                             attachments
                         });
                     } catch (e) {
-                        console.error('Error parsing email:', e);
+                        
                     }
                 });
             });
@@ -217,7 +217,7 @@ ${text.substring(0, 2000)}`;
             ai_interpretation: interpretationResult.rawResponse
         };
     } catch (error: any) {
-        console.error('MiniMax error:', error);
+        
         return {
             type: 'lead',
             summary: `Error en análisis: ${error.message}`,
@@ -239,7 +239,7 @@ async function analyzeImageAttachment(
         const result = await analyzeImage(base64, prompt);
         return result;
     } catch (error: any) {
-        console.error('Error analyzing image:', error);
+        
         return `Error al analizar imagen ${filename}: ${error.message}`;
     }
 }
@@ -282,7 +282,7 @@ async function saveToInboxSuggestions(
         .single();
 
     if (error) {
-        console.error('Error saving to iai_inbox_suggestions:', error);
+        
         throw error;
     }
 
@@ -311,7 +311,7 @@ async function uploadAttachment(
         });
 
         if (!strategyRes.ok) {
-            console.error('Error getting upload strategy');
+            
             return null;
         }
 
@@ -350,7 +350,7 @@ async function uploadAttachment(
             }
         }
     } catch (error) {
-        console.error('Error uploading attachment:', error);
+        
     }
     return null;
 }
@@ -428,7 +428,7 @@ export async function GET() {
                 results.errors++;
                 results.processed++;
                 results.messages.push(`Error: ${error.message}`);
-                console.error('Error processing email:', error);
+                
             }
         }
 
@@ -443,7 +443,7 @@ export async function GET() {
         });
 
     } catch (error: any) {
-        console.error('IMAP polling error:', error);
+        
         return NextResponse.json({
             success: false,
             error: error.message,

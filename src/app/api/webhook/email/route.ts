@@ -8,7 +8,7 @@ export async function POST(req: Request) {
     try {
         // CRITICAL: Webhook secret is MANDATORY
         if (!env.WEBHOOK_SECRET) {
-            console.error('WEBHOOK_SECRET not configured - rejecting request');
+            
             return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 });
         }
         
@@ -144,7 +144,7 @@ export async function POST(req: Request) {
                         });
                     }
                 } catch (e) {
-                    console.error('Error saving attachment:', e);
+                    
                 }
             }
         }
@@ -214,7 +214,7 @@ export async function POST(req: Request) {
                 extractedData = JSON.parse(extractionRaw);
             }
         } catch (e) {
-            console.error('Error parsing extraction:', e);
+            
         }
 
         try {
@@ -224,7 +224,7 @@ export async function POST(req: Request) {
                 aiInterpretation = interpretationRaw;
             }
         } catch (e) {
-            console.error('Error parsing interpretation:', e);
+            
         }
 
         // Extraer email del remitente si es necesario
@@ -316,7 +316,7 @@ export async function POST(req: Request) {
         });
 
     } catch (error: any) {
-        console.error('Email webhook error:', error);
+        
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

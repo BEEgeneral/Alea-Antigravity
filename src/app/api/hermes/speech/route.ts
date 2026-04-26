@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid content-type. Use JSON for TTS or FormData for STT' }, { status: 400 });
 
   } catch (error: any) {
-    console.error('Speech API error:', error);
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -83,7 +83,7 @@ async function handleTTS(body: { text?: string; voice?: string; speed?: number; 
     });
 
   } catch (error: any) {
-    console.error('TTS error:', error);
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -124,7 +124,7 @@ async function handleSTT(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('STT error:', error);
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

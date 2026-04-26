@@ -65,7 +65,6 @@ export async function GET(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('Memory API error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -174,7 +173,6 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('Memory POST error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -216,7 +214,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true });
 
   } catch (error: any) {
-    console.error('Memory DELETE error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

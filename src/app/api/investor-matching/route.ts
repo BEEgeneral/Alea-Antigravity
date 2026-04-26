@@ -155,7 +155,7 @@ export async function GET(req: Request) {
     });
 
   } catch (error: any) {
-    console.error('Matching API error:', error);
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -248,7 +248,7 @@ export async function POST(req: Request) {
     });
 
   } catch (error: any) {
-    console.error('Recommendations error:', error);
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

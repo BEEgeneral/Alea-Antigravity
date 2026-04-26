@@ -58,7 +58,7 @@ export async function POST(req: Request) {
         return NextResponse.json(result);
 
     } catch (error: any) {
-        console.error("Error parsing PDF via Gemini:", error);
+        
         return NextResponse.json({ error: error.message || 'Error processing request' }, { status: 500 });
     }
 }

@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       });
 
       if (profileError) {
-        console.error('Profile creation error:', profileError);
+        
       }
     }
 
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
       message: 'Account created successfully. You can now login.'
     });
   } catch (error: any) {
-    console.error('Accept invitation error:', error);
+    
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
       role: invitation.role
     });
   } catch (error: any) {
-    console.error('Check invitation error:', error);
+    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       message: 'Password reset successful. You can now login with your new password.'
     });
   } catch (error: any) {
-    console.error('Reset password error:', error);
+    
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

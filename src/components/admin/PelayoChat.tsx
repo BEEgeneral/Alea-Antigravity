@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Bot, User, Loader2, X, MessageSquare, Mic, MicOff, Volume2, Sparkles } from 'lucide-react';
+import { Send, Bot, User, Loader2, X, MessageSquare, Mic, MicOff, Volume2, Sparkles, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { recordFeedback } from '@/lib/telemetry';
 
 interface Message {
   id: string;
@@ -9,6 +10,7 @@ interface Message {
   content: string;
   timestamp: Date;
   streaming?: boolean;
+  feedback?: 'thumbs_up' | 'thumbs_down' | null;
 }
 
 interface HermesStreamEvent {
@@ -24,6 +26,27 @@ interface HermesStreamEvent {
 interface VoiceConfig {
   enabled: boolean;
   voiceId?: string;
+}
+
+function FeedbackButtons({ messageId, onFeedback }: { messageId: string; onFeedback: (msgId: string, rating: 'thumbs_up' | 'thumbs_down') => void }) {
+  return (
+    <div className="flex items-center space-x-1 mt-1">
+      <button
+        onClick={() => onFeedback(messageId, 'thumbs_up')}
+        className="p-1 rounded hover:bg-green-500/20 text-green-600 transition-colors"
+        title="Respuesta útil"
+      >
+        <ThumbsUp className="w-3 h-3" />
+      </button>
+      <button
+        onClick={() => onFeedback(messageId, 'thumbs_down')}
+        className="p-1 rounded hover:bg-red-500/20 text-red-600 transition-colors"
+        title="Respuesta mejorable"
+      >
+        <ThumbsDown className="w-3 h-3" />
+      </button>
+    </div>
+  );
 }
 
 export function ChatButton({ onClick }: { onClick: () => void }) {
@@ -276,6 +299,33 @@ export default function PelayoChat({ isOpen, onClose }: { isOpen: boolean; onClo
     setVoiceConfig(prev => ({ ...prev, enabled: !prev.enabled }));
   };
 
+  const handleFeedback = useCallback(async (messageId: string, rating: 'thumbs_up' | 'thumbs_down') => {
+    // Find the message content
+    const msg = messages.find(m => m.id === messageId);
+    if (!msg) return;
+
+    // Update local state
+    setMessages(prev => prev.map(m =>
+      m.id === messageId ? { ...m, feedback: rating } : m
+    ));
+
+    // Send to telemetry
+    try {
+      await fetch('/api/telemetry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_type: 'user.feedback',
+          rating,
+          messageId,
+          feedback_text: `User rated message: ${rating}`,
+        }),
+      });
+    } catch (e) {
+      console.error('Feedback error:', e);
+    }
+  }, [messages]);
+
   if (!isOpen) return null;
 
   return (
@@ -333,6 +383,9 @@ export default function PelayoChat({ isOpen, onClose }: { isOpen: boolean; onClo
                 }`}>
                   {msg.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
                 </p>
+                {msg.role === 'assistant' && !msg.streaming && (
+                  <FeedbackButtons messageId={msg.id} onFeedback={handleFeedback} />
+                )}
               </div>
             </div>
           </div>

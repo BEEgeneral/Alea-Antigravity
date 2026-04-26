@@ -100,13 +100,8 @@ export interface ActivityLog {
     action: string;
     detail: string;
     time: string;
-}
-
-export interface ActivityLog {
-    id: string;
-    action: string;
-    detail: string;
-    time: string;
+    user_id?: string;
+    metadata?: Record<string, any>;
 }
 
 export const MOCK_ACTIVITY: ActivityLog[] = [

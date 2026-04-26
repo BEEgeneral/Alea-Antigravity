@@ -9,6 +9,7 @@ export interface HermesConfig {
   systemPrompt?: string;
   maxTokens?: number;
   temperature?: number;
+  tools?: ToolDefinition[];
 }
 
 export interface Message {

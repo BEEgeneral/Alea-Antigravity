@@ -141,7 +141,7 @@ class PaperclipClient {
     agentId: string,
     config?: { heartbeat?: boolean; schedule?: string }
   ): Promise<{ success: boolean; instanceId?: string }> {
-    return this.request('/api/agents/${agentId}/spawn', {
+    return this.request(`/api/agents/${agentId}/spawn`, {
       method: 'POST',
       body: JSON.stringify(config || {}),
     });

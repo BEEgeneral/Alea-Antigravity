@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       user: { id: insertResult.rows[0].id, email: insertResult.rows[0].email, role: insertResult.rows[0].role }
     });
   } catch (error: any) {
-    console.error("Invite error:", error);
+    // Log via telemetry if available, otherwise omit console logging in API routes
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

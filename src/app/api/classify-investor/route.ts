@@ -160,7 +160,9 @@ export async function POST(req: Request) {
             name,
             company
           })
-        }).catch(console.error);
+        }).catch(() => {
+          // Silently ignore scrape trigger failure - already returned success
+        });
       }
 
       return NextResponse.json({

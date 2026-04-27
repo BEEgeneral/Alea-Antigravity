@@ -6,7 +6,7 @@ export async function GET() {
     const connected = await isAdobeConnected();
     return NextResponse.json({ connected });
   } catch (error) {
-    console.error("Error checking Adobe connection:", error);
+    // Silently handle Adobe connection errors - endpoint is for status check
     return NextResponse.json({ connected: false });
   }
 }

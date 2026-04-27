@@ -48,7 +48,6 @@ export async function GET(request: NextRequest) {
       new URL("/praetorium?adobe_connected=true", request.url)
     );
   } catch (err) {
-    console.error("Error exchanging tokens:", err);
     return NextResponse.redirect(
       new URL(`/praetorium?adobe_error=${encodeURIComponent("token_exchange_failed")}`, request.url)
     );

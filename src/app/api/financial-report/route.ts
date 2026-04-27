@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { generateReportPipeline, getReportFromInsForge, listReportsForProperty, deleteReport } from '@/lib/financial-subagent';
-import { createServerClient } from '@/lib/insforge-server';
+import pool from '@/lib/vps-pg';
 
 export async function GET(req: Request) {
   try {
@@ -33,15 +33,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'propertyId es obligatorio' }, { status: 400 });
     }
 
-    // Fetch property from InsForge
-    const client = createServerClient();
-    const { data: property, error } = await client.database
-      .from('properties')
-      .select('*')
-      .eq('id', propertyId)
-      .single();
+    // Fetch property from VPS PostgreSQL
+    const propertyResult = await pool.query(
+      'SELECT * FROM properties WHERE id = $1',
+      [propertyId]
+    );
+    const property = propertyResult.rows[0];
 
-    if (error || !property) {
+    if (!property) {
       return NextResponse.json({ error: 'Propiedad no encontrada' }, { status: 404 });
     }
 

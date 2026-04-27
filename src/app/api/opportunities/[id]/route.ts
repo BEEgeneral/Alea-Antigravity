@@ -1,25 +1,16 @@
-import { NextResponse } from 'next/server';
-import { createAuthenticatedClient } from '@/lib/insforge-server';
+import pool from "@/lib/vps-pg";
+import { NextResponse } from "next/server";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { id } = await params;
 
-    const { data: opp, error } = await client
-      .database
-      .from('opportunities')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const result = await pool.query(
+      'SELECT * FROM opportunities WHERE id = $1',
+      [id]
+    );
+    const opp = result.rows[0];
 
-    if (error) throw error;
     if (!opp) {
       return NextResponse.json({ error: 'Opportunity not found' }, { status: 404 });
     }
@@ -32,13 +23,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { id } = await params;
     const body = await req.json();
 
@@ -50,30 +34,28 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       'metadata'
     ];
 
-    const updateData: Record<string, any> = { 
-      updated_at: new Date().toISOString(),
-      last_update_at: new Date().toISOString(),
-      sla_breached: false,
-      sla_breach_notified: false
-    };
+    const updateParts: string[] = ['updated_at = NOW()', 'last_update_at = NOW()', 'sla_breached = false', 'sla_breach_notified = false'];
+    const paramsArr: any[] = [];
+    let paramIndex = 1;
     
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
-        updateData[field] = body[field];
+        updateParts.push(`${field} = $${paramIndex++}`);
+        paramsArr.push(body[field]);
       }
     }
 
-    const { data, error } = await client
-      .database
-      .from('opportunities')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
+    paramsArr.push(id);
+    const result = await pool.query(
+      `UPDATE opportunities SET ${updateParts.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+      paramsArr
+    );
 
-    if (error) throw error;
+    if (result.rows.length === 0) {
+      return NextResponse.json({ error: 'Opportunity not found' }, { status: 404 });
+    }
 
-    return NextResponse.json({ success: true, opportunity: data });
+    return NextResponse.json({ success: true, opportunity: result.rows[0] });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -81,22 +63,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { id } = await params;
 
-    const { error } = await client
-      .database
-      .from('opportunities')
-      .delete()
-      .eq('id', id);
+    const result = await pool.query('DELETE FROM opportunities WHERE id = $1 RETURNING id', [id]);
 
-    if (error) throw error;
+    if (result.rows.length === 0) {
+      return NextResponse.json({ error: 'Opportunity not found' }, { status: 404 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

@@ -1,47 +1,41 @@
-import { NextResponse } from 'next/server';
-import { createAuthenticatedClient } from '@/lib/insforge-server';
+import pool from "@/lib/vps-pg";
+import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { searchParams } = new URL(req.url);
     const investorId = searchParams.get('investorId');
     const status = searchParams.get('status') || 'new';
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    let query = client
-      .database
-      .from('investor_interests')
-      .select(`
-        *,
-        investor:investors(id, full_name, company_name, email, max_ticket_eur),
-        property:properties(id, title, address, asset_type, price, thumbnail_url)
-      `)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    let query = 'SELECT * FROM investor_interests';
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let paramIndex = 1;
 
     if (status && status !== 'all') {
-      query = query.eq('status', status);
+      conditions.push(`status = $${paramIndex++}`);
+      params.push(status);
     }
 
     if (investorId) {
-      query = query.eq('investor_id', investorId);
+      conditions.push(`investor_id = $${paramIndex++}`);
+      params.push(investorId);
     }
 
-    const { data: interests, error } = await query;
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
     }
+
+    query += ` ORDER BY created_at DESC LIMIT $${paramIndex}`;
+    params.push(limit);
+
+    const result = await pool.query(query, params);
+
+    const interests = result.rows || [];
 
     const byInvestor: Record<string, any[]> = {};
-    (interests || []).forEach((interest: any) => {
+    interests.forEach((interest: any) => {
       const invId = interest.investor_id;
       if (!byInvestor[invId]) {
         byInvestor[invId] = [];
@@ -50,10 +44,10 @@ export async function GET(req: Request) {
     });
 
     return NextResponse.json({
-      interests: interests || [],
+      interests,
       byInvestor,
-      total: interests?.length || 0,
-      newCount: interests?.filter((i: any) => i.status === 'new').length || 0
+      total: interests.length,
+      newCount: interests.filter((i: any) => i.status === 'new').length || 0
     });
 
   } catch (error: any) {
@@ -63,37 +57,31 @@ export async function GET(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { interestId, status, notes, role } = await req.json();
 
     if (!interestId) {
       return NextResponse.json({ error: 'Missing interest ID' }, { status: 400 });
     }
 
-    const updateData: any = {};
-    if (status) updateData.status = status;
-    if (notes !== undefined) updateData.notes = notes;
-    if (role !== undefined) updateData.role = role; // 'buyer' | 'seller' | 'both'
+    const updates: string[] = [];
+    const params: any[] = [];
+    let paramIndex = 1;
 
-    const { data, error } = await client
-      .database
-      .from('investor_interests')
-      .update(updateData)
-      .eq('id', interestId)
-      .select()
-      .single();
+    if (status) { updates.push(`status = $${paramIndex++}`); params.push(status); }
+    if (notes !== undefined) { updates.push(`notes = $${paramIndex++}`); params.push(notes); }
+    if (role !== undefined) { updates.push(`role = $${paramIndex++}`); params.push(role); }
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (updates.length === 0) {
+      return NextResponse.json({ error: 'No updates provided' }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, data });
+      params.push(interestId);
+    const result = await pool.query(
+      `UPDATE investor_interests SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+      params
+    );
+
+    return NextResponse.json({ success: true, data: result.rows[0] });
 
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -102,13 +90,6 @@ export async function PATCH(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await req.json();
     const { investor_id, property_id, lead_id, signal_id, role, match_score, notes } = body;
 
@@ -118,38 +99,24 @@ export async function POST(req: Request) {
 
     // Check for duplicate
     if (property_id) {
-      const { data: existing } = await client.database
-        .from('investor_interests')
-        .select('id')
-        .eq('investor_id', investor_id)
-        .eq('property_id', property_id)
-        .single();
+      const existing = await pool.query(
+        'SELECT id FROM investor_interests WHERE investor_id = $1 AND property_id = $2',
+        [investor_id, property_id]
+      );
 
-      if (existing) {
+      if (existing.rows.length > 0) {
         return NextResponse.json({ error: 'Ya existe un interés para este inversor y propiedad' }, { status: 409 });
       }
     }
 
-    const { data, error } = await client.database
-      .from('investor_interests')
-      .insert({
-        investor_id,
-        property_id: property_id || null,
-        lead_id: lead_id || null,
-        signal_id: signal_id || null,
-        role: role || 'buyer', // 'buyer' | 'seller' | 'both'
-        match_score: match_score || null,
-        notes: notes || null,
-        status: 'new',
-      })
-      .select()
-      .single();
+    const result = await pool.query(
+      `INSERT INTO investor_interests (investor_id, property_id, lead_id, signal_id, role, match_score, notes, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'new')
+       RETURNING *`,
+      [investor_id, property_id || null, lead_id || null, signal_id || null, role || 'buyer', match_score || null, notes || null]
+    );
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ interest: data }, { status: 201 });
+    return NextResponse.json({ interest: result.rows[0] }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

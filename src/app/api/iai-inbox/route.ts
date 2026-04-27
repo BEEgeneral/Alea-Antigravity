@@ -1,44 +1,36 @@
-import { NextResponse } from 'next/server';
-import { createAuthenticatedClient } from '@/lib/insforge';
+import pool from "@/lib/vps-pg";
+import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
   try {
-    let token = req.headers.get('authorization')?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    }
-
-    const client = createAuthenticatedClient(token);
-    const { data: authData, error: authError } = await client.auth.getCurrentUser();
-
-    if (authError || !authData?.user) {
-      return NextResponse.json({ error: 'Token inválido' }, { status: 401 });
-    }
-
     const url = new URL(req.url);
     const status = url.searchParams.get('status');
     const limit = parseInt(url.searchParams.get('limit') || '50', 10);
 
-    let query = client.database
-      .from('iai_inbox_suggestions')
-      .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    let query = 'SELECT * FROM iai_inbox_suggestions';
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let paramIndex = 1;
 
     if (status && status !== 'all') {
-      query = query.eq('status', status);
+      conditions.push(`status = $${paramIndex++}`);
+      params.push(status);
     }
 
-    const { data: suggestions, error, count } = await query;
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
     }
+
+    query += ` ORDER BY created_at DESC LIMIT $${paramIndex}`;
+    params.push(limit);
+
+    const result = await pool.query(query, params);
+
+    const countResult = await pool.query('SELECT COUNT(*) as count FROM iai_inbox_suggestions');
 
     return NextResponse.json({
-      suggestions: suggestions || [],
-      total: count || 0,
+      suggestions: result.rows || [],
+      total: parseInt(countResult.rows[0]?.count || '0'),
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

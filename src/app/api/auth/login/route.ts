@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { insforge, getRedirectPath } from '@/lib/insforge';
+import pool from '@/lib/vps-pg';
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,12 +32,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data: profile } = await insforge
-      .database
-      .from('user_profiles')
-      .select('*')
-      .eq('auth_user_id', data.user.id)
-      .single();
+    const profileResult = await pool.query(
+      'SELECT * FROM user_profiles WHERE auth_user_id = $1',
+      [data.user.id]
+    );
+    const profile = profileResult.rows[0];
 
     if (!profile) {
       return NextResponse.json(

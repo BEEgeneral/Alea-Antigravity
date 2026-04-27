@@ -1,8 +1,8 @@
-import { createAuthenticatedClient } from "@/lib/insforge-server";
+import pool from "@/lib/vps-pg";
 import { NextRequest, NextResponse } from "next/server";
 
 const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID || '';
-const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET || '';
+const GMAIL_CLIENT_SECRET=process.env.GMAIL_CLIENT_SECRET || '';
 
 async function getFreshAccessToken(refreshToken: string): Promise<string | null> {
   try {
@@ -21,13 +21,12 @@ async function getFreshAccessToken(refreshToken: string): Promise<string | null>
   } catch { return null; }
 }
 
-async function getGmailTokens(client: any, userId: string) {
-  const { data } = await client.database
-    .from('gmail_tokens')
-    .select('*')
-    .eq('user_id', userId)
-    .single();
-  return data;
+async function getGmailTokens(userId: string) {
+  const result = await pool.query(
+    'SELECT * FROM gmail_tokens WHERE user_id = $1',
+    [userId]
+  );
+  return result.rows[0] || null;
 }
 
 async function createCalendarEvent(accessToken: string, summary: string, description: string, startTime: string, endTime: string, attendees: string[]) {
@@ -65,37 +64,45 @@ async function createCalendarEvent(accessToken: string, summary: string, descrip
 
 export async function GET(request: NextRequest) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-  
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
     const { searchParams } = new URL(request.url);
     const leadId = searchParams.get("lead_id");
     const status = searchParams.get("status");
     const assignedToMe = searchParams.get("assigned_to_me");
     const overdue = searchParams.get("overdue");
     const limit = parseInt(searchParams.get("limit") || "50");
+    const userId = searchParams.get("user_id");
 
-    let query = client
-      .database
-      .from("agenda_actions")
-      .select("*")
-      .order("due_date", { ascending: true })
-      .limit(limit);
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let paramIndex = 1;
 
-    if (leadId) query = query.eq("lead_id", leadId);
-    if (status) query = query.eq("status", status);
-    if (assignedToMe === "true") query = query.eq("assigned_agent_id", user.id);
+    if (leadId) {
+      conditions.push(`lead_id = $${paramIndex++}`);
+      params.push(leadId);
+    }
+    if (status) {
+      conditions.push(`status = $${paramIndex++}`);
+      params.push(status);
+    }
+    if (assignedToMe === "true" && userId) {
+      conditions.push(`assigned_agent_id = $${paramIndex++}`);
+      params.push(userId);
+    }
     if (overdue === "true") {
-      query = query.lt("due_date", new Date().toISOString());
-      query = query.neq("status", "completed");
-      query = query.neq("status", "cancelled");
+      conditions.push(`due_date < NOW()`);
+      conditions.push(`status != 'completed'`);
+      conditions.push(`status != 'cancelled'`);
     }
 
-    const { data, error } = await query;
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json(data);
+    let query = 'SELECT * FROM agenda_actions';
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+    query += ` ORDER BY due_date ASC LIMIT $${paramIndex}`;
+    params.push(limit);
+
+    const result = await pool.query(query, params);
+    return NextResponse.json(result.rows);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -103,11 +110,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-  
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
     const body = await request.json();
     const {
       lead_id,
@@ -131,38 +133,19 @@ export async function POST(request: NextRequest) {
       calendar_attendees = [],
     } = body;
 
-    const { data, error } = await client
-      .database
-      .from("agenda_actions")
-      .insert({
-        lead_id,
-        investor_id,
-        property_id,
-        title,
-        description,
-        action_type,
-        action_category,
-        due_date,
-        scheduled_for,
-        estimated_duration_minutes,
-        priority,
-        status,
-        sla_hours,
-        pipeline_stage,
-        assigned_agent_id: assigned_agent_id || user.id,
-        created_by: user.id,
-        is_auto_generated,
-        trigger_rule,
-      })
-      .select()
-      .single();
+    const result = await pool.query(
+      `INSERT INTO agenda_actions (lead_id, investor_id, property_id, title, description, action_type, action_category, due_date, scheduled_for, estimated_duration_minutes, priority, status, sla_hours, pipeline_stage, assigned_agent_id, created_by, is_auto_generated, trigger_rule)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+       RETURNING *`,
+      [lead_id, investor_id, property_id, title, description, action_type, action_category, due_date, scheduled_for, estimated_duration_minutes, priority, status, sla_hours, pipeline_stage, assigned_agent_id || 'system', 'system', is_auto_generated, trigger_rule]
+    );
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+    const data = result.rows[0];
     let calendarEvent = null;
     
     if (create_calendar_event && action_type === 'meeting' && data.due_date) {
-      const tokens = await getGmailTokens(client, user.id);
+      const tokens = await getGmailTokens(assigned_agent_id || 'system');
       if (tokens?.refresh_token) {
         let accessToken = tokens.access_token;
         if (tokens.expires_at && new Date(tokens.expires_at) < new Date()) {
@@ -180,37 +163,30 @@ export async function POST(request: NextRequest) {
             );
             
             if (calendarEvent.id) {
-              await client.database
-                .from('agenda_actions')
-                .update({ google_calendar_event_id: calendarEvent.id })
-                .eq('id', data.id);
-              
+              await pool.query(
+                "UPDATE agenda_actions SET google_calendar_event_id = $1 WHERE id = $2",
+                [calendarEvent.id, data.id]
+              );
               calendarEvent.htmlLink = `https://calendar.google.com/calendar/event?id=${calendarEvent.id}`;
             }
           } catch (calError: any) {
-            
+            // Calendar event creation failed, continue without it
           }
         }
       }
     }
 
-    await client.database.from("agenda_activity_log").insert({
-      action_id: data.id,
-      lead_id,
-      activity_type: "created",
-      description: `Action created: ${title}`,
-      agent_id: user.id,
-    });
+    await pool.query(
+      `INSERT INTO agenda_activity_log (action_id, lead_id, activity_type, description, agent_id)
+       VALUES ($1, $2, 'created', $3, $4)`,
+      [data.id, lead_id, `Action created: ${title}`, assigned_agent_id || 'system']
+    );
 
-    if (lead_id) {
-      await client
-        .database
-        .from("leads")
-        .update({ 
-          current_action_id: data.id, 
-          next_action_due: due_date 
-        })
-        .eq("id", lead_id);
+    if (lead_id && due_date) {
+      await pool.query(
+        "UPDATE leads SET current_action_id = $1, next_action_due = $2 WHERE id = $3",
+        [data.id, due_date, lead_id]
+      );
     }
 
     return NextResponse.json({ ...data, calendarEvent }, { status: 201 });
@@ -221,38 +197,47 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-  
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
     const body = await request.json();
     const { id, ...updates } = body;
 
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
 
+    const updateParts: string[] = [];
+    const params: any[] = [];
+    let paramIndex = 1;
+
     if (updates.status === "completed") {
-      updates.completed_at = new Date().toISOString();
-      updates.completed_by = user.id;
+      updateParts.push(`completed_at = $${paramIndex++}`);
+      params.push(new Date().toISOString());
+      updateParts.push(`completed_by = $${paramIndex++}`);
+      params.push(updates.user_id || 'system');
     }
 
-    const { data, error } = await client
-      .database
-      .from("agenda_actions")
-      .update(updates)
-      .eq("id", id)
-      .select()
-      .single();
+    for (const key of Object.keys(updates)) {
+      if (key !== 'id' && key !== 'completed_at' && key !== 'completed_by') {
+        updateParts.push(`${key} = $${paramIndex++}`);
+        params.push(updates[key]);
+      }
+    }
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (updateParts.length === 0) {
+      return NextResponse.json({ error: "No updates provided" }, { status: 400 });
+    }
 
-    await client.database.from("agenda_activity_log").insert({
-      action_id: id,
-      lead_id: data.lead_id,
-      activity_type: updates.status === "completed" ? "completed" : "updated",
-      description: `Action ${updates.status === "completed" ? "completed" : "updated"}: ${data.title}`,
-      agent_id: user.id,
-    });
+    params.push(id);
+    const result = await pool.query(
+      `UPDATE agenda_actions SET ${updateParts.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+      params
+    );
+
+
+    const data = result.rows[0];
+    
+    await pool.query(
+      `INSERT INTO agenda_activity_log (action_id, lead_id, activity_type, description, agent_id)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [id, data.lead_id, updates.status === "completed" ? "completed" : "updated", `Action ${updates.status === "completed" ? "completed" : "updated"}: ${data.title}`, updates.user_id || 'system']
+    );
 
     return NextResponse.json(data);
   } catch (error: any) {
@@ -262,23 +247,16 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-  
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
 
-    const { error } = await client
-      .database
-      .from("agenda_actions")
-      .delete()
-      .eq("id", id);
+    const result = await pool.query('DELETE FROM agenda_actions WHERE id = $1 RETURNING id', [id]);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (result.rows.length === 0) {
+      return NextResponse.json({ error: "Action not found" }, { status: 404 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

@@ -1,15 +1,8 @@
-import { NextResponse } from 'next/server';
-import { createAuthenticatedClient } from '@/lib/insforge-server';
+import pool from "@/lib/vps-pg";
+import { NextResponse } from "next/server";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { id } = await params;
     const body = await req.json();
     const { entity_type, override_data } = body;
@@ -19,14 +12,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     // 1. Get the suggestion
-    const { data: suggestion, error: suggestionError } = await client
-      .database
-      .from('iai_inbox_suggestions')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const suggestionResult = await pool.query(
+      'SELECT * FROM iai_inbox_suggestions WHERE id = $1',
+      [id]
+    );
+    const suggestion = suggestionResult.rows[0];
 
-    if (suggestionError || !suggestion) {
+    if (!suggestion) {
       return NextResponse.json({ error: 'Sugerencia no encontrada' }, { status: 404 });
     }
 
@@ -37,16 +29,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // 2. Create the appropriate entity
     if (entity_type === 'property') {
-      // Check if property already exists (by title + vendor_name or address)
+      // Check if property already exists (by title)
       let existingProperty = null;
       if (data.title) {
-        const { data: found } = await client
-          .database
-          .from('properties')
-          .select('id')
-          .eq('title', data.title)
-          .maybeSingle();
-        existingProperty = found;
+        const found = await pool.query(
+          'SELECT id FROM properties WHERE title = $1',
+          [data.title]
+        );
+        existingProperty = found.rows[0];
       }
 
       if (existingProperty) {
@@ -57,38 +47,33 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         }, { status: 409 });
       }
 
-      const { data: property, error: propertyError } = await client
-        .database
-        .from('properties')
-        .insert({
-          title: data.title || suggestion.original_email_subject,
-          description: data.description || '',
-          asset_type: normalizeAssetType(data.type),
-          address: data.address || '',
-          price: data.price || null,
-          meters: data.meters || null,
-          vendor_name: data.vendor_name || data.contact_name || suggestion.sender_email,
-          is_off_market: true,
-          is_published: false,
-          owner_id: user.id,
-        })
-        .select()
-        .single();
+      const propertyResult = await pool.query(
+        `INSERT INTO properties (title, description, asset_type, address, price, meters, vendor_name, is_off_market, is_published, owner_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, true, false, $8)
+         RETURNING *`,
+        [
+          data.title || suggestion.original_email_subject,
+          data.description || '',
+          normalizeAssetType(data.type),
+          data.address || '',
+          data.price || null,
+          data.meters || null,
+          data.vendor_name || data.contact_name || suggestion.sender_email,
+          'system'
+        ]
+      );
 
-      if (propertyError) throw propertyError;
-      createdEntity = { type: 'property', data: property };
+      createdEntity = { type: 'property', data: propertyResult.rows[0] };
 
     } else if (entity_type === 'investor') {
-      // Check if investor already exists (by email or name)
+      // Check if investor already exists (by email)
       let existingInvestor = null;
       if (data.contact_email) {
-        const { data: found } = await client
-          .database
-          .from('investors')
-          .select('id')
-          .eq('email', data.contact_email)
-          .maybeSingle();
-        existingInvestor = found;
+        const found = await pool.query(
+          'SELECT id FROM investors WHERE email = $1',
+          [data.contact_email]
+        );
+        existingInvestor = found.rows[0];
       }
 
       if (existingInvestor) {
@@ -99,57 +84,47 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         }, { status: 409 });
       }
 
-      const { data: investor, error: investorError } = await client
-        .database
-        .from('investors')
-        .insert({
-          full_name: data.contact_name || data.title || suggestion.sender_email.split('@')[0],
-          email: data.contact_email || suggestion.sender_email,
-          phone: data.contact_phone || '',
-          company_name: data.company_name || '',
-          investor_type: normalizeInvestorType(data.investor_type),
-          budget_min: data.budget_min || data.min_ticket || null,
-          budget_max: data.budget_max || data.max_ticket || null,
-          kyc_status: 'pending',
-          source_of_funds: data.source_of_funds || 'email_inbox',
-        })
-        .select()
-        .single();
+      const investorResult = await pool.query(
+        `INSERT INTO investors (full_name, email, phone, company_name, investor_type, budget_min, budget_max, kyc_status, source_of_funds)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8)
+         RETURNING *`,
+        [
+          data.contact_name || data.title || suggestion.sender_email.split('@')[0],
+          data.contact_email || suggestion.sender_email,
+          data.contact_phone || '',
+          data.company_name || '',
+          normalizeInvestorType(data.investor_type),
+          data.budget_min || data.min_ticket || null,
+          data.budget_max || data.max_ticket || null,
+          data.source_of_funds || 'email_inbox'
+        ]
+      );
 
-      if (investorError) throw investorError;
-      createdEntity = { type: 'investor', data: investor };
+      createdEntity = { type: 'investor', data: investorResult.rows[0] };
 
     } else if (entity_type === 'lead') {
-      const { data: lead, error: leadError } = await client
-        .database
-        .from('leads')
-        .insert({
-          name: data.contact_name || data.title || suggestion.sender_email.split('@')[0],
-          email: data.contact_email || suggestion.sender_email,
-          phone: data.contact_phone || '',
-          source: 'email_inbox',
-          status: 'new',
-          investor: data.title,
-        })
-        .select()
-        .single();
+      const leadResult = await pool.query(
+        `INSERT INTO leads (name, email, phone, source, status, investor)
+         VALUES ($1, $2, $3, 'email_inbox', 'new', $4)
+         RETURNING *`,
+        [
+          data.contact_name || data.title || suggestion.sender_email.split('@')[0],
+          data.contact_email || suggestion.sender_email,
+          data.contact_phone || '',
+          data.title
+        ]
+      );
 
-      if (leadError) throw leadError;
-      createdEntity = { type: 'lead', data: lead };
+      createdEntity = { type: 'lead', data: leadResult.rows[0] };
     }
 
     // 3. Update suggestion status
-    await client
-      .database
-      .from('iai_inbox_suggestions')
-      .update({ 
-        status: 'approved',
-        approved_at: new Date().toISOString(),
-        approved_by: user.id,
-        linked_entity_id: createdEntity?.data?.id,
-        linked_entity_type: entity_type,
-      })
-      .eq('id', id);
+    await pool.query(
+      `UPDATE iai_inbox_suggestions 
+       SET status = 'approved', approved_at = NOW(), approved_by = $1, linked_entity_id = $2, linked_entity_type = $3
+       WHERE id = $4`,
+      ['system', createdEntity?.data?.id, entity_type, id]
+    );
 
     return NextResponse.json({ 
       success: true, 
@@ -158,7 +133,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     });
 
   } catch (error: any) {
-    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

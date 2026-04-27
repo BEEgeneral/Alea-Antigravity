@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { insforge } from "@/lib/insforge-client";
+import { useSession } from "next-auth/react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -17,6 +17,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import { insforge } from "@/lib/insforge";
 
 interface RadarProperty {
     id: string;
@@ -31,6 +32,7 @@ interface RadarProperty {
 
 export default function InvestmentRadar() {
     const router = useRouter();
+    const { data: session, status } = useSession();
     const [properties, setProperties] = useState<RadarProperty[]>([]);
     const [loading, setLoading] = useState(true);
     const [authChecked, setAuthChecked] = useState(false);
@@ -41,87 +43,77 @@ export default function InvestmentRadar() {
     const [fetchError, setFetchError] = useState<string | null>(null);
     const [lastInterestSave, setLastInterestSave] = useState<number>(0);
 
-    // Auth & Permission guard — uses getUser() for server-validated auth
+    // Auth & Permission guard — uses NextAuth session for validated auth
     useEffect(() => {
-        const checkAuth = async () => {
-            const { data: { user }, error: authError } = await insforge.auth.getCurrentUser();
-            if (authError || !user) {
-                router.push("/login");
-                return;
-            }
+        if (status === "unauthenticated") {
+            router.push("/login");
+            return;
+        }
 
-            const userId = user.id;
-            const userEmail = user.email;
+        if (status === "authenticated" && session?.user) {
+            const checkAuth = async () => {
+                const userEmail = session.user!.email;
 
-            // God Mode check for Super Admin
-            const normalizedEmail = userEmail?.toLowerCase();
-            if (normalizedEmail === 'beenocode@gmail.com' || normalizedEmail === 'albertogala@beenocode.com') {
-                setAuthChecked(true);
-                return;
-            }
-
-            // Get user role from user_profiles table
-            const { data: profile } = await insforge.database
-                .from('user_profiles')
-                .select('role, is_approved')
-                .eq('auth_user_id', userId)
-                .single();
-            
-            const userRole = profile?.role;
-            const isApproved = profile?.is_approved;
-
-            // 1. Admin or agent by profile role → instant access
-            if (userRole === 'admin' || userRole === 'agent') {
-                setAuthChecked(true);
-                return;
-            }
-
-            // 2. Check if user is a registered investor (by email match)
-            if (userEmail) {
-                const { data: investor } = await insforge.database
-                        .from('investors')
-                    .select('id, is_verified')
-                    .eq('email', userEmail)
-                    .maybeSingle();
-
-                if (investor) {
-                    setInvestorId(investor.id);
-                    if (investor.is_verified) {
-                        setAuthChecked(true);
-                    } else {
-                        setNdaRequired(true);
-                        setAuthChecked(true);
-                    }
+                // God Mode check for Super Admin
+                const normalizedEmail = userEmail?.toLowerCase();
+                if (normalizedEmail === 'beenocode@gmail.com' || normalizedEmail === 'albertogala@beenocode.com') {
+                    setAuthChecked(true);
                     return;
                 }
-            }
 
-            // 3. Check if user is a registered collaborator (by email match)
-            if (userEmail) {
+                const userRole = (session.user as any).role;
+                const isApproved = (session.user as any).is_approved;
+
+                // 1. Admin or agent by profile role → instant access
+                if (userRole === 'admin' || userRole === 'agent') {
+                    setAuthChecked(true);
+                    return;
+                }
+
+                // 2. Check if user is a registered investor (by email match)
+                if (userEmail) {
+                    const { data: investor } = await insforge.database
+                            .from('investors')
+                        .select('id, is_verified')
+                        .eq('email', userEmail)
+                        .maybeSingle();
+
+                    if (investor) {
+                        setInvestorId(investor.id);
+                        if (investor.is_verified) {
+                            setAuthChecked(true);
+                        } else {
+                            setNdaRequired(true);
+                            setAuthChecked(true);
+                        }
+                        return;
+                    }
+                }
+
+                // 3. Check if user is a registered collaborator (by email match)
                 const { data: collaborator } = await insforge.database
                         .from('collaborators')
-                    .select('id')
+                    .select('id, is_active')
                     .eq('email', userEmail)
                     .maybeSingle();
 
                 if (collaborator) {
-                    setAuthChecked(true);
+                    if (collaborator.is_active) {
+                        setAuthChecked(true);
+                    } else {
+                        router.push("/login");
+                    }
                     return;
                 }
-            }
 
-            // 4. Also check profile role = 'investor'
-            if (userRole === 'investor') {
-                setNdaRequired(true);
-                setAuthChecked(true);
-                return;
-            }
-
-            // Not authorized → redirect home
-            router.push("/");
-        };
-        checkAuth();
-    }, [router]);
+                // Default: redirect if not approved
+                if (!isApproved) {
+                    router.push("/login");
+                }
+            };
+            checkAuth();
+        }
+    }, [status, session, router]);
 
     useEffect(() => {
         if (!authChecked) return;

@@ -3,9 +3,10 @@
 import { FileText, ShieldCheck, Clock, Building2, Wallet, LogOut } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { insforge } from "@/lib/insforge-client";
+import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import { insforge } from "@/lib/insforge-client";
 
 interface InvestorProfile {
     id: string;
@@ -18,42 +19,54 @@ interface InvestorProfile {
 
 export default function ProfilePage() {
     const router = useRouter();
+    const { data: session, status } = useSession();
     const [investor, setInvestor] = useState<InvestorProfile | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchInvestor = async () => {
-            const { data: { user } } = await insforge.auth.getCurrentUser();
-            if (!user) {
-                router.push('/login');
-                return;
-            }
+        if (status === "unauthenticated") {
+            router.push('/login');
+            return;
+        }
 
-            const { data } = await insforge.database
-                .from('investors')
-                .select('id, full_name, email, kyc_status, interests, budget_max')
-                .eq('id', user.id)
-                .single();
+        if (status === "authenticated" && session?.user) {
+            const fetchInvestor = async () => {
+                // Use session user email to fetch investor data from the investors table
+                const { data } = await insforge.database
+                    .from('investors')
+                    .select('id, full_name, email, kyc_status, interests, budget_max')
+                    .eq('email', session.user!.email!)
+                    .single();
 
-            if (data) {
-                setInvestor(data);
-            } else {
-                router.push('/');
-            }
-            setLoading(false);
-        };
-        fetchInvestor();
-    }, [router]);
+                if (data) {
+                    setInvestor(data);
+                } else {
+                    // If no investor record, use session user data directly
+                    setInvestor({
+                        id: (session.user as any).id || '',
+                        full_name: session.user!.name || '',
+                        email: session.user!.email || '',
+                        kyc_status: 'pending',
+                        interests: [],
+                        budget_max: undefined,
+                    });
+                }
+                setLoading(false);
+            };
+            fetchInvestor();
+        }
+    }, [status, session, router]);
 
     const handleLogout = async () => {
-        await insforge.auth.signOut();
+        await signOut({ redirect: false });
         // Clean up any legacy localStorage items
         localStorage.removeItem('alea_investor_id');
         localStorage.removeItem('alea_investor_name');
+        localStorage.removeItem('insforge_token');
         router.push('/');
     };
 
-    if (loading) return (
+    if (loading || status === "loading") return (
         <div className="min-h-screen bg-background flex items-center justify-center">
             <div className="w-12 h-12 rounded-full border-t-2 border-primary animate-spin" />
         </div>

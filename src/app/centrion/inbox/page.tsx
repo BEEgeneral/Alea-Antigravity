@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { insforge } from "@/lib/insforge-client";
+import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Mail,
@@ -53,6 +53,7 @@ const STATUS_COLORS: Record<SuggestionStatus, string> = {
 
 export default function IAIMboxPage() {
     const router = useRouter();
+    const { data: session, status } = useSession();
     const [suggestions, setSuggestions] = useState<IAISuggestion[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedSuggestion, setSelectedSuggestion] = useState<IAISuggestion | null>(null);
@@ -62,21 +63,14 @@ export default function IAIMboxPage() {
     const [authChecked, setAuthChecked] = useState(false);
 
     useEffect(() => {
-        const checkAuth = async () => {
-            const token = localStorage.getItem('insforge_token');
-            if (!token) {
-                router.push('/login');
-                return;
-            }
-            const { data: { user } } = await insforge.auth.getCurrentUser();
-            if (!user) {
-                router.push('/login');
-                return;
-            }
+        if (status === "unauthenticated") {
+            router.push('/login');
+            return;
+        }
+        if (status === "authenticated") {
             setAuthChecked(true);
-        };
-        checkAuth();
-    }, [router]);
+        }
+    }, [status, router]);
 
     const fetchSuggestions = async () => {
         setLoading(true);

@@ -9,7 +9,7 @@ import {
   RefreshCw, Link2, ExternalLink, Check
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { insforge } from "@/lib/insforge-client";
+import { useSession } from "next-auth/react";
 import { AgendaAction, AgendaSuggestion, ActionType, ActionPriority, ActionStatus } from "@/types/admin";
 
 const ACTION_ICONS: Record<string, any> = {
@@ -51,6 +51,7 @@ interface AgendaPanelProps {
 
 export default function AgendaPanel({ leadId, isEmbedded }: AgendaPanelProps) {
   const router = useRouter();
+  const { data: session } = useSession();
   const [actions, setActions] = useState<AgendaAction[]>([]);
   const [suggestions, setSuggestions] = useState<AgendaSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,9 +135,8 @@ export default function AgendaPanel({ leadId, isEmbedded }: AgendaPanelProps) {
     setLoading(true);
     let url = "/api/agenda/actions?limit=50";
     if (leadId) url += `&lead_id=${leadId}`;
-    
-    const { data: { user } } = await insforge.auth.getCurrentUser();
-    if (!user) return;
+
+    if (!session?.user) return;
 
     const res = await fetch(url);
     const data = await res.json();
@@ -153,8 +153,7 @@ export default function AgendaPanel({ leadId, isEmbedded }: AgendaPanelProps) {
   async function createAction() {
     if (!newAction.title || !newAction.due_date) return;
 
-    const { data: { user } } = await insforge.auth.getCurrentUser();
-    if (!user) return;
+    if (!session?.user) return;
 
     const res = await fetch("/api/agenda/actions", {
       method: "POST",
@@ -166,7 +165,7 @@ export default function AgendaPanel({ leadId, isEmbedded }: AgendaPanelProps) {
         due_date: new Date(newAction.due_date).toISOString(),
         priority: newAction.priority,
         lead_id: leadId,
-        assigned_agent_id: user.id,
+        assigned_agent_id: (session.user as any).id,
         create_calendar_event: newAction.action_type === 'meeting' && newAction.create_calendar_event && gmailConnected,
       }),
     });

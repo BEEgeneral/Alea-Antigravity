@@ -7,11 +7,11 @@ import type { NextAuthConfig } from "next-auth"
 // Neon PostgreSQL connection pool
 // ─────────────────────────────────────────────────────────
 const neonPool = new Pool({
-  host: "ep-plain-fog-al6rviiz-pooler.c-3.eu-central-1.aws.neon.tech",
-  port: 5432,
-  user: "neondb_owner",
-  password: "npg_BeHqsl30DKZA",
-  database: "neondb",
+  host: process.env.NEON_HOST || "ep-plain-fog-al6rviiz-pooler.c-3.eu-central-1.aws.neon.tech",
+  port: parseInt(process.env.NEON_PORT || "5432", 10),
+  user: process.env.NEON_USER || "neondb_owner",
+  password: process.env.NEON_PASSWORD,
+  database: process.env.NEON_DATABASE || "neondb",
   ssl: { rejectUnauthorized: false },
   max: 5,
 })
@@ -22,7 +22,7 @@ const neonPool = new Pool({
 export const authConfig: NextAuthConfig = {
   providers: [
     Resend({
-      apiKey: process.env.RESEND_API_KEY || "re_dUncha3i_7XrsyfpEiPyppXcn1mtEEb46",
+      apiKey: process.env.RESEND_API_KEY,
       from: "Alea Signature <noreply@aleasignature.com>",
     }),
   ],

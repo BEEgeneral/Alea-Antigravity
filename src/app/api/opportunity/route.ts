@@ -12,7 +12,15 @@ export async function PATCH(req: Request) {
 
         const { status, notes, assigned_to, priority } = await req.json();
 
-        const updateData: any = { updated_at: new Date().toISOString() };
+        type IAIInboxUpdate = Partial<{
+          status: string;
+          notes: string;
+          assigned_to: string;
+          priority: string;
+          updated_at: string;
+        }>;
+
+        const updateData: IAIInboxUpdate = { updated_at: new Date().toISOString() };
 
         if (status !== undefined) updateData.status = status;
         if (notes !== undefined) updateData.notes = notes;

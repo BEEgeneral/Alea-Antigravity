@@ -233,7 +233,7 @@ async function matchSignalToInvestors(
   signal: any,
   leadId: string
 ): Promise<{ highPriority: Array<{ investor: string; opportunity: string; score: number }> }> {
-  const highPriority: Array<{ investor: string; opportunity: string; score: number }> = { highPriority: [] } as any;
+  const highPriority: Array<{ investor: string; opportunity: string; score: number }> = [];
 
   try {
     // Get investors with piedra personality and budget overlap

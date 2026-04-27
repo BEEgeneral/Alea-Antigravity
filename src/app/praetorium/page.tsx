@@ -268,7 +268,7 @@ export default function AdminDashboard() {
     };
 
     const handleRejectSuggestion = async (id: string) => {
-        await insforge.database.from('iai_inbox_suggestions').update({ status: 'rejected' }).eq('id', id);
+        await fetch('/api/iai-inbox/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'rejected' }) });
         setIaiSuggestions(prev => prev.filter(s => s.id !== id));
     };
 
@@ -375,7 +375,7 @@ export default function AdminDashboard() {
 
             // Mark suggestion as approved
             if (selectedSuggestion) {
-                await insforge.database.from('iai_inbox_suggestions').update({ status: 'approved' }).eq('id', selectedSuggestion.id);
+                await fetch('/api/iai-inbox/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: selectedSuggestion.id, status: 'approved' }) });
                 setIaiSuggestions(prev => prev.filter(s => s.id !== selectedSuggestion.id));
             }
 
@@ -809,7 +809,7 @@ useEffect(() => {
                 }
 
                 if (Object.keys(propUpdates).length > 0) {
-                    await insforge.database.from('properties').update(propUpdates).eq('id', lead.property_id);
+                    await fetch('/api/properties', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: lead.property_id, ...propUpdates }) });
                     setProperties(prev => prev.map(p => p.id === lead.property_id ? { ...p, ...propUpdates } : p));
                 }
             }
@@ -838,7 +838,8 @@ useEffect(() => {
             return;
         }
 
-        const { data } = await insforge.database.from('agents').select('*').order('created_at', { ascending: false });
+        const res = await fetch('/api/agents/list');
+        const data = res.ok ? (await res.json()).agents : null;
         if (data) setAgents(data);
         setIsAddingAgent(false);
         setAgentForm({ full_name: "", email: "", role: "agent" });
@@ -873,7 +874,7 @@ useEffect(() => {
                 setShowToast(true);
 
                 if (selectedSuggestion) {
-                    await insforge.database.from('iai_inbox_suggestions').update({ status: 'approved' }).eq('id', selectedSuggestion.id);
+                    await fetch('/api/iai-inbox/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: selectedSuggestion.id, status: 'approved' }) });
                     setIaiSuggestions(prev => prev.filter(s => s.id !== selectedSuggestion.id));
                     setSelectedSuggestion(null);
                 }
@@ -918,7 +919,7 @@ useEffect(() => {
                 setShowToast(true);
 
                 if (selectedSuggestion) {
-                    await insforge.database.from('iai_inbox_suggestions').update({ status: 'approved' }).eq('id', selectedSuggestion.id);
+                    await fetch('/api/iai-inbox/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: selectedSuggestion.id, status: 'approved' }) });
                     setIaiSuggestions(prev => prev.filter(s => s.id !== selectedSuggestion.id));
                     setSelectedSuggestion(null);
                 }
@@ -993,7 +994,7 @@ useEffect(() => {
                 if (data) setCollaborators(prev => [data[0], ...prev]);
 
                 if (selectedSuggestion) {
-                    await insforge.database.from('iai_inbox_suggestions').update({ status: 'approved' }).eq('id', selectedSuggestion.id);
+                    await fetch('/api/iai-inbox/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: selectedSuggestion.id, status: 'approved' }) });
                     setIaiSuggestions(prev => prev.filter(s => s.id !== selectedSuggestion.id));
                     setSelectedSuggestion(null);
                 }
@@ -2717,7 +2718,7 @@ useEffect(() => {
                                                                         <button
                                                                             onClick={async (e) => {
                                                                                 e.stopPropagation();
-                                                                                await insforge.database.from('iai_inbox_suggestions').update({ status: 'rejected' }).eq('id', suggestion.id);
+                                                                                await fetch('/api/iai-inbox/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: suggestion.id, status: 'rejected' }) });
                                                                                 setIaiSuggestions(prev => prev.map(s => s.id === suggestion.id ? { ...s, status: 'rejected' } : s));
                                                                             }}
                                                                             className="px-3 py-1 bg-red-500 text-white rounded-lg text-xs flex items-center gap-1 hover:bg-red-600"

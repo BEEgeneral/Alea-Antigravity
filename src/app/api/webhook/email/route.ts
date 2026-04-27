@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { insforgeAdmin } from '@/lib/insforge-admin';
 import { env } from '@/lib/env';
 import { analyzeWithMinimax } from '@/lib/minimax';
+import { INSFORGE_API_KEY } from '@/lib/insforge-constants';
 
 export async function POST(req: Request) {
     try {
@@ -83,7 +84,7 @@ export async function POST(req: Request) {
                         {
                             method: 'POST',
                             headers: {
-                                'Authorization': 'Bearer ik_dbb952a6fd01508d4ae7f53b36e23eaf',
+                                'Authorization': `Bearer ${INSFORGE_API_KEY}`,
                                 'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
@@ -130,7 +131,7 @@ export async function POST(req: Request) {
                                 {
                                     method: 'POST',
                                     headers: {
-                                        'Authorization': 'Bearer ik_dbb952a6fd01508d4ae7f53b36e23eaf',
+                                        'Authorization': `Bearer ${INSFORGE_API_KEY}`,
                                         'Content-Type': 'application/json'
                                     },
                                     body: JSON.stringify({ size: buffer.length, contentType: att.content_type })

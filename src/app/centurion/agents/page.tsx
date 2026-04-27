@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users, Plus, Search, Shield, CheckCircle, XCircle, MoreHorizontal, Loader2 } from "lucide-react";
+import { Users, Plus, Search, Shield, CheckCircle, XCircle, MoreHorizontal, Loader2, Network } from "lucide-react";
+import AddAgentModal from "@/components/admin/modals/AddAgentModal";
+import InvestorPropertyGraph from "@/components/admin/InvestorPropertyGraph";
 
 interface Agent {
     id: string;
@@ -13,11 +15,22 @@ interface Agent {
     created_at: string;
 }
 
+interface AgentForm {
+    full_name: string;
+    email: string;
+    role: string;
+}
+
 export default function AgentsPage() {
     const [agents, setAgents] = useState<Agent[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>('all');
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [showGraph, setShowGraph] = useState(false);
+    const [addForm, setAddForm] = useState<AgentForm>({ full_name: '', email: '', role: 'agent' });
+    const [addError, setAddError] = useState<string | null>(null);
+    const [addLoading, setAddLoading] = useState(false);
 
     useEffect(() => {
         const fetchAgents = async () => {
@@ -68,7 +81,7 @@ export default function AgentsPage() {
 
     const handleReject = async (id: string) => {
         if (!confirm('¿Estás seguro de que quieres rechazar este agente?')) return;
-        
+
         try {
             const token = localStorage.getItem('insforge_token');
             const res = await fetch(`/api/admin/agents/${id}`, {
@@ -81,6 +94,32 @@ export default function AgentsPage() {
             }
         } catch (err) {
             console.error('Error rejecting agent:', err);
+        }
+    };
+
+    const handleAddAgent = async () => {
+        if (!addForm.full_name || !addForm.email) {
+            setAddError('Nombre y email son obligatorios');
+            return;
+        }
+        setAddLoading(true);
+        setAddError(null);
+        try {
+            const token = localStorage.getItem('insforge_token');
+            const res = await fetch('/api/admin/agents', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(addForm),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Error creando agente');
+            setAgents(prev => [...prev, data.agent]);
+            setShowAddModal(false);
+            setAddForm({ full_name: '', email: '', role: 'agent' });
+        } catch (err: any) {
+            setAddError(err.message);
+        } finally {
+            setAddLoading(false);
         }
     };
 
@@ -109,10 +148,22 @@ export default function AgentsPage() {
                     <h1 className="text-2xl font-serif font-medium">Control de Agentes</h1>
                     <p className="text-sm text-muted-foreground mt-1">Gestionar usuarios, agentes y permisos del sistema</p>
                 </div>
-                <button className="flex items-center space-x-2 px-4 py-2 bg-primary text-white rounded-xl hover:opacity-90 transition-all">
-                    <Plus size={18} />
-                    <span className="text-sm font-medium">Nuevo Agente</span>
-                </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setShowGraph(true)}
+                        className="flex items-center space-x-2 px-4 py-2 bg-[#c5a059]/10 text-[#c5a059] border border-[#c5a059]/20 rounded-xl hover:bg-[#c5a059]/20 transition-all text-sm font-medium"
+                    >
+                        <Network size={16} />
+                        <span>Red Inversor↔Activos</span>
+                    </button>
+                    <button
+                        onClick={() => setShowAddModal(true)}
+                        className="flex items-center space-x-2 px-4 py-2 bg-primary text-white rounded-xl hover:opacity-90 transition-all"
+                    >
+                        <Plus size={18} />
+                        <span className="text-sm font-medium">Nuevo Agente</span>
+                    </button>
+                </div>
             </div>
 
             {/* Filters */}
@@ -225,6 +276,70 @@ export default function AgentsPage() {
                     <p className="text-muted-foreground">No se encontraron agentes</p>
                 </div>
             )}
+
+            {/* Add Agent Modal */}
+            {showAddModal && (
+                <div className="fixed inset-0 z-[90] flex items-center justify-center p-6">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
+                    <div className="relative bg-[#111] border border-[#c5a059]/20 rounded-3xl shadow-2xl p-8 w-full max-w-md">
+                        <h2 className="font-serif text-xl text-[#c5a059] mb-1">Dar de Alta Agente</h2>
+                        <p className="text-xs text-white/40 uppercase tracking-widest font-bold mb-6 italic">Registro manual de nuevo miembro del equipo</p>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-[10px] uppercase tracking-widest font-black text-white/40 block mb-1.5 px-1">Nombre Completo</label>
+                                <input
+                                    type="text"
+                                    placeholder="Ej: Alberto Gala"
+                                    value={addForm.full_name}
+                                    onChange={e => setAddForm(p => ({ ...p, full_name: e.target.value }))}
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#c5a059]/50 transition-all"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] uppercase tracking-widest font-black text-white/40 block mb-1.5 px-1">Email Profesional</label>
+                                <input
+                                    type="email"
+                                    placeholder="correo@aleasignature.com"
+                                    value={addForm.email}
+                                    onChange={e => setAddForm(p => ({ ...p, email: e.target.value }))}
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#c5a059]/50 transition-all"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] uppercase tracking-widest font-black text-white/40 block mb-1.5 px-1">Rol Asignado</label>
+                                <select
+                                    value={addForm.role}
+                                    onChange={e => setAddForm(p => ({ ...p, role: e.target.value }))}
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#c5a059]/50 transition-all appearance-none"
+                                >
+                                    <option value="agent">Agente</option>
+                                    <option value="admin">Administrador</option>
+                                    <option value="collaborator">Colaborador</option>
+                                </select>
+                            </div>
+                        </div>
+                        {addError && <p className="mt-3 text-xs text-red-400">{addError}</p>}
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={() => setShowAddModal(false)}
+                                className="flex-1 px-4 py-2.5 border border-white/10 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-white/5 transition-all"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleAddAgent}
+                                disabled={addLoading}
+                                className="flex-1 px-4 py-2.5 bg-[#c5a059] text-black rounded-xl text-xs font-bold uppercase tracking-widest hover:opacity-90 transition-all disabled:opacity-50"
+                            >
+                                {addLoading ? <Loader2 size={14} className="animate-spin mx-auto" /> : 'Confirmar Alta'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Investor-Property Graph */}
+            <InvestorPropertyGraph isOpen={showGraph} onClose={() => setShowGraph(false)} />
         </div>
     );
 }

@@ -1,12 +1,12 @@
 import { Pool } from 'pg';
 
 const pool = new Pool({
-  host: '187.127.70.123',
-  port: 32771,
-  user: 'xIzJ0sKnef0zDaGr',
-  password: 'ljXIYJFJXYNlSmT5GwB3UBrDdQV5VLJN',
-  database: 'WXZpOp4g1D35LkHs',
-  ssl: false,
+  host: 'ep-plain-fog-al6rviiz-pooler.c-3.eu-central-1.aws.neon.tech',
+  port: 5432,
+  user: 'neondb_owner',
+  password: 'npg_BeHqsl30DKZA',
+  database: 'neondb',
+  ssl: { rejectUnauthorized: false },
 });
 
 export default pool;

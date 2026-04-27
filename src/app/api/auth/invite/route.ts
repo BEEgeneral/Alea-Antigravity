@@ -1,116 +1,94 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { insforge } from '@/lib/insforge';
+import pool from "@/lib/vps-pg";
+import { createHash } from "crypto";
+
+function hashPassword(password: string): string {
+  return createHash("sha256").update(password).digest("hex");
+}
 
 export async function POST(request: NextRequest) {
   try {
     const { token, password, name } = await request.json();
 
     if (!token || !password) {
-      return NextResponse.json(
-        { error: 'Token and password are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Token and password are required" }, { status: 400 });
     }
 
-    const { data: invitation, error: fetchError } = await insforge
-      .database
-      .from('pending_invitations')
-      .select('*')
-      .eq('token', token)
-      .single();
+    // 1. Buscar invitación
+    const invResult = await pool.query(
+      "SELECT * FROM pending_invitations WHERE token = $1",
+      [token]
+    );
 
-    if (fetchError || !invitation) {
-      return NextResponse.json(
-        { error: 'Invalid or expired invitation' },
-        { status: 404 }
-      );
+    if (invResult.rows.length === 0) {
+      return NextResponse.json({ error: "Invalid or expired invitation" }, { status: 404 });
     }
+
+    const invitation = invResult.rows[0];
 
     if (invitation.accepted) {
-      return NextResponse.json(
-        { error: 'Invitation already accepted' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invitation already accepted" }, { status: 400 });
     }
 
     if (new Date(invitation.expires_at) < new Date()) {
-      return NextResponse.json(
-        { error: 'Invitation has expired' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invitation has expired" }, { status: 400 });
     }
 
-    const { data: authData, error: signUpError } = await insforge.auth.signUp({
-      email: invitation.email,
-      password,
-      name: name || invitation.email.split('@')[0]
-    });
+    // 2. Crear usuario en tabla users
+    const userId = crypto.randomUUID();
+    const hashedPassword = hashPassword(password);
 
-    if (signUpError) {
-      return NextResponse.json(
-        { error: signUpError.message },
-        { status: 400 }
-      );
-    }
+    const insertResult = await pool.query(
+      `INSERT INTO users (id, name, email, role, is_active, is_approved, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, true, true, NOW(), NOW())
+       ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW()
+       RETURNING *`,
+      [userId, name || invitation.email.split("@")[0], invitation.email, invitation.role || "user"]
+    );
 
-    if (authData?.user) {
-      await insforge
-        .database
-        .from('pending_invitations')
-        .update({ accepted: true })
-        .eq('id', invitation.id);
-
-      const { error: profileError } = await insforge.database.from('user_profiles').insert({
-        id: authData.user.id,
-        role: invitation.role,
-        is_active: true,
-        is_approved: true
-      });
-
-      if (profileError) {
-        
-      }
-    }
+    // 3. Marcar invitación como aceptada
+    await pool.query(
+      "UPDATE pending_invitations SET accepted = true WHERE id = $1",
+      [invitation.id]
+    );
 
     return NextResponse.json({
       success: true,
-      message: 'Account created successfully. You can now login.'
+      message: "Account created successfully. You can now login.",
+      user: { id: insertResult.rows[0].id, email: insertResult.rows[0].email, role: insertResult.rows[0].role }
     });
   } catch (error: any) {
-    
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error("Invite error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const token = searchParams.get('token');
+    const token = searchParams.get("token");
 
     if (!token) {
-      return NextResponse.json({ error: 'Token is required' }, { status: 400 });
+      return NextResponse.json({ error: "Token is required" }, { status: 400 });
     }
 
-    const { data: invitation, error } = await insforge
-      .database
-      .from('pending_invitations')
-      .select('*')
-      .eq('token', token)
-      .single();
+    const result = await pool.query(
+      "SELECT * FROM pending_invitations WHERE token = $1",
+      [token]
+    );
 
-    if (error || !invitation) {
-      return NextResponse.json({ error: 'Invalid or expired invitation' }, { status: 404 });
+    if (result.rows.length === 0) {
+      return NextResponse.json({ error: "Invalid or expired invitation" }, { status: 404 });
     }
+
+    const invitation = result.rows[0];
 
     if (invitation.accepted) {
-      return NextResponse.json({ error: 'Invitation already accepted', accepted: true }, { status: 400 });
+      return NextResponse.json({ error: "Invitation already accepted", accepted: true }, { status: 400 });
     }
 
     if (new Date(invitation.expires_at) < new Date()) {
-      return NextResponse.json({ error: 'Invitation has expired' }, { status: 400 });
+      return NextResponse.json({ error: "Invitation has expired" }, { status: 400 });
     }
 
     return NextResponse.json({
@@ -119,7 +97,6 @@ export async function GET(request: NextRequest) {
       role: invitation.role
     });
   } catch (error: any) {
-    
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

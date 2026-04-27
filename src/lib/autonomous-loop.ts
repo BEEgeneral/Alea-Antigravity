@@ -301,13 +301,6 @@ async function matchSignalToInvestors(
  * Manual trigger — call this from an API route or cron.
  */
 export async function triggerAutonomousLoop(): Promise<LoopResult> {
-  console.log('[AutonomousLoop] Starting loop at', new Date().toISOString());
   const result = await runAutonomousLoop();
-  console.log('[AutonomousLoop] Completed:', JSON.stringify({
-    signals: result.signalsProcessed,
-    actions: result.actionsCreated,
-    duration: result.duration_ms,
-    errors: result.errors.length,
-  }));
   return result;
 }

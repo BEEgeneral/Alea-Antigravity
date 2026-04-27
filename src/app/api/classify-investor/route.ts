@@ -65,12 +65,12 @@ export async function POST(req: Request) {
                 };
               }
             } catch (parseErr) {
-              console.warn('Could not parse AI classification response:', parseErr);
+              // Silently ignore parse errors - falls back to rule-based classification
             }
           }
         }
       } catch (aiErr) {
-        console.warn('AI classification failed, using rule-based:', aiErr);
+        // Silently fall back to rule-based classification
       }
     }
 

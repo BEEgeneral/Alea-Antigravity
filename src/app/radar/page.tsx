@@ -141,12 +141,7 @@ export default function InvestmentRadar() {
         if (now - lastInterestSave < 30000 && type === 'filter_search') return;
         
         try {
-            await insforge.database.from('investor_interests').insert({
-                investor_id: investorId,
-                property_id: propertyId || null,
-                interest_type: type,
-                filter_criteria: type === 'filter_search' ? filterCriteria : null
-            });
+            await fetch('/api/investor-interests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ investor_id: investorId, property_id: propertyId || null, interest_type: type, filter_criteria: type === 'filter_search' ? filterCriteria : null }) });
             setLastInterestSave(now);
         } catch (e) {
             console.error('Error saving interest:', e);

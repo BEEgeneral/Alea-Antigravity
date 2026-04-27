@@ -251,7 +251,7 @@ export default function AssetPyramid() {
       const [propsRes, leadsRes, actionsRes] = await Promise.allSettled([
         fetch("/api/admin/properties", { headers }),
         fetch("/api/admin/investors", { headers }),
-        insforge.database.from("agenda_actions").select("*").limit(500),
+        fetch("/api/agenda/actions?limit=500"),
       ]);
 
       let props: Property[] = [];
@@ -268,8 +268,11 @@ export default function AssetPyramid() {
 
       let allActions: AgendaAction[] = [];
       if (actionsRes.status === "fulfilled") {
-        const result = (actionsRes.value as any);
-        if (result.data) allActions = result.data;
+        const res = actionsRes.value as Response;
+        if (res.ok) {
+          const data = await res.json();
+          allActions = Array.isArray(data) ? data : data.actions || [];
+        }
       }
 
       // Try interactions

@@ -39,7 +39,6 @@ export async function GET(req: NextRequest) {
     }
 
     if (action === 'feedback') {
-      const { searchParams } = new URL(req.url);
       const limit = parseInt(searchParams.get('limit') || '50');
       const client = await createAuthenticatedClient();
       const { data, error } = await client

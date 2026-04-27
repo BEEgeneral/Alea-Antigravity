@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { triggerAutonomousLoop } from '@/lib/autonomous-loop';
-import { createServerClient } from '@/lib/insforge-server';
+import pool from '@/lib/vps-pg';
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,36 +29,30 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    const client = createServerClient();
-
-    // Get last 10 loop executions from telemetry
-    const { data: executions } = await client
-      .database
-      .from('telemetry_events')
-      .select('metadata, created_at')
-      .eq('event_type', 'action.triggered')
-      .eq('metadata->>loop_phase', 'signal_processing')
-      .order('created_at', { ascending: false })
-      .limit(5);
+    // Get last 5 loop executions from telemetry
+    const executionsResult = await pool.query(
+      `SELECT metadata, created_at FROM telemetry_events 
+       WHERE event_type = 'action.triggered' AND metadata->>'loop_phase' = 'signal_processing'
+       ORDER BY created_at DESC LIMIT 5`
+    );
+    const executions = executionsResult.rows;
 
     // Get pending signals count
-    const { count: pendingSignals } = await client
-      .database
-      .from('signals')
-      .select('id', { count: 'exact' })
-      .eq('status', 'detected');
+    const pendingSignalsResult = await pool.query(
+      "SELECT COUNT(*) as count FROM signals WHERE status = 'detected'"
+    );
+    const pendingSignals = parseInt(pendingSignalsResult.rows[0]?.count || '0');
 
     // Get pending actions count
-    const { count: pendingActions } = await client
-      .database
-      .from('agenda_actions')
-      .select('id', { count: 'exact' })
-      .eq('status', 'pending');
+    const pendingActionsResult = await pool.query(
+      "SELECT COUNT(*) as count FROM agenda_actions WHERE status = 'pending'"
+    );
+    const pendingActions = parseInt(pendingActionsResult.rows[0]?.count || '0');
 
     return NextResponse.json({
       lastExecutions: executions || [],
-      pendingSignals: pendingSignals || 0,
-      pendingActions: pendingActions || 0,
+      pendingSignals,
+      pendingActions,
       loopStatus: 'operational',
     });
   } catch (err: any) {

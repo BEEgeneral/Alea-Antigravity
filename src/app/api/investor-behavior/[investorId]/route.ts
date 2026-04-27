@@ -1,18 +1,11 @@
-import { NextResponse } from 'next/server';
-import { createAuthenticatedClient } from '@/lib/insforge-server';
+import pool from "@/lib/vps-pg";
+import { NextResponse } from "next/server";
 
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ investorId: string }> }
 ) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { investorId } = await params;
     const { searchParams } = new URL(req.url);
     const eventType = searchParams.get('eventType');
@@ -22,34 +15,30 @@ export async function GET(
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
 
-    let query = client
-      .database
-      .from('investor_behavior')
-      .select('*')
-      .eq('investor_id', investorId)
-      .gte('created_at', cutoffDate.toISOString())
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    let query = 'SELECT * FROM investor_behavior WHERE investor_id = $1 AND created_at >= $2';
+    const paramsArr: any[] = [investorId, cutoffDate.toISOString()];
+    let paramIndex = 3;
 
     if (eventType) {
-      query = query.eq('event_type', eventType);
+      query += ` AND event_type = $${paramIndex++}`;
+      paramsArr.push(eventType);
     }
 
-    const { data: events, error } = await query;
+    query += ` ORDER BY created_at DESC LIMIT $${paramIndex}`;
+    paramsArr.push(limit);
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    const result = await pool.query(query, paramsArr);
+    const events = result.rows;
 
     // Aggregate statistics
     const stats = {
-      total: events?.length || 0,
+      total: events.length || 0,
       byType: {} as Record<string, number>,
-      uniqueProperties: new Set(events?.filter(e => e.target_type === 'property').map(e => e.target_id)).size,
-      lastActivity: events?.[0]?.created_at || null
+      uniqueProperties: new Set(events.filter((e: any) => e.target_type === 'property').map((e: any) => e.target_id)).size,
+      lastActivity: events[0]?.created_at || null
     };
 
-    (events || []).forEach((e: any) => {
+    events.forEach((e: any) => {
       stats.byType[e.event_type] = (stats.byType[e.event_type] || 0) + 1;
     });
 
@@ -60,7 +49,6 @@ export async function GET(
     });
 
   } catch (error: any) {
-    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

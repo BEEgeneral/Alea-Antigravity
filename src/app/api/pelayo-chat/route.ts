@@ -11,50 +11,44 @@
 
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
-import { createAuthenticatedClient } from '@/lib/insforge';
+import pool from '@/lib/vps-pg';
 import { generateText, analyzeWithAI, isMiniMaxConfigured } from '@/lib/ai-minimax';
 
-async function getCRMData(client: Awaited<ReturnType<typeof createAuthenticatedClient>>) {
+async function getCRMData() {
   const [leads, properties, investors, mandatarios, collaborators] = await Promise.all([
-    client.database.from('leads').select('*').order('created_at', { ascending: false }).limit(50),
-    client.database.from('properties').select('*').order('created_at', { ascending: false }).limit(50),
-    client.database.from('investors').select('*').order('created_at', { ascending: false }).limit(50),
-    client.database.from('mandatarios').select('*').order('full_name', { ascending: true }).limit(50),
-    client.database.from('collaborators').select('*').order('full_name', { ascending: true }).limit(50),
+    pool.query('SELECT * FROM leads ORDER BY created_at DESC LIMIT 50'),
+    pool.query('SELECT * FROM properties ORDER BY created_at DESC LIMIT 50'),
+    pool.query('SELECT * FROM investors ORDER BY created_at DESC LIMIT 50'),
+    pool.query('SELECT * FROM mandatarios ORDER BY full_name ASC LIMIT 50'),
+    pool.query('SELECT * FROM collaborators ORDER BY full_name ASC LIMIT 50'),
   ]);
 
   return {
-    leads: leads.data || [],
-    properties: properties.data || [],
-    investors: investors.data || [],
-    mandatarios: mandatarios.data || [],
-    collaborators: collaborators.data || [],
+    leads: leads.rows || [],
+    properties: properties.rows || [],
+    investors: investors.rows || [],
+    mandatarios: mandatarios.rows || [],
+    collaborators: collaborators.rows || [],
   };
 }
 
-async function getAgendaActions(client: Awaited<ReturnType<typeof createAuthenticatedClient>>, userId: string) {
-  const { data } = await client
-    .database
-    .from('agenda_actions')
-    .select('*')
-    .eq('user_id', userId)
-    .order('due_date', { ascending: true })
-    .limit(20);
-
-  return data || [];
+async function getAgendaActions(userId: string) {
+  const result = await pool.query(
+    'SELECT * FROM agenda_actions WHERE assigned_agent_id = $1 ORDER BY due_date ASC LIMIT 20',
+    [userId]
+  );
+  return result.rows || [];
 }
 
 async function saveConversation(
-  client: Awaited<ReturnType<typeof createAuthenticatedClient>>,
   userId: string,
   role: 'user' | 'assistant',
   content: string
 ) {
-  await client.database.from('pelayo_conversations').insert({
-    user_id: userId,
-    role,
-    content,
-  });
+  await pool.query(
+    'INSERT INTO pelayo_conversations (user_id, role, content) VALUES ($1, $2, $3)',
+    [userId, role, content]
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -71,16 +65,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    const client = createAuthenticatedClient(token);
-
-    const { data: authData, error: authError } = await client.auth.getCurrentUser();
-
-    if (authError || !authData?.user) {
-      return NextResponse.json({ error: 'Token inválido' }, { status: 401 });
-    }
-
     const { message } = await req.json();
-    const userId = authData.user.id || authData.user.email;
 
     if (!message?.trim()) {
       return NextResponse.json({ error: 'Mensaje vacío' }, { status: 400 });
@@ -94,8 +79,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Get CRM data
-    const crm = await getCRMData(client);
-    const agendaActions = await getAgendaActions(client, userId);
+    const crm = await getCRMData();
+    const agendaActions = await getAgendaActions('system');
 
     // Build context
     const summary = `
@@ -145,8 +130,8 @@ ${summary}`;
     );
 
     // Save conversation
-    await saveConversation(client, userId, 'user', message);
-    await saveConversation(client, userId, 'assistant', response);
+    await saveConversation('system', 'user', message);
+    await saveConversation('system', 'assistant', response);
 
     return NextResponse.json({
       response: response || 'He procesado tu mensaje. ¿Hay algo más?',
@@ -181,20 +166,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    const client = createAuthenticatedClient(token);
-    const { data: authData } = await client.auth.getCurrentUser();
-
-    if (!authData?.user) {
-      return NextResponse.json({ error: 'Token inválido' }, { status: 401 });
-    }
-
     const { searchParams } = new URL(req.url);
     const type = searchParams.get('type') || 'stats';
-    const userId = authData.user.id;
 
     if (type === 'stats') {
-      const crm = await getCRMData(client);
-      const agendaActions = await getAgendaActions(client, userId);
+      const crm = await getCRMData();
+      const agendaActions = await getAgendaActions('system');
 
       return NextResponse.json({
         leads: crm.leads.length,

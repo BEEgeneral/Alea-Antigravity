@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAuthenticatedClient } from '@/lib/insforge';
+import pool from '@/lib/vps-pg';
 
 export async function POST(
   req: Request,
@@ -21,81 +22,71 @@ export async function POST(
 
     const { id } = await params;
 
-    const { data: suggestion, error: fetchError } = await client
-      .database.from('iai_inbox_suggestions')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const suggestionResult = await pool.query(
+      'SELECT * FROM iai_inbox_suggestions WHERE id = $1',
+      [id]
+    );
+    const suggestion = suggestionResult.rows[0];
 
-    if (fetchError || !suggestion) {
+    if (!suggestion) {
       return NextResponse.json({ error: 'Sugerencia no encontrada' }, { status: 404 });
     }
 
     let createData: any = null;
 
     if (suggestion.suggestion_type === 'investor' || suggestion.suggestion_type === 'lead') {
-      const { data: investor, error: investorError } = await client
-        .database.from('investors')
-        .insert({
-          email: suggestion.sender_email,
-          full_name: suggestion.extracted_data?.contact_name || suggestion.extracted_data?.vendor_name || suggestion.sender_email.split('@')[0],
-          phone: suggestion.extracted_data?.contact_phone || null,
-          budget_min: suggestion.extracted_data?.price ? suggestion.extracted_data.price * 0.7 : null,
-          budget_max: suggestion.extracted_data?.price || null,
-          kyc_status: 'pending',
-          source: 'email_intelligence',
-        })
-        .select('id')
-        .single();
+      const investorResult = await pool.query(
+        `INSERT INTO investors (email, full_name, phone, budget_min, budget_max, kyc_status, source)
+         VALUES ($1, $2, $3, $4, $5, 'pending', 'email_intelligence')
+         RETURNING id`,
+        [
+          suggestion.sender_email,
+          suggestion.extracted_data?.contact_name || suggestion.extracted_data?.vendor_name || suggestion.sender_email.split('@')[0],
+          suggestion.extracted_data?.contact_phone || null,
+          suggestion.extracted_data?.price ? suggestion.extracted_data.price * 0.7 : null,
+          suggestion.extracted_data?.price || null,
+        ]
+      );
 
-      if (investorError && !investorError.message.includes('duplicate')) {
-        
-      } else {
-        createData = { type: 'investor', id: investor?.id };
+      if (investorResult.rows.length > 0) {
+        createData = { type: 'investor', id: investorResult.rows[0]?.id };
       }
     }
 
     if (suggestion.suggestion_type === 'property') {
-      const { data: property, error: propertyError } = await client
-        .database.from('properties')
-        .insert({
-          title: suggestion.extracted_data?.title || suggestion.original_email_subject,
-          address: suggestion.extracted_data?.address || 'Por confirmar',
-          asset_type: suggestion.extracted_data?.type || 'Otro',
-          price: suggestion.extracted_data?.price || 0,
-          size_sqm: suggestion.extracted_data?.meters || null,
-          is_off_market: true,
-          is_published: false,
-          source: 'email_intelligence',
-        })
-        .select('id')
-        .single();
+      const propertyResult = await pool.query(
+        `INSERT INTO properties (title, address, asset_type, price, size_sqm, is_off_market, is_published, source)
+         VALUES ($1, $2, $3, $4, $5, true, false, 'email_intelligence')
+         RETURNING id`,
+        [
+          suggestion.extracted_data?.title || suggestion.original_email_subject,
+          suggestion.extracted_data?.address || 'Por confirmar',
+          suggestion.extracted_data?.type || 'Otro',
+          suggestion.extracted_data?.price || 0,
+          suggestion.extracted_data?.meters || null,
+        ]
+      );
 
-      if (propertyError && !propertyError.message.includes('duplicate')) {
-        
-      } else {
-        createData = { type: 'property', id: property?.id };
+      if (propertyResult.rows.length > 0) {
+        createData = { type: 'property', id: propertyResult.rows[0]?.id };
       }
     }
 
-    const { data: updated, error: updateError } = await client
-      .database.from('iai_inbox_suggestions')
-      .update({
-        status: 'approved',
-        approved_by: authData.user.id,
-        approved_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select()
-      .single();
+    const updatedResult = await pool.query(
+      `UPDATE iai_inbox_suggestions 
+       SET status = 'approved', approved_by = $1, approved_at = NOW() 
+       WHERE id = $2 
+       RETURNING *`,
+      [authData.user.id, id]
+    );
 
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    if (updatedResult.rows.length === 0) {
+      return NextResponse.json({ error: 'Failed to update suggestion' }, { status: 500 });
     }
 
     return NextResponse.json({
       success: true,
-      suggestion: updated,
+      suggestion: updatedResult.rows[0],
       created: createData,
     });
   } catch (error: any) {

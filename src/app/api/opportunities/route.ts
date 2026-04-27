@@ -1,46 +1,46 @@
-import { NextResponse } from 'next/server';
-import { createAuthenticatedClient } from '@/lib/insforge-server';
+import pool from "@/lib/vps-pg";
+import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const url = new URL(req.url);
     const status = url.searchParams.get('status');
     const priority = url.searchParams.get('priority');
     const pipeline = url.searchParams.get('pipeline_stage');
     const limit = parseInt(url.searchParams.get('limit') || '50', 10);
 
-    let query = client.database
-      .from('opportunities')
-      .select('*', { count: 'exact' })
-      .order('detected_at', { ascending: false })
-      .limit(limit);
+    let query = 'SELECT * FROM opportunities';
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let paramIndex = 1;
 
     if (status && status !== 'all') {
-      query = query.eq('status', status);
+      conditions.push(`status = $${paramIndex++}`);
+      params.push(status);
     }
     if (priority && priority !== 'all') {
-      query = query.eq('priority', priority);
+      conditions.push(`priority = $${paramIndex++}`);
+      params.push(priority);
     }
     if (pipeline && pipeline !== 'all') {
-      query = query.eq('pipeline_stage', pipeline);
+      conditions.push(`pipeline_stage = $${paramIndex++}`);
+      params.push(pipeline);
     }
 
-    const { data: opportunities, error, count } = await query;
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
     }
+
+    query += ` ORDER BY detected_at DESC LIMIT $${paramIndex}`;
+    params.push(limit);
+
+    const result = await pool.query(query, params);
+
+    const countResult = await pool.query('SELECT COUNT(*) as count FROM opportunities');
 
     return NextResponse.json({
-      opportunities: opportunities || [],
-      total: count || 0,
+      opportunities: result.rows || [],
+      total: parseInt(countResult.rows[0]?.count || '0'),
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -49,13 +49,6 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await req.json();
     const {
       signal_id,
@@ -69,13 +62,10 @@ export async function POST(req: Request) {
     // Calculate alea_score from signal if provided
     let alea_score = 50;
     if (signal_id) {
-      const { data: signal } = await client
-        .database
-        .from('signals')
-        .select('alea_score')
-        .eq('id', signal_id)
-        .single();
-      if (signal) alea_score = signal.alea_score || 50;
+      const signalResult = await pool.query('SELECT alea_score FROM signals WHERE id = $1', [signal_id]);
+      if (signalResult.rows.length > 0) {
+        alea_score = signalResult.rows[0].alea_score || 50;
+      }
     }
 
     // Determine priority from score
@@ -85,27 +75,15 @@ export async function POST(req: Request) {
     else if (!priority && alea_score >= 45) finalPriority = 'medium';
     else if (!priority) finalPriority = 'low';
 
-    const { data, error } = await client
-      .database
-      .from('opportunities')
-      .insert({
-        signal_id,
-        property_id,
-        investor_id,
-        lead_id,
-        alea_score,
-        priority: finalPriority,
-        estimated_value,
-        status: 'active',
-        pipeline_stage: 'prospect',
-        created_by: user.id,
-      })
-      .select()
-      .single();
+    const result = await pool.query(
+      `INSERT INTO opportunities (signal_id, property_id, investor_id, lead_id, alea_score, priority, estimated_value, status, pipeline_stage, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', 'prospect', $8)
+       RETURNING *`,
+      [signal_id, property_id, investor_id, lead_id, alea_score, finalPriority, estimated_value, 'system']
+    );
 
-    if (error) throw error;
 
-    return NextResponse.json({ success: true, opportunity: data });
+    return NextResponse.json({ success: true, opportunity: result.rows[0] });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

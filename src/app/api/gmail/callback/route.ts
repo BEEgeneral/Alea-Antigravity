@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/insforge-server';
-import { cookies } from 'next/headers';
+import pool from '@/lib/vps-pg';
 
 const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID || '';
-const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET || '';
+const GMAIL_CLIENT_SECRET=process.env.GMAIL_CLIENT_SECRET || '';
 const GMAIL_REDIRECT_URI = process.env.GMAIL_REDIRECT_URI || 'https://if8rkq6j.eu-central.insforge.app/api/gmail/callback';
 
 interface TokenResponse {
@@ -59,7 +58,6 @@ export async function GET(request: NextRequest) {
     const tokens: TokenResponse = await tokenResponse.json();
 
     if (tokens.error) {
-      
       return NextResponse.redirect(
         new URL(`/praetorium?gmail_error=${encodeURIComponent(tokens.error)}`, request.url)
       );
@@ -67,34 +65,24 @@ export async function GET(request: NextRequest) {
 
     const expiresAt = new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString();
 
-    const insforge = createServerClient();
-    
-    const { error: upsertError } = await insforge.database
-      .from('gmail_tokens')
-      .upsert({
-        user_id: userId,
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token || null,
-        token_type: tokens.token_type || 'Bearer',
-        expires_at: expiresAt,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'user_id'
-      });
-
-    if (upsertError) {
-      
-      return NextResponse.redirect(
-        new URL('/praetorium?gmail_error=db_error', request.url)
-      );
-    }
+    // Upsert using PostgreSQL ON CONFLICT
+    await pool.query(
+      `INSERT INTO gmail_tokens (user_id, access_token, refresh_token, token_type, expires_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       ON CONFLICT (user_id) DO UPDATE SET
+         access_token = EXCLUDED.access_token,
+         refresh_token = EXCLUDED.refresh_token,
+         token_type = EXCLUDED.token_type,
+         expires_at = EXCLUDED.expires_at,
+         updated_at = NOW()`,
+      [userId, tokens.access_token, tokens.refresh_token || null, tokens.token_type || 'Bearer', expiresAt]
+    );
 
     return NextResponse.redirect(
       new URL('/praetorium?gmail_connected=true', request.url)
     );
 
   } catch (err: any) {
-    
     return NextResponse.redirect(
       new URL(`/praetorium?gmail_error=${encodeURIComponent(err.message)}`, request.url)
     );

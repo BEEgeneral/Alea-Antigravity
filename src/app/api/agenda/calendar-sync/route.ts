@@ -1,8 +1,8 @@
+import pool from "@/lib/vps-pg";
 import { NextRequest, NextResponse } from "next/server";
-import { createAuthenticatedClient } from "@/lib/insforge-server";
 
 const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID || '';
-const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET || '';
+const GMAIL_CLIENT_SECRET=process.env.GMAIL_CLIENT_SECRET || '';
 
 async function getFreshAccessToken(refreshToken: string): Promise<string | null> {
   try {
@@ -23,21 +23,17 @@ async function getFreshAccessToken(refreshToken: string): Promise<string | null>
 
 export async function GET(request: NextRequest) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-  
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
     const { searchParams } = new URL(request.url);
     const days = parseInt(searchParams.get('days') || '14');
     const timeMin = new Date().toISOString();
     const timeMax = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+    const userId = searchParams.get('user_id') || 'system';
 
-    const { data: tokens } = await client.database
-      .from('gmail_tokens')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
+    const tokensResult = await pool.query(
+      'SELECT * FROM gmail_tokens WHERE user_id = $1',
+      [userId]
+    );
+    const tokens = tokensResult.rows[0];
 
     if (!tokens?.refresh_token) {
       return NextResponse.json({ error: 'Gmail not connected', connected: false }, { status: 200 });
@@ -81,12 +77,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-  
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
     const { events } = await request.json();
+    const userId = request.headers.get('x-user-id') || 'system';
 
     if (!events || !Array.isArray(events)) {
       return NextResponse.json({ error: 'events array required' }, { status: 400 });
@@ -101,31 +93,24 @@ export async function POST(request: NextRequest) {
         const endTime = new Date(event.end || new Date(startTime.getTime() + 60 * 60 * 1000));
         const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
 
-        const { data, error } = await client.database
-          .from('agenda_actions')
-          .insert({
-            title: event.summary || 'Evento de Google Calendar',
-            description: `${event.description || ''}${event.location ? '\n📍 ' + event.location : ''}`,
-            action_type: 'meeting',
-            action_category: 'external',
-            due_date: startTime.toISOString(),
-            scheduled_for: startTime.toISOString(),
-            estimated_duration_minutes: durationMinutes || 30,
-            priority: 'medium',
-            status: 'scheduled',
-            assigned_agent_id: user.id,
-            created_by: user.id,
-            is_auto_generated: true,
-            trigger_rule: 'google_calendar_sync',
-            google_calendar_event_id: event.id,
-          })
-          .select()
-          .single();
+        const result = await pool.query(
+          `INSERT INTO agenda_actions (title, description, action_type, action_category, due_date, scheduled_for, estimated_duration_minutes, priority, status, assigned_agent_id, created_by, is_auto_generated, trigger_rule, google_calendar_event_id)
+           VALUES ($1, $2, 'meeting', 'external', $3, $4, $5, 'medium', 'scheduled', $6, $7, true, 'google_calendar_sync', $8)
+           RETURNING *`,
+          [
+            event.summary || 'Evento de Google Calendar',
+            `${event.description || ''}${event.location ? '\n📍 ' + event.location : ''}`,
+            startTime.toISOString(),
+            startTime.toISOString(),
+            durationMinutes || 30,
+            userId,
+            userId,
+            event.id
+          ]
+        );
 
-        if (error) {
-          errors.push({ eventId: event.id, error: error.message });
-        } else {
-          created.push({ ...data, meetLink: event.meetLink });
+        if (result.rows.length > 0) {
+          created.push({ ...result.rows[0], meetLink: event.meetLink });
         }
       } catch (err: any) {
         errors.push({ eventId: event.id, error: err.message });

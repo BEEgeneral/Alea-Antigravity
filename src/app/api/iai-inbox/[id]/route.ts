@@ -1,27 +1,21 @@
-import { NextResponse } from 'next/server';
-import { createAuthenticatedClient, createServerClient } from '@/lib/insforge-server';
+import pool from "@/lib/vps-pg";
+import { NextResponse } from "next/server";
 
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { id } = await params;
 
-    const { data: suggestion, error } = await client
-      .database
-      .from('iai_inbox_suggestions')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const result = await pool.query(
+      'SELECT * FROM iai_inbox_suggestions WHERE id = $1',
+      [id]
+    );
+    const suggestion = result.rows[0];
 
-    if (error) throw error;
     if (!suggestion) {
-      return NextResponse.json({ error: 'Sugerencia no encontrada' }, { status: 404 });
+      return NextResponse.json({ error: "Sugerencia no encontrada" }, { status: 404 });
     }
 
     return NextResponse.json({ suggestion });
@@ -30,171 +24,150 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
 }
 
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { id } = await params;
     const body = await req.json();
-
     const { status, override_data } = body;
 
-    const updateData: Record<string, any> = {};
-    if (status) updateData.status = status;
-    if (override_data) updateData.extracted_data = override_data;
+    const updates: string[] = [];
+    const paramsArr: any[] = [];
+    let paramIndex = 1;
 
-    const { data, error } = await client
-      .database
-      .from('iai_inbox_suggestions')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
+    if (status) {
+      updates.push(`status = $${paramIndex++}`);
+      paramsArr.push(status);
+    }
+    if (override_data) {
+      updates.push(`extracted_data = $${paramIndex++}`);
+      paramsArr.push(override_data);
+    }
 
-    if (error) throw error;
+    if (updates.length === 0) {
+      return NextResponse.json({ error: "No updates provided" }, { status: 400 });
+    }
 
-    return NextResponse.json({ success: true, suggestion: data });
+    paramsArr.push(id);
+    const result = await pool.query(
+      `UPDATE iai_inbox_suggestions SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+      paramsArr
+    );
+
+    if (result.rows.length === 0) {
+      return NextResponse.json({ error: "Sugerencia no encontrada" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, suggestion: result.rows[0] });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-/**
- * POST /api/iai-inbox/[id]
- * Crea un registro CRM (Lead, Property, Investor) desde una sugerencia aprobada.
- * Body: { action: 'create_lead' | 'create_property' | 'create_investor' }
- */
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { id } = await params;
     const body = await req.json();
     const { action, override_data } = body;
 
     // 1. Get the suggestion
-    const { data: suggestion, error: suggestionError } = await client
-      .database
-      .from('iai_inbox_suggestions')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const suggestionResult = await pool.query(
+      'SELECT * FROM iai_inbox_suggestions WHERE id = $1',
+      [id]
+    );
+    const suggestion = suggestionResult.rows[0];
 
-    if (suggestionError || !suggestion) {
-      return NextResponse.json({ error: 'Sugerencia no encontrada' }, { status: 404 });
+    if (!suggestion) {
+      return NextResponse.json({ error: "Sugerencia no encontrada" }, { status: 404 });
     }
 
     const extracted = override_data || suggestion.extracted_data || {};
-    const adminClient = createServerClient();
     let result: Record<string, any> = {};
 
     if (action === 'create_lead' || action === 'create') {
       // Create Lead from suggestion
-      const { data: lead, error: leadError } = await adminClient
-        .database
-        .from('leads')
-        .insert({
-          name: extracted.name || suggestion.sender_email?.split('@')[0] || 'Lead desde IAI',
-          email: extracted.email || suggestion.sender_email || '',
-          phone: extracted.phone || '',
-          source: 'iai_inbox',
-          status: 'new',
-          type: suggestion.suggestion_type === 'property' ? 'buyer' : 'seller',
-          investor: extracted.company_name || '',
-          property: extracted.property_title || extracted.title || '',
-          ticket: extracted.ticket_size || '',
-          created_by: user.id,
-        })
-        .select()
-        .single();
+      const leadResult = await pool.query(
+        `INSERT INTO leads (name, email, phone, source, status, type, investor, property, ticket, created_by)
+         VALUES ($1, $2, $3, 'iai_inbox', 'new', $4, $5, $6, $7, $8)
+         RETURNING *`,
+        [
+          extracted.name || suggestion.sender_email?.split('@')[0] || 'Lead desde IAI',
+          extracted.email || suggestion.sender_email || '',
+          extracted.phone || '',
+          suggestion.suggestion_type === 'property' ? 'buyer' : 'seller',
+          extracted.company_name || '',
+          extracted.property_title || extracted.title || '',
+          extracted.ticket_size || '',
+          'system'
+        ]
+      );
 
-      if (leadError) throw leadError;
+      const lead = leadResult.rows[0];
 
       // Link opportunity if property/investor detected
       if (suggestion.suggestion_type === 'property' && lead.id) {
-        await adminClient
-          .database
-          .from('opportunities')
-          .insert({
-            lead_id: lead.id,
-            alea_score: 50,
-            priority: 'medium',
-            status: 'active',
-            pipeline_stage: 'prospect',
-            created_by: user.id,
-          });
+        await pool.query(
+          `INSERT INTO opportunities (lead_id, alea_score, priority, status, pipeline_stage, created_by)
+           VALUES ($1, 50, 'medium', 'active', 'prospect', $2)`,
+          [lead.id, 'system']
+        );
       }
 
       result = { lead };
     } else if (action === 'create_property') {
-      const { data: property, error: propertyError } = await adminClient
-        .database
-        .from('properties')
-        .insert({
-          title: extracted.title || suggestion.original_email_subject || 'Propiedad desde IAI',
-          description: extracted.description || '',
-          type: normalizePropertyType(extracted.asset_type),
-          price: parseFloat(extracted.price) || 0,
-          meters: parseFloat(extracted.meters) || 0,
-          address: extracted.address || '',
-          vendor_name: extracted.vendor_name || suggestion.sender_email || '',
-          status: 'available',
-          is_off_market: true,
-          created_by: user.id,
-        })
-        .select()
-        .single();
+      const propertyResult = await pool.query(
+        `INSERT INTO properties (title, description, type, price, meters, address, vendor_name, status, is_off_market, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'available', true, $8)
+         RETURNING *`,
+        [
+          extracted.title || suggestion.original_email_subject || 'Propiedad desde IAI',
+          extracted.description || '',
+          normalizePropertyType(extracted.asset_type),
+          parseFloat(extracted.price) || 0,
+          parseFloat(extracted.meters) || 0,
+          extracted.address || '',
+          extracted.vendor_name || suggestion.sender_email || '',
+          'system'
+        ]
+      );
 
-      if (propertyError) throw propertyError;
-      result = { property };
+      result = { property: propertyResult.rows[0] };
     } else if (action === 'create_investor') {
-      const { data: investor, error: investorError } = await adminClient
-        .database
-        .from('investors')
-        .insert({
-          full_name: extracted.name || suggestion.sender_email?.split('@')[0] || 'Investor desde IAI',
-          email: extracted.email || suggestion.sender_email || '',
-          phone: extracted.phone || '',
-          company_name: extracted.company_name || '',
-          investor_type: normalizeInvestorType(extracted.investor_type),
-          ticket_size: extracted.ticket_size || 'MEDIUM',
-          budget_min: parseFloat(extracted.budget_min) || 0,
-          budget_max: parseFloat(extracted.budget_max) || 0,
-          status: 'active',
-          created_by: user.id,
-        })
-        .select()
-        .single();
+      const investorResult = await pool.query(
+        `INSERT INTO investors (full_name, email, phone, company_name, investor_type, ticket_size, budget_min, budget_max, status, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', $9)
+         RETURNING *`,
+        [
+          extracted.name || suggestion.sender_email?.split('@')[0] || 'Investor desde IAI',
+          extracted.email || suggestion.sender_email || '',
+          extracted.phone || '',
+          extracted.company_name || '',
+          normalizeInvestorType(extracted.investor_type),
+          extracted.ticket_size || 'MEDIUM',
+          parseFloat(extracted.budget_min) || 0,
+          parseFloat(extracted.budget_max) || 0,
+          'system'
+        ]
+      );
 
-      if (investorError) throw investorError;
-      result = { investor };
+      result = { investor: investorResult.rows[0] };
     } else {
       return NextResponse.json({ error: 'acción desconocida. Use: create_lead, create_property, create_investor' }, { status: 400 });
     }
 
     // Mark suggestion as processed
-    await client
-      .database
-      .from('iai_inbox_suggestions')
-      .update({ 
-        status: 'approved',
-        extracted_data: { ...extracted, crm_result: result }
-      })
-      .eq('id', id);
+    await pool.query(
+      `UPDATE iai_inbox_suggestions SET status = 'approved', extracted_data = $1 WHERE id = $2`,
+      [{ ...extracted, crm_result: result }, id]
+    );
 
     return NextResponse.json({ success: true, ...result });
   } catch (error: any) {
-    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

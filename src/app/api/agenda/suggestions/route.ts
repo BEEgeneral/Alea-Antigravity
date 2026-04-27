@@ -1,15 +1,10 @@
-import { createAuthenticatedClient } from "@/lib/insforge-server";
+import pool from "@/lib/vps-pg";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
   try {
-    const client = await createAuthenticatedClient();
-    const { data: { user } } = await client.auth.getCurrentUser();
-  
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
     const { searchParams } = new URL(request.url);
-    const agentId = searchParams.get("agent_id") || user.id;
+    const agentId = searchParams.get("agent_id");
     const includeOverdue = searchParams.get("include_overdue") !== "false";
     const includeUpcoming = searchParams.get("include_upcoming") !== "false";
     const hoursAhead = parseInt(searchParams.get("hours_ahead") || "72");
@@ -18,68 +13,68 @@ export async function GET(request: NextRequest) {
     const now = new Date();
 
     if (includeOverdue) {
-      const { data: overdueActions } = await client
-        .database
-        .from("agenda_actions")
-        .select("id, title, due_date, priority, status, action_type, sla_hours, pipeline_stage, lead_id")
-        .eq("assigned_agent_id", agentId)
-        .neq("status", "completed")
-        .neq("status", "cancelled")
-        .lt("due_date", now.toISOString())
-        .order("due_date", { ascending: true });
+      const overdueResult = await pool.query(
+        `SELECT id, title, due_date, priority, status, action_type, sla_hours, pipeline_stage, lead_id
+         FROM agenda_actions
+         WHERE assigned_agent_id = $1
+         AND status != 'completed'
+         AND status != 'cancelled'
+         AND due_date < $2
+         ORDER BY due_date ASC`,
+        [agentId || 'system', now.toISOString()]
+      );
 
-      if (overdueActions) {
-        for (const action of overdueActions) {
-          const hoursOverdue = Math.floor((now.getTime() - new Date(action.due_date).getTime()) / (1000 * 60 * 60));
-          suggestions.push({
-            id: `overdue_${action.id}`,
-            lead_id: action.lead_id,
-            action_id: action.id,
-            suggestion_type: "overdue",
-            title: `Acción vencida: ${action.title}`,
-            message: `Han pasado ${hoursOverdue}h desde la fecha límite. ${action.action_type === 'call' ? 'Llama' : action.action_type === 'email' ? 'Envía email' : 'Completa'} lo antes posible.`,
-            priority: hoursOverdue > 48 ? "critical" : hoursOverdue > 24 ? "urgent" : "high",
-            days_overdue: Math.floor(hoursOverdue / 24),
-            hours_overdue: hoursOverdue,
-            pipeline_stage: action.pipeline_stage,
-          });
-        }
+      const overdueActions = overdueResult.rows;
+      for (const action of overdueActions) {
+        const hoursOverdue = Math.floor((now.getTime() - new Date(action.due_date).getTime()) / (1000 * 60 * 60));
+        suggestions.push({
+          id: `overdue_${action.id}`,
+          lead_id: action.lead_id,
+          action_id: action.id,
+          suggestion_type: "overdue",
+          title: `Acción vencida: ${action.title}`,
+          message: `Han pasado ${hoursOverdue}h desde la fecha límite. ${action.action_type === 'call' ? 'Llama' : action.action_type === 'email' ? 'Envía email' : 'Completa'} lo antes posible.`,
+          priority: hoursOverdue > 48 ? "critical" : hoursOverdue > 24 ? "urgent" : "high",
+          days_overdue: Math.floor(hoursOverdue / 24),
+          hours_overdue: hoursOverdue,
+          pipeline_stage: action.pipeline_stage,
+        });
       }
     }
 
     if (includeUpcoming) {
       const upcomingDeadline = new Date(now.getTime() + hoursAhead * 60 * 60 * 1000);
 
-      const { data: upcomingActions } = await client
-        .database
-        .from("agenda_actions")
-        .select("id, title, due_date, priority, status, action_type, sla_hours, pipeline_stage, lead_id")
-        .eq("assigned_agent_id", agentId)
-        .neq("status", "completed")
-        .neq("status", "cancelled")
-        .gte("due_date", now.toISOString())
-        .lte("due_date", upcomingDeadline.toISOString())
-        .order("due_date", { ascending: true });
+      const upcomingResult = await pool.query(
+        `SELECT id, title, due_date, priority, status, action_type, sla_hours, pipeline_stage, lead_id
+         FROM agenda_actions
+         WHERE assigned_agent_id = $1
+         AND status != 'completed'
+         AND status != 'cancelled'
+         AND due_date >= $2
+         AND due_date <= $3
+         ORDER BY due_date ASC`,
+        [agentId || 'system', now.toISOString(), upcomingDeadline.toISOString()]
+      );
 
-      if (upcomingActions) {
-        for (const action of upcomingActions) {
-          const hoursUntil = Math.floor((new Date(action.due_date).getTime() - now.getTime()) / (1000 * 60 * 60));
-          const isSlaWarning = action.sla_hours && hoursUntil <= 24;
-          
-          suggestions.push({
-            id: `upcoming_${action.id}`,
-            lead_id: action.lead_id,
-            action_id: action.id,
-            suggestion_type: isSlaWarning ? "sla_warning" : "upcoming",
-            title: isSlaWarning ? `⚠️ SLA próximo a vencer: ${action.title}` : `Recordatorio: ${action.title}`,
-            message: isSlaWarning 
-              ? `Quedan ${hoursUntil}h para el SLA. ${action.action_type === 'call' ? 'Llama ahora' : 'Completa esta acción pronto'}.`
-              : `Due en ${hoursUntil <= 24 ? `${hoursUntil} horas` : `${Math.floor(hoursUntil / 24)} días`}.`,
-            priority: isSlaWarning ? "high" : hoursUntil <= 24 ? "medium" : "low",
-            hours_until_due: hoursUntil,
-            pipeline_stage: action.pipeline_stage,
-          });
-        }
+      const upcomingActions = upcomingResult.rows;
+      for (const action of upcomingActions) {
+        const hoursUntil = Math.floor((new Date(action.due_date).getTime() - now.getTime()) / (1000 * 60 * 60));
+        const isSlaWarning = action.sla_hours && hoursUntil <= 24;
+        
+        suggestions.push({
+          id: `upcoming_${action.id}`,
+          lead_id: action.lead_id,
+          action_id: action.id,
+          suggestion_type: isSlaWarning ? "sla_warning" : "upcoming",
+          title: isSlaWarning ? `⚠️ SLA próximo a vencer: ${action.title}` : `Recordatorio: ${action.title}`,
+          message: isSlaWarning 
+            ? `Quedan ${hoursUntil}h para el SLA. ${action.action_type === 'call' ? 'Llama ahora' : 'Completa esta acción pronto'}.`
+            : `Due en ${hoursUntil <= 24 ? `${hoursUntil} horas` : `${Math.floor(hoursUntil / 24)} días`}.`,
+          priority: isSlaWarning ? "high" : hoursUntil <= 24 ? "medium" : "low",
+          hours_until_due: hoursUntil,
+          pipeline_stage: action.pipeline_stage,
+        });
       }
     }
 

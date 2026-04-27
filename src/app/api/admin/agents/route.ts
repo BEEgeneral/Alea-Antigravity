@@ -1,20 +1,10 @@
-import { createAuthenticatedClient } from "@/lib/insforge-server";
+import pool from "@/lib/vps-pg";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
     try {
-        const client = await createAuthenticatedClient(request);
-
-        const { data: agents, error } = await client.database
-            .from("agents")
-            .select("*")
-            .order("full_name");
-
-        if (error) {
-            return NextResponse.json({ error: error.message, details: error }, { status: 500 });
-        }
-
-        return NextResponse.json({ agents: agents || [] });
+        const result = await pool.query('SELECT * FROM agents ORDER BY full_name');
+        return NextResponse.json({ agents: result.rows || [] });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -22,7 +12,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
-        const client = await createAuthenticatedClient(request);
         const body = await request.json();
         const { full_name, email, role } = body;
 
@@ -31,34 +20,19 @@ export async function POST(request: NextRequest) {
         }
 
         // Check if agent already exists
-        const { data: existing } = await client.database
-            .from("agents")
-            .select("id")
-            .eq("email", email)
-            .single();
-
-        if (existing) {
+        const existing = await pool.query('SELECT id FROM agents WHERE email = $1', [email]);
+        if (existing.rows.length > 0) {
             return NextResponse.json({ error: 'Ya existe un agente con este email' }, { status: 409 });
         }
 
-        const { data: agent, error } = await client.database
-            .from("agents")
-            .insert({
-                full_name,
-                email,
-                role: role || 'agent',
-                is_approved: false,
-                has_centurion_access: false,
-                created_at: new Date().toISOString(),
-            })
-            .select()
-            .single();
+        const result = await pool.query(
+            `INSERT INTO agents (full_name, email, role, is_approved, has_centurion_access, created_at) 
+             VALUES ($1, $2, $3, false, false, NOW()) 
+             RETURNING *`,
+            [full_name, email, role || 'agent']
+        );
 
-        if (error) {
-            return NextResponse.json({ error: error.message }, { status: 500 });
-        }
-
-        return NextResponse.json({ agent }, { status: 201 });
+        return NextResponse.json({ agent: result.rows[0] }, { status: 201 });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }

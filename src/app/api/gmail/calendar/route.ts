@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createAuthenticatedClient } from '@/lib/insforge-server';
+import pool from "@/lib/vps-pg";
+import { NextRequest, NextResponse } from "next/server";
 
 const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID || '';
-const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET || '';
+const GMAIL_CLIENT_SECRET=process.env.GMAIL_CLIENT_SECRET || '';
 
 async function getFreshAccessToken(refreshToken: string): Promise<string | null> {
   try {
@@ -22,26 +22,19 @@ async function getFreshAccessToken(refreshToken: string): Promise<string | null>
     const data = await response.json();
     return data.access_token || null;
   } catch (error) {
-    
     return null;
   }
 }
 
 export async function GET(request: NextRequest) {
-  const client = await createAuthenticatedClient();
-  const { data: { user } } = await client.auth.getCurrentUser();
-  
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const userId = request.headers.get('x-user-id') || 'system';
 
   try {
-    const { data: tokens } = await client
-      .database
-      .from('gmail_tokens')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
+    const tokensResult = await pool.query(
+      'SELECT * FROM gmail_tokens WHERE user_id = $1',
+      [userId]
+    );
+    const tokens = tokensResult.rows[0];
 
     if (!tokens || !tokens.refresh_token) {
       return NextResponse.json({ error: 'Gmail not connected', connected: false }, { status: 200 });
@@ -97,26 +90,19 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error: any) {
-    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
-  const client = await createAuthenticatedClient();
-  const { data: { user } } = await client.auth.getCurrentUser();
-  
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const userId = request.headers.get('x-user-id') || 'system';
 
   try {
-    const { data: tokens } = await client
-      .database
-      .from('gmail_tokens')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
+    const tokensResult = await pool.query(
+      'SELECT * FROM gmail_tokens WHERE user_id = $1',
+      [userId]
+    );
+    const tokens = tokensResult.rows[0];
 
     if (!tokens || !tokens.refresh_token) {
       return NextResponse.json({ error: 'Gmail not connected' }, { status: 400 });
@@ -190,7 +176,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

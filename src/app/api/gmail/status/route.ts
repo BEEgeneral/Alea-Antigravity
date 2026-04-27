@@ -1,21 +1,15 @@
-import { NextResponse } from 'next/server';
-import { createAuthenticatedClient } from '@/lib/insforge-server';
+import pool from "@/lib/vps-pg";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET() {
-  const client = await createAuthenticatedClient();
-  const { data: { user } } = await client.auth.getCurrentUser();
-  
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export async function GET(request: NextRequest) {
+  const userId = request.headers.get('x-user-id') || 'system';
 
   try {
-    const { data: tokens } = await client
-      .database
-      .from('gmail_tokens')
-      .select('id, expires_at, updated_at')
-      .eq('user_id', user.id)
-      .single();
+    const result = await pool.query(
+      'SELECT id, expires_at, updated_at FROM gmail_tokens WHERE user_id = $1',
+      [userId]
+    );
+    const tokens = result.rows[0];
 
     return NextResponse.json({ 
       connected: !!tokens,
@@ -23,30 +17,17 @@ export async function GET() {
     });
 
   } catch (error: any) {
-    
     return NextResponse.json({ connected: false, error: error.message }, { status: 500 });
   }
 }
 
-export async function DELETE() {
-  const client = await createAuthenticatedClient();
-  const { data: { user } } = await client.auth.getCurrentUser();
-  
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export async function DELETE(request: NextRequest) {
+  const userId = request.headers.get('x-user-id') || 'system';
 
   try {
-    await client
-      .database
-      .from('gmail_tokens')
-      .delete()
-      .eq('user_id', user.id);
-
+    await pool.query('DELETE FROM gmail_tokens WHERE user_id = $1', [userId]);
     return NextResponse.json({ success: true });
-
   } catch (error: any) {
-    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

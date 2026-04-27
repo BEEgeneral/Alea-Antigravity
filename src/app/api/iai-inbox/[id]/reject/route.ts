@@ -1,44 +1,29 @@
+import pool from "@/lib/vps-pg";
 import { NextResponse } from 'next/server';
-import { createAuthenticatedClient } from '@/lib/insforge';
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    let token = req.headers.get('authorization')?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    }
-
-    const client = createAuthenticatedClient(token);
-    const { data: authData, error: authError } = await client.auth.getCurrentUser();
-
-    if (authError || !authData?.user) {
-      return NextResponse.json({ error: 'Token inválido' }, { status: 401 });
-    }
-
     const { id } = await params;
+    const userId = req.headers.get('x-user-id') || 'system';
 
-    const { data: updated, error } = await client
-      .database.from('iai_inbox_suggestions')
-      .update({
-        status: 'rejected',
-        rejected_by: authData.user.id,
-        rejected_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select()
-      .single();
+    const result = await pool.query(
+      `UPDATE iai_inbox_suggestions 
+       SET status = 'rejected', rejected_by = $1, rejected_at = NOW() 
+       WHERE id = $2 
+       RETURNING *`,
+      [userId, id]
+    );
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (result.rows.length === 0) {
+      return NextResponse.json({ error: 'Sugerencia no encontrada' }, { status: 404 });
     }
 
     return NextResponse.json({
       success: true,
-      suggestion: updated,
+      suggestion: result.rows[0],
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

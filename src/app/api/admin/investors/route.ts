@@ -1,20 +1,10 @@
-import { createAuthenticatedClient } from "@/lib/insforge-server";
+import pool from "@/lib/vps-pg";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
     try {
-        const client = await createAuthenticatedClient(request);
-
-        const { data: investors, error } = await client.database
-            .from("investors")
-            .select("*")
-            .order("full_name");
-
-        if (error) {
-            return NextResponse.json({ error: error.message, details: error }, { status: 500 });
-        }
-
-        return NextResponse.json({ investors: investors || [] });
+        const result = await pool.query('SELECT * FROM investors ORDER BY full_name');
+        return NextResponse.json({ investors: result.rows || [] });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }

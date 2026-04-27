@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { insforge } from '@/lib/insforge';
+import pool from '@/lib/vps-pg';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,28 +15,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const { data: adminProfile } = await insforge
-      .database
-      .from('user_profiles')
-      .select('*')
-      .eq('id', currentUser.user.id)
-      .single();
+    const profileResult = await pool.query(
+      'SELECT * FROM user_profiles WHERE id = $1',
+      [currentUser.user.id]
+    );
+    const adminProfile = profileResult.rows[0];
       
     if (!adminProfile || adminProfile.role !== 'admin') {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    const { data: profiles, error } = await insforge
-      .database
-      .from('user_profiles')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const result = await pool.query(
+      'SELECT * FROM user_profiles ORDER BY created_at DESC'
+    );
 
-    if (error) {
-      return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
-    }
-
-    return NextResponse.json({ users: profiles || [] });
+    return NextResponse.json({ users: result.rows || [] });
   } catch (error: any) {
     
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

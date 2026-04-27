@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X, TrendingUp, Loader2, Download, BarChart3, PieChart,
-  DollarSign, Percent, Calculator, Building2, ShieldAlert,
+  X, TrendingUp, Loader2, Download, BarChart3,
+  Calculator, ShieldAlert,
   ArrowUpRight, ArrowDownRight, Minus, FileText, RefreshCw,
-  ChevronDown, ExternalLink, Info
+  TrendingUpIcon, Target, Percent
 } from 'lucide-react';
 
 interface Property {
@@ -44,6 +44,20 @@ interface KeyMetric {
   color?: string;
 }
 
+// Extended metrics from real backend calculation
+interface ExtendedMetrics {
+  irr?: number;
+  roi?: number;
+  netProfit?: number;
+  paybackYears?: number;
+  confidence?: number;
+  recommendation?: 'BUY' | 'HOLD' | 'SELL';
+  grossYield?: number;
+  netYield?: number;
+  capRate?: number;
+  cashOnCash?: number;
+}
+
 export default function FinancialReportModal({ property, onClose }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('summary');
   const [loading, setLoading] = useState(false);
@@ -52,6 +66,8 @@ export default function FinancialReportModal({ property, onClose }: Props) {
   const [reportId, setReportId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [investorProfile, setInvestorProfile] = useState<'family_office' | 'hnw' | 'regional'>('family_office');
+  const [metrics, setMetrics] = useState<ExtendedMetrics>({});
+  const [reportData, setReportData] = useState<any>(null);
 
   // Computed financial metrics
   const price = property.price || 0;
@@ -83,11 +99,13 @@ export default function FinancialReportModal({ property, onClose }: Props) {
   const annualCashFlow = annualNOI - annualDebtService;
   const cashOnCash = equity > 0 ? (annualCashFlow / equity) * 100 : 0;
 
-  const recommendation = netYield >= 6 ? 'BUY' : netYield >= 4 ? 'HOLD' : 'SELL';
+  const recommendation = metrics.recommendation || (netYield >= 6 ? 'BUY' : netYield >= 4 ? 'HOLD' : 'SELL');
   const recColor = { BUY: 'text-emerald-400', HOLD: 'text-amber-400', SELL: 'text-red-400' }[recommendation];
   const recBg = { BUY: 'bg-emerald-500/10', HOLD: 'bg-amber-500/10', SELL: 'bg-red-500/10' }[recommendation];
   const recBorder = { BUY: 'border-emerald-500/30', HOLD: 'border-amber-500/30', SELL: 'border-red-500/30' }[recommendation];
   const recIcon = { BUY: <ArrowUpRight size={20} />, HOLD: <Minus size={20} />, SELL: <ArrowDownRight size={20} /> }[recommendation];
+  const recLabel = { BUY: '✅ RECOMENDADO PARA COMPRA', HOLD: '⚠️ MANTENER BAJO OBSERVACIÓN', SELL: '🔴 CONSIDERAR DESINVERSIÓN' }[recommendation];
+  const recSource = metrics.irr ? `· IRR real: ${metrics.irr.toFixed(1)}% · ROI: ${metrics.roi?.toFixed(0)}%` : '';
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'summary', label: 'Resumen', icon: <ShieldAlert size={14} /> },
@@ -95,6 +113,35 @@ export default function FinancialReportModal({ property, onClose }: Props) {
     { id: 'market', label: 'Mercado', icon: <BarChart3 size={14} /> },
     { id: 'report', label: 'Informe .md', icon: <FileText size={14} /> },
   ];
+
+  // Parse IRR/ROI from generated markdown report
+  const parseMetricsFromMarkdown = (markdown: string): ExtendedMetrics => {
+    const parseNum = (label: string): number | undefined => {
+      const match = markdown.match(new RegExp(`\\*\\*${label}\\*\\*\\s*\\|\\s*([\\d.,-]+)`));
+      if (match) return parseFloat(match[1].replace(/\./g, '').replace(',', '.'));
+      return undefined;
+    };
+    const irrMatch = markdown.match(/\*\*IRR\*\*[^\n]*\|\s*([\d.,]+)/);
+    const roiMatch = markdown.match(/\*\*ROI Total[^\n]*\|\s*([\d.,]+)/);
+    const npMatch = markdown.match(/\*\*Beneficio Neto[^\n]*\|\s*([\d.,-]+)/);
+    const pbMatch = markdown.match(/\*\*Payback[^\n]*\|\s*([\d.,-]+)/);
+    const confMatch = markdown.match(/\*\*Confidence[^\n]*\|\s*([\d.,]+)/);
+    const recMatch = markdown.match(/RECOMENDADO PARA COMPRA|CONSIDERAR DESINVERSIÓN|MANTENER BAJO OBSERVACIÓN/);
+    let recommendation: 'BUY' | 'HOLD' | 'SELL' = 'HOLD';
+    if (recMatch) {
+      if (recMatch[0].includes('COMPRA')) recommendation = 'BUY';
+      else if (recMatch[0].includes('DESINVERSIÓN')) recommendation = 'SELL';
+      else recommendation = 'HOLD';
+    }
+    return {
+      irr: irrMatch ? parseFloat(irrMatch[1].replace(',', '.')) : undefined,
+      roi: roiMatch ? parseFloat(roiMatch[1].replace(',', '.')) : undefined,
+      netProfit: npMatch ? parseFloat(npMatch[1].replace(/\./g, '').replace(',', '.')) : undefined,
+      paybackYears: pbMatch && pbMatch[1] !== 'N/A' ? parseFloat(pbMatch[1].replace(',', '.')) : undefined,
+      confidence: confMatch ? parseFloat(confMatch[1].replace(',', '.')) / 100 : undefined,
+      recommendation,
+    };
+  };
 
   const handleGenerateReport = async () => {
     setGenerating(true);
@@ -113,6 +160,10 @@ export default function FinancialReportModal({ property, onClose }: Props) {
       if (!res.ok) throw new Error(data.error || 'Error generando informe');
       setReportMarkdown(data.reportMarkdown);
       setReportId(data.reportId);
+      setReportData(data);
+      // Parse real metrics from markdown
+      const parsed = parseMetricsFromMarkdown(data.reportMarkdown);
+      setMetrics(parsed);
       setActiveTab('report');
     } catch (err: any) {
       setError(err.message);
@@ -144,6 +195,8 @@ export default function FinancialReportModal({ property, onClose }: Props) {
       if (data.report) {
         setReportMarkdown(data.report.report_markdown);
         setReportId(data.report.id);
+        const parsed = parseMetricsFromMarkdown(data.report.report_markdown);
+        setMetrics(parsed);
         setActiveTab('report');
       } else {
         setError('No hay informe guardado para este activo. Genera uno nuevo.');
@@ -160,8 +213,8 @@ export default function FinancialReportModal({ property, onClose }: Props) {
     { label: 'Alquiler mensal', value: monthlyRent > 0 ? `${monthlyRent.toLocaleString('es-ES')} €` : 'N/A', trend: 'neutral' },
     { label: 'Yield Bruta', value: grossYield > 0 ? `${grossYield.toFixed(2)}%` : 'N/A', sub: 'Bruta', trend: grossYield >= 5 ? 'up' : grossYield < 3 ? 'down' : 'neutral' },
     { label: 'Yield Neta', value: netYield > 0 ? `${netYield.toFixed(2)}%` : 'N/A', sub: 'Tras costes', trend: netYield >= 5 ? 'up' : netYield < 3 ? 'down' : 'neutral' },
-    { label: 'Cap Rate', value: capRate > 0 ? `${capRate.toFixed(2)}%` : 'N/A', trend: capRate >= 6 ? 'up' : 'neutral' },
-    { label: 'Cash-on-Cash', value: cashOnCash !== 0 ? `${cashOnCash.toFixed(2)}%` : 'N/A', sub: 'Anual', trend: cashOnCash >= 8 ? 'up' : cashOnCash < 0 ? 'down' : 'neutral' },
+    { label: metrics.irr ? 'IRR' : 'Cap Rate', value: metrics.irr ? `${metrics.irr.toFixed(1)}%` : capRate > 0 ? `${capRate.toFixed(2)}%` : 'N/A', sub: metrics.irr ? 'Real (5 años)' : 'Estimado', trend: metrics.irr && metrics.irr >= 15 ? 'up' : metrics.irr && metrics.irr < 8 ? 'down' : 'neutral', color: metrics.irr && metrics.irr >= 15 ? '#22c55e' : metrics.irr && metrics.irr < 8 ? '#ef4444' : '#c5a059' },
+    { label: metrics.roi ? 'ROI Total' : 'Cash-on-Cash', value: metrics.roi ? `${metrics.roi.toFixed(0)}%` : cashOnCash !== 0 ? `${cashOnCash.toFixed(2)}%` : 'N/A', sub: metrics.roi ? '(5 años)' : 'Anual', trend: metrics.roi && metrics.roi >= 50 ? 'up' : 'neutral', color: metrics.roi && metrics.roi >= 50 ? '#22c55e' : '#c5a059' },
   ];
 
   return (
@@ -212,10 +265,10 @@ export default function FinancialReportModal({ property, onClose }: Props) {
             <span className={recColor}>{recIcon}</span>
             <div>
               <p className={`text-sm font-bold uppercase tracking-widest ${recColor}`}>
-                {recommendation === 'BUY' ? '✅ RECOMENDADO PARA COMPRA' : recommendation === 'HOLD' ? '⚠️ MANTENER BAJO OBSERVACIÓN' : '🔴 CONSIDERAR DESINVERSIÓN'}
+                {recLabel}
               </p>
               <p className="text-xs text-white/40 mt-0.5">
-                Perfil: {investorProfile === 'family_office' ? 'Family Office' : investorProfile === 'hnw' ? 'High Net Worth' : 'Inversor Regional'} · Yield neta: {netYield.toFixed(2)}% · Cash-on-Cash: {cashOnCash.toFixed(2)}%
+                Perfil: {investorProfile === 'family_office' ? 'Family Office' : investorProfile === 'hnw' ? 'High Net Worth' : 'Inversor Regional'} · Yield neta: {netYield.toFixed(2)}% · Cash-on-Cash: {cashOnCash.toFixed(2)}%{recSource}
               </p>
             </div>
           </div>
@@ -437,25 +490,43 @@ export default function FinancialReportModal({ property, onClose }: Props) {
                   <h3 className="text-xs font-bold uppercase tracking-widest text-[#c5a059] mb-4">Métricas de Inversión</h3>
                   <div className="space-y-4">
                     {[
-                      { label: 'Cash-on-Cash Return', value: cashOnCash, suffix: '%', good: (v: number) => v >= 8 },
-                      { label: 'Equity Multiple', value: annualNOI > 0 && equity > 0 ? (annualNOI / equity) * 100 : 0, suffix: '%', good: (v: number) => v >= 10 },
-                      { label: 'Break-even Occupancy', value: annualDebtService > 0 && monthlyRent > 0 ? (annualDebtService / (monthlyRent * 12)) * 100 : 0, suffix: '%', good: (v: number) => v <= 70 },
+                      { label: 'IRR', value: metrics.irr, suffix: '%', good: (v: number) => v >= 15, real: true },
+                      { label: 'ROI Total', value: metrics.roi, suffix: '%', good: (v: number) => v >= 50, real: true },
+                      { label: 'Beneficio Neto', value: metrics.netProfit, suffix: '€', good: (v: number) => v > 0, real: true, isEuro: true },
+                      { label: 'Payback', value: metrics.paybackYears, suffix: ' años', good: (v: number) => v > 0 && v <= 10, real: true },
+                      { label: 'Cash-on-Cash Return', value: cashOnCash, suffix: '%', good: (v: number) => v >= 8, real: false },
                     ].map(metric => {
-                      const isGood = metric.good(metric.value);
+                      if (metric.real && metric.value === undefined) return null;
+                      const isGood = typeof metric.value === 'number' ? metric.good(metric.value) : false;
+                      const displayValue = metric.isEuro && typeof metric.value === 'number'
+                        ? `${metric.value >= 0 ? '+' : ''}${Math.round(metric.value / 1000)}K€`
+                        : typeof metric.value === 'number' ? `${metric.value.toFixed(1)}${metric.suffix}` : '—';
                       return (
                         <div key={metric.label}>
                           <div className="flex justify-between mb-1">
-                            <span className="text-xs text-white/40">{metric.label}</span>
+                            <span className="text-xs text-white/40">{metric.label}{metric.real && ' (real)'}</span>
                             <span className={`text-sm font-serif font-bold ${isGood ? 'text-emerald-400' : 'text-red-400'}`}>
-                              {metric.value.toFixed(1)}{metric.suffix}
+                              {displayValue}
                             </span>
                           </div>
                           <div className="h-1 bg-[#222] rounded-full">
-                            <div className={`h-full rounded-full ${isGood ? 'bg-emerald-500' : 'bg-red-500'}`} style={{ width: `${Math.min(metric.value, 100)}%` }} />
+                            <div className={`h-full rounded-full ${isGood ? 'bg-emerald-500' : 'bg-red-500'}`}
+                              style={{ width: `${Math.min(typeof metric.value === 'number' ? Math.abs(metric.value) : 50, 100)}%`}} />
                           </div>
                         </div>
                       );
                     })}
+                    {metrics.confidence && (
+                      <div className="pt-2 border-t border-[#c5a059]/10">
+                        <div className="flex justify-between mb-1">
+                          <span className="text-xs text-white/40">Confidence</span>
+                          <span className="text-xs text-[#c5a059] font-bold">{(metrics.confidence * 100).toFixed(0)}%</span>
+                        </div>
+                        <div className="h-1 bg-[#222] rounded-full">
+                          <div className="h-full bg-[#c5a059] rounded-full" style={{ width: `${metrics.confidence * 100}%`}} />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

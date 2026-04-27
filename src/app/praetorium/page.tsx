@@ -449,7 +449,8 @@ useEffect(() => {
     }, [activeTab, currentUser]);
     
     const handleLogout = async () => {
-        await insforge.auth.signOut();
+        const { signOut } = await import("next-auth/react");
+        await signOut({ redirect: false });
         window.location.href = "/";
     };
 

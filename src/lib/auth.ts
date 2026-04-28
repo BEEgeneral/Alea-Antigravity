@@ -1,20 +1,12 @@
 import NextAuth from "next-auth"
 import Resend from "next-auth/providers/resend"
-import { Pool } from "pg"
+import { neon } from "@neondatabase/serverless"
 import type { NextAuthConfig } from "next-auth"
 
 // ─────────────────────────────────────────────────────────
-// Neon PostgreSQL connection pool
+// Neon HTTP serverless driver (Edge Runtime compatible)
 // ─────────────────────────────────────────────────────────
-const neonPool = new Pool({
-  host: process.env.NEON_HOST || "ep-plain-fog-al6rviiz-pooler.c-3.eu-central-1.aws.neon.tech",
-  port: parseInt(process.env.NEON_PORT || "5432", 10),
-  user: process.env.NEON_USER || "neondb_owner",
-  password: process.env.NEON_PASSWORD,
-  database: process.env.NEON_DATABASE || "neondb",
-  ssl: { rejectUnauthorized: false },
-  max: 5,
-})
+const sql = neon(process.env.DATABASE_URL!)
 
 // ─────────────────────────────────────────────────────────
 // NextAuth v5 config — Magic Link via Resend (JWT sessions)
@@ -40,10 +32,7 @@ export const authConfig: NextAuthConfig = {
         // Fetch role from Neon users table
         if (user.email) {
           try {
-            const { rows } = await neonPool.query(
-              "SELECT role, is_active, is_approved FROM users WHERE email = $1",
-              [user.email]
-            )
+            const rows = await sql`SELECT role, is_active, is_approved FROM users WHERE email = ${user.email}`
             if (rows[0]) {
               token.role = rows[0].role
               token.is_active = rows[0].is_active
@@ -72,13 +61,34 @@ export const authConfig: NextAuthConfig = {
       return session
     },
     authorized({ auth, request: { nextUrl } }) {
-      const isLoggedIn = !!auth?.user
-      const isOnProtected = !["/login", "/register", "/forgot-password", "/api/auth", "/_next", "/favicon"].some(
-        (p) => nextUrl.pathname.startsWith(p)
-      )
-      if (isOnProtected && !isLoggedIn) {
-        return Response.redirect(new URL("/login", nextUrl))
+      const { pathname } = nextUrl
+
+      // Rutas públicas sin auth
+      const publicRoutes = ["/", "/login", "/register", "/forgot-password", "/api/auth", "/_next", "/favicon", "/aviso-legal", "/cookies", "/cumplimiento", "/privacidad", "/terminos"]
+      if (publicRoutes.some((p) => pathname.startsWith(p))) return true
+
+      // User autenticado — redirigir según rol desde la home
+      if (pathname === "/" && auth?.user) {
+        const role = (auth.user as any)?.role
+        if (role === "investor") return Response.redirect(new URL("/radar", nextUrl))
+        if (role === "agent" || role === "admin") return Response.redirect(new URL("/praetorium", nextUrl))
+        return true
       }
+
+      // /praetorium requiere auth — redirigir a login directamente
+      if (pathname.startsWith("/praetorium")) {
+        if (!auth?.user) return Response.redirect(new URL("/login", nextUrl))
+        const role = (auth.user as any)?.role
+        if (role !== "admin" && role !== "agent") {
+          const email = (auth.user as any)?.email?.toLowerCase()
+          const isGodMode = email === "beenocode@gmail.com" || email === "albertogala@beenocode.com"
+          if (!isGodMode) return Response.redirect(new URL("/login", nextUrl))
+        }
+        return true
+      }
+
+      // Todo lo demás requiere auth — redirect a home
+      if (!auth?.user) return Response.redirect(new URL("/", nextUrl))
       return true
     },
   },

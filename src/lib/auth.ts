@@ -1,26 +1,79 @@
 import NextAuth from "next-auth"
-import Resend from "next-auth/providers/resend"
+import Credentials from "next-auth/providers/credentials"
 import { neon } from "@neondatabase/serverless"
+import bcrypt from "bcryptjs"
 import type { NextAuthConfig } from "next-auth"
 
-// ─────────────────────────────────────────────────────────
-// Neon HTTP serverless driver (Edge Runtime compatible)
-// ─────────────────────────────────────────────────────────
-const sql = neon(process.env.DATABASE_URL!)
+// Edge-compatible Neon driver (lazy — only connects at runtime)
+// Initialized once on first use
+let _sql: ReturnType<typeof neon> | null = null
+function getSql() {
+  if (!_sql) _sql = neon(process.env.DATABASE_URL!)
+  return _sql
+}
 
-// ─────────────────────────────────────────────────────────
-// NextAuth v5 config — Magic Link via Resend (JWT sessions)
-// ─────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────
+// Password hashing helpers
+// ─────────────────────────────────────────────────────────────────
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 12)
+}
+
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return bcrypt.compare(password, hash)
+}
+
+// ─────────────────────────────────────────────────────────────────
+// NextAuth v5 config — Credentials (email + password)
+// ─────────────────────────────────────────────────────────────────
 export const authConfig: NextAuthConfig = {
   providers: [
-    Resend({
-      apiKey: process.env.RESEND_API_KEY,
-      from: "Alea Signature <noreply@aleasignature.com>",
+    Credentials({
+      name: "credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null
+
+        const email = credentials.email as string
+        const password = credentials.password as string
+
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const rows = await (getSql() as any)`SELECT id, email, name, password_hash, role, is_active, is_approved FROM users WHERE email = ${email.toLowerCase()}`
+
+          if (!rows[0]) return null
+
+          const user = rows[0]
+
+          // Fallback: if no password hash, deny login (user must reset)
+          if (!user.password_hash) return null
+
+          const valid = await verifyPassword(password, user.password_hash)
+          if (!valid) return null
+
+          // Check if account is active
+          if (!user.is_active) return null
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role || "agent",
+            is_active: user.is_active ?? true,
+            is_approved: user.is_approved ?? true,
+          }
+        } catch (err) {
+          console.error("Auth error:", err)
+          return null
+        }
+      },
     }),
   ],
   pages: {
     signIn: "/login",
-    verifyRequest: "/login?verified=1",
     error: "/login",
   },
   callbacks: {
@@ -29,45 +82,44 @@ export const authConfig: NextAuthConfig = {
         token.id = user.id as string
         token.email = user.email
         token.name = user.name
-        // Fetch role from Neon users table
-        if (user.email) {
-          try {
-            const rows = await sql`SELECT role, is_active, is_approved FROM users WHERE email = ${user.email}`
-            if (rows[0]) {
-              token.role = rows[0].role
-              token.is_active = rows[0].is_active
-              token.is_approved = rows[0].is_approved
-            } else {
-              token.role = "agent"
-              token.is_active = true
-              token.is_approved = false
-            }
-          } catch {
-            token.role = "agent"
-            token.is_active = true
-            token.is_approved = false
-          }
-        }
+        token.role = (user as any).role || "agent"
+        token.is_active = (user as any).is_active ?? true
+        token.is_approved = (user as any).is_approved ?? true
       }
       return token
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).id = token.id as string
+        ;(session.user as any).id = token.id as string
         ;(session.user as any).role = token.role || "agent"
         ;(session.user as any).is_active = token.is_active ?? true
-        ;(session.user as any).is_approved = token.is_approved ?? false
+        ;(session.user as any).is_approved = token.is_approved ?? true
       }
       return session
     },
     authorized({ auth, request: { nextUrl } }) {
       const { pathname } = nextUrl
 
-      // Rutas públicas sin auth
-      const publicRoutes = ["/", "/login", "/register", "/forgot-password", "/api/auth", "/_next", "/favicon", "/aviso-legal", "/cookies", "/cumplimiento", "/privacidad", "/terminos"]
+      // Public routes (no auth required)
+      const publicRoutes = [
+        "/",
+        "/login",
+        "/register",
+        "/forgot-password",
+        "/reset-password",
+        "/invite",
+        "/api/auth",
+        "/_next",
+        "/favicon",
+        "/aviso-legal",
+        "/cookies",
+        "/cumplimiento",
+        "/privacidad",
+        "/terminos",
+      ]
       if (publicRoutes.some((p) => pathname.startsWith(p))) return true
 
-      // User autenticado — redirigir según rol desde la home
+      // Authenticated user on home — redirect by role
       if (pathname === "/" && auth?.user) {
         const role = (auth.user as any)?.role
         if (role === "investor") return Response.redirect(new URL("/radar", nextUrl))
@@ -75,7 +127,7 @@ export const authConfig: NextAuthConfig = {
         return true
       }
 
-      // /praetorium requiere auth — redirigir a login directamente
+      // /praetorium requires auth — redirect to login
       if (pathname.startsWith("/praetorium")) {
         if (!auth?.user) return Response.redirect(new URL("/login", nextUrl))
         const role = (auth.user as any)?.role
@@ -87,7 +139,7 @@ export const authConfig: NextAuthConfig = {
         return true
       }
 
-      // Todo lo demás requiere auth — redirect a home
+      // All other routes require auth
       if (!auth?.user) return Response.redirect(new URL("/", nextUrl))
       return true
     },

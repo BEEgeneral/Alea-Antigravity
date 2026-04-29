@@ -2,16 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-    Users, Shield, Mail, CheckCircle, XCircle, 
-    UserPlus, Copy, Check, AlertCircle, Loader2, 
-    RefreshCw, Trash2, User, ChevronLeft
+import {
+    Users, Shield, CheckCircle, XCircle,
+    UserPlus, AlertCircle, Loader2,
+    User, ChevronLeft
 } from "lucide-react";
 import Link from "next/link";
 
 interface UserProfile {
     id: string;
-    auth_user_id: string;
     role: string;
     is_active: boolean;
     is_approved: boolean;
@@ -20,30 +19,25 @@ interface UserProfile {
     created_at: string;
 }
 
-interface Invitation {
-    id: string;
+interface InviteForm {
     email: string;
+    name: string;
     role: string;
-    token: string;
-    accepted: boolean;
-    expires_at: string;
-    created_at: string;
 }
 
 export default function UserManagement() {
     const [users, setUsers] = useState<UserProfile[]>([]);
-    const [invitations, setInvitations] = useState<Invitation[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'users' | 'invitations'>('users');
     const [inviteEmail, setInviteEmail] = useState('');
+    const [inviteName, setInviteName] = useState('');
+    const [inviteRole, setInviteRole] = useState('agent');
     const [inviteLoading, setInviteLoading] = useState(false);
     const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
     const [inviteError, setInviteError] = useState<string | null>(null);
-    const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
     useEffect(() => {
         fetchUsers();
-        fetchInvitations();
     }, []);
 
     const fetchUsers = async () => {
@@ -61,27 +55,19 @@ export default function UserManagement() {
     };
 
     const fetchInvitations = async () => {
-        try {
-            const res = await fetch('/api/auth/invite');
-            const data = await res.json();
-            if (data.invitations) {
-                setInvitations(data.invitations);
-            }
-        } catch (e) {
-            console.error('Error fetching invitations:', e);
-        }
+        // No longer needed — invitations are now immediate user creations
     };
 
-    const handleRevoke = async (authUserId: string) => {
+    const handleRevoke = async (id: string) => {
         try {
             const res = await fetch('/api/auth/users/revoke', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: authUserId })
+                body: JSON.stringify({ userId: id })
             });
             if (res.ok) {
-                setUsers(users.map(u => 
-                    u.auth_user_id === authUserId ? { ...u, is_active: false } : u
+                setUsers(users.map(u =>
+                    u.id === id ? { ...u, is_active: false } : u
                 ));
             }
         } catch (e) {
@@ -89,16 +75,16 @@ export default function UserManagement() {
         }
     };
 
-    const handleActivate = async (authUserId: string) => {
+    const handleActivate = async (id: string) => {
         try {
             const res = await fetch('/api/auth/users/activate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: authUserId })
+                body: JSON.stringify({ userId: id })
             });
             if (res.ok) {
-                setUsers(users.map(u => 
-                    u.auth_user_id === authUserId ? { ...u, is_active: true } : u
+                setUsers(users.map(u =>
+                    u.id === id ? { ...u, is_active: true } : u
                 ));
             }
         } catch (e) {
@@ -108,6 +94,7 @@ export default function UserManagement() {
 
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!inviteEmail) return;
         setInviteLoading(true);
         setInviteError(null);
         setInviteSuccess(null);
@@ -116,29 +103,25 @@ export default function UserManagement() {
             const res = await fetch('/api/auth/invite', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: inviteEmail, role: 'agent' })
+                body: JSON.stringify({ email: inviteEmail, name: inviteName, role: inviteRole }),
             });
             const data = await res.json();
 
             if (!res.ok) {
-                setInviteError(data.error || 'Error al crear invitación');
+                setInviteError(data.error || 'Error al crear usuario');
                 return;
             }
 
-            setInviteSuccess(data.invitationUrl);
+            setInviteSuccess(`Usuario creado: ${data.email}. Se han enviado las credenciales a su email.`);
             setInviteEmail('');
-            fetchInvitations();
+            setInviteName('');
+            setInviteRole('agent');
+            fetchUsers();
         } catch (e) {
             setInviteError('Error de conexión');
         } finally {
             setInviteLoading(false);
         }
-    };
-
-    const copyToClipboard = (text: string, token: string) => {
-        navigator.clipboard.writeText(text);
-        setCopiedToken(token);
-        setTimeout(() => setCopiedToken(null), 2000);
     };
 
     const formatDate = (date: string) => {
@@ -182,13 +165,13 @@ export default function UserManagement() {
                     <button
                         onClick={() => setActiveTab('invitations')}
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                            activeTab === 'invitations' 
-                                ? 'bg-foreground text-background' 
+                            activeTab === 'invitations'
+                                ? 'bg-foreground text-background'
                                 : 'bg-muted text-muted-foreground hover:text-foreground'
                         }`}
                     >
-                        <Mail size={16} className="inline mr-2" />
-                        Invitaciones
+                        <UserPlus size={16} className="inline mr-2" />
+                        Crear Agente
                     </button>
                 </div>
             </div>
@@ -246,7 +229,7 @@ export default function UserManagement() {
                                                 <div className="flex items-center space-x-2">
                                                     {user.is_active ? (
                                                         <button
-                                                            onClick={() => handleRevoke(user.auth_user_id)}
+                                                            onClick={() => handleRevoke(user.id)}
                                                             className="p-2 hover:bg-red-500/10 rounded-lg transition-colors text-red-500"
                                                             title="Revocar acceso"
                                                         >
@@ -254,7 +237,7 @@ export default function UserManagement() {
                                                         </button>
                                                     ) : (
                                                         <button
-                                                            onClick={() => handleActivate(user.auth_user_id)}
+                                                            onClick={() => handleActivate(user.id)}
                                                             className="p-2 hover:bg-emerald-500/10 rounded-lg transition-colors text-emerald-500"
                                                             title="Activar acceso"
                                                         >
@@ -284,29 +267,61 @@ export default function UserManagement() {
                         className="space-y-6"
                     >
                         <div className="bg-card/50 backdrop-blur-xl border border-border/50 rounded-3xl p-6">
-                            <h3 className="font-medium mb-4">Invitar Nuevo Agente</h3>
-                            <form onSubmit={handleInvite} className="flex gap-4">
-                                <div className="flex-1">
-                                    <input
-                                        type="email"
-                                        value={inviteEmail}
-                                        onChange={(e) => setInviteEmail(e.target.value)}
-                                        placeholder="email@ejemplo.com"
-                                        className="w-full bg-muted/30 border border-border rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-primary/50"
-                                        required
-                                    />
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <h3 className="font-medium">Crear Nuevo Agente</h3>
+                                    <p className="text-sm text-muted-foreground mt-0.5">Se enviarán las credenciales de acceso al email indicado.</p>
                                 </div>
-                                <button
-                                    type="submit"
-                                    disabled={inviteLoading}
-                                    className="bg-foreground text-background px-6 py-3 rounded-xl font-medium flex items-center space-x-2 hover:-translate-y-0.5 transition-transform disabled:opacity-50"
-                                >
-                                    {inviteLoading ? (
-                                        <Loader2 size={18} className="animate-spin" />
-                                    ) : (
-                                        <><UserPlus size={18} /><span>Invitar</span></>
-                                    )}
-                                </button>
+                            </div>
+                            <form onSubmit={handleInvite} className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-white/40 block mb-1.5">Nombre Completo</label>
+                                        <input
+                                            type="text"
+                                            value={inviteName}
+                                            onChange={(e) => setInviteName(e.target.value)}
+                                            placeholder="Ej: María García"
+                                            className="w-full bg-muted/30 border border-border rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-primary/50"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-white/40 block mb-1.5">Email *</label>
+                                        <input
+                                            type="email"
+                                            value={inviteEmail}
+                                            onChange={(e) => setInviteEmail(e.target.value)}
+                                            placeholder="email@ejemplo.com"
+                                            className="w-full bg-muted/30 border border-border rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-primary/50"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-widest font-black text-white/40 block mb-1.5">Rol</label>
+                                        <select
+                                            value={inviteRole}
+                                            onChange={(e) => setInviteRole(e.target.value)}
+                                            className="w-full bg-muted/30 border border-border rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-primary/50 appearance-none"
+                                        >
+                                            <option value="agent">Agente</option>
+                                            <option value="collaborator">Colaborador</option>
+                                            <option value="admin">Administrador</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="flex justify-end">
+                                    <button
+                                        type="submit"
+                                        disabled={inviteLoading}
+                                        className="bg-foreground text-background px-6 py-3 rounded-xl font-medium flex items-center space-x-2 hover:-translate-y-0.5 transition-transform disabled:opacity-50"
+                                    >
+                                        {inviteLoading ? (
+                                            <Loader2 size={18} className="animate-spin" />
+                                        ) : (
+                                            <><UserPlus size={18} /><span>Crear y Enviar Credenciales</span></>
+                                        )}
+                                    </button>
+                                </div>
                             </form>
                             {inviteError && (
                                 <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm flex items-center">
@@ -315,95 +330,12 @@ export default function UserManagement() {
                                 </div>
                             )}
                             {inviteSuccess && (
-                                <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center text-emerald-500 text-sm">
-                                            <CheckCircle size={16} className="mr-2 shrink-0" />
-                                            Invitación creada
-                                        </div>
-                                        <button
-                                            onClick={() => copyToClipboard(inviteSuccess, 'new')}
-                                            className="text-xs text-muted-foreground hover:text-foreground flex items-center"
-                                        >
-                                            {copiedToken === 'new' ? (
-                                                <><Check size={14} className="mr-1" /> Copiado</>
-                                            ) : (
-                                                <><Copy size={14} className="mr-1" /> Copiar link</>
-                                            )}
-                                        </button>
-                                    </div>
-                                    <div className="mt-2 p-2 bg-muted/50 rounded-lg font-mono text-xs break-all">
-                                        {inviteSuccess}
-                                    </div>
+                                <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-500 text-sm flex items-center">
+                                    <CheckCircle size={16} className="mr-2 shrink-0" />
+                                    {inviteSuccess}
                                 </div>
                             )}
                         </div>
-
-                        <div className="bg-card/50 backdrop-blur-xl border border-border/50 rounded-3xl overflow-hidden">
-                            <div className="p-6 border-b border-border/50">
-                                <h3 className="font-medium">Invitaciones Pendientes ({invitations.filter(i => !i.accepted).length})</h3>
-                            </div>
-                            <div className="divide-y divide-border/50">
-                                {invitations.filter(i => !i.accepted).map((invite) => (
-                                    <div key={invite.id} className="p-6 flex items-center justify-between">
-                                        <div className="flex items-center space-x-4">
-                                            <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                                                <Mail size={18} className="text-blue-500" />
-                                            </div>
-                                            <div>
-                                                <span className="font-medium">{invite.email}</span>
-                                                <div className="text-sm text-muted-foreground">
-                                                    Enviada {formatDate(invite.created_at)} · Expira {formatDate(invite.expires_at)}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() => copyToClipboard(
-                                                `${window.location.origin}/invite?token=${invite.token}`,
-                                                invite.token
-                                            )}
-                                            className="px-4 py-2 bg-muted hover:bg-muted/80 rounded-lg text-sm flex items-center space-x-2 transition-colors"
-                                        >
-                                            {copiedToken === invite.token ? (
-                                                <><Check size={16} className="text-emerald-500" /> Copiado</>
-                                            ) : (
-                                                <><Copy size={16} /> Copiar Link</>
-                                            )}
-                                        </button>
-                                    </div>
-                                ))}
-                                {invitations.filter(i => !i.accepted).length === 0 && (
-                                    <div className="p-12 text-center text-muted-foreground">
-                                        No hay invitaciones pendientes
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {invitations.filter(i => i.accepted).length > 0 && (
-                            <div className="bg-card/50 backdrop-blur-xl border border-border/50 rounded-3xl overflow-hidden">
-                                <div className="p-6 border-b border-border/50">
-                                    <h3 className="font-medium text-muted-foreground">Invitaciones Aceptadas ({invitations.filter(i => i.accepted).length})</h3>
-                                </div>
-                                <div className="divide-y divide-border/50">
-                                    {invitations.filter(i => i.accepted).map((invite) => (
-                                        <div key={invite.id} className="p-6 flex items-center justify-between opacity-60">
-                                            <div className="flex items-center space-x-4">
-                                                <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                                                    <CheckCircle size={18} className="text-emerald-500" />
-                                                </div>
-                                                <div>
-                                                    <span className="font-medium">{invite.email}</span>
-                                                    <div className="text-sm text-muted-foreground">
-                                                        Aceptada {formatDate(invite.created_at)}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
                     </motion.div>
                 )}
             </AnimatePresence>

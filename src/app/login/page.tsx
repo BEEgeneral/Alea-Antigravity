@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Mail, ArrowRight, AlertCircle, ChevronLeft, CheckCircle2, Loader2 } from "lucide-react";
+import { Shield, Mail, Lock, ArrowRight, AlertCircle, ChevronLeft, CheckCircle2, Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -13,18 +13,17 @@ function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { data: session } = useSession();
-    const verifiedParam = searchParams.get("verified");
     const errorParam = searchParams.get("error");
-    const prefillEmail = searchParams.get("email") || "";
+    const verifiedParam = searchParams.get("verified");
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [email, setEmail] = useState(prefillEmail);
-    const [magicLinkSent, setMagicLinkSent] = useState(false);
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         if (session?.user) {
-            // Already logged in, redirect based on role
             const role = (session.user as any).role;
             if (role === "admin" || role === "agent") {
                 router.push("/praetorium");
@@ -35,8 +34,12 @@ function LoginForm() {
     }, [session, router]);
 
     useEffect(() => {
-        if (errorParam === 'access-revoked') {
-            setError("Tu acceso ha sido revocado. Contacta con el administrador.");
+        if (errorParam === "access-denied") {
+            setError("No tienes permisos para acceder. Contacta con el administrador.");
+        } else if (errorParam === "CredentialsSignin") {
+            setError("Email o contraseña incorrectos.");
+        } else if (errorParam) {
+            setError("Error de autenticación. Inténtalo de nuevo.");
         }
     }, [errorParam]);
 
@@ -46,18 +49,20 @@ function LoginForm() {
         setError(null);
 
         try {
-            const result = await signIn("resend", {
-                email,
+            const result = await signIn("credentials", {
+                email: email.toLowerCase().trim(),
+                password,
                 redirect: false,
             });
 
             if (result?.error) {
-                setError("No se pudo enviar el enlace mágico. Verifica tu email.");
+                setError("Email o contraseña incorrectos.");
                 setLoading(false);
                 return;
             }
 
-            setMagicLinkSent(true);
+            // Redirect will happen via useEffect
+            router.push("/praetorium");
         } catch (err: any) {
             console.error("Login Error:", err);
             setError("Error de conexión. Inténtalo de nuevo.");
@@ -65,81 +70,6 @@ function LoginForm() {
             setLoading(false);
         }
     };
-
-    if (magicLinkSent) {
-        return (
-            <main className="min-h-screen bg-background text-foreground selection:bg-primary/30 font-sans flex items-center justify-center relative overflow-hidden px-6">
-                <div className="absolute inset-0 z-0">
-                    <div className="absolute inset-0 bg-gradient-to-b from-background via-background/90 to-background z-10" />
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] opacity-40" />
-                </div>
-
-                <Link
-                    href="/"
-                    className="fixed top-8 left-8 z-50 flex items-center space-x-2 text-xs font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors group"
-                >
-                    <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-                    <span>Volver al Inicio</span>
-                </Link>
-
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8, ease: "easeOut" }}
-                    className="w-full max-w-md relative z-10"
-                >
-                    <div className="text-center mb-12">
-                        <div className="flex flex-col items-center space-y-4">
-                            <Image
-                                src="/alea-monogram-white.png"
-                                alt="Aleasignature Logo"
-                                width={64}
-                                height={64}
-                                className="h-16 w-auto opacity-90 transition-opacity hover:opacity-100 hidden dark:block"
-                            />
-                            <Image
-                                src="/alea-monogram-black.png"
-                                alt="Aleasignature Logo"
-                                width={64}
-                                height={64}
-                                className="h-16 w-auto opacity-90 transition-opacity hover:opacity-100 dark:hidden"
-                            />
-                            <h1 className="font-serif text-3xl tracking-widest font-medium">Aleasignature.</h1>
-                        </div>
-                    </div>
-
-                    <div className="bg-card/50 backdrop-blur-xl border border-border/50 rounded-[2.5rem] p-8 md:p-10 shadow-3xl relative overflow-hidden">
-                        <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                            className="w-16 h-16 mx-auto mb-6 rounded-full bg-emerald-500/20 flex items-center justify-center"
-                        >
-                            <CheckCircle2 size={32} className="text-emerald-500" />
-                        </motion.div>
-
-                        <h2 className="text-2xl font-serif mb-4 text-center">Revisa tu correo</h2>
-                        <p className="text-center text-muted-foreground text-sm mb-8 leading-relaxed">
-                            Hemos enviado un enlace de acceso a <strong>{email}</strong>.<br />
-                            Haz clic en el enlace para iniciar sesión.
-                        </p>
-
-                        <button
-                            onClick={() => setMagicLinkSent(false)}
-                            className="w-full text-center text-sm text-primary hover:underline"
-                        >
-                            Usar otro correo
-                        </button>
-                    </div>
-
-                    <div className="mt-12 flex items-center justify-center space-x-3 text-muted-foreground/40">
-                        <Shield size={14} />
-                        <span className="text-[10px] uppercase tracking-widest font-black">Secure Encryption — SSL 256-bit</span>
-                    </div>
-                </motion.div>
-            </main>
-        );
-    }
 
     return (
         <main className="min-h-screen bg-background text-foreground selection:bg-primary/30 font-sans flex items-center justify-center relative overflow-hidden px-6">
@@ -197,12 +127,23 @@ function LoginForm() {
                         {error && (
                             <motion.div
                                 initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
+                                animate={{ opacity: 1, height: "auto" }}
                                 exit={{ opacity: 0, height: 0 }}
                                 className="mb-6 p-4 bg-red-500/5 border border-red-500/20 rounded-2xl flex items-center space-x-3 text-red-500 text-xs font-medium"
                             >
                                 <AlertCircle size={16} className="shrink-0" />
                                 <span>{error}</span>
+                            </motion.div>
+                        )}
+                        {verifiedParam === "1" && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="mb-6 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl flex items-center space-x-3 text-emerald-500 text-xs font-medium"
+                            >
+                                <CheckCircle2 size={16} className="shrink-0" />
+                                <span>Contraseña actualizada correctamente. Ya puedes iniciar sesión.</span>
                             </motion.div>
                         )}
                     </AnimatePresence>
@@ -223,8 +164,49 @@ function LoginForm() {
                                     placeholder="tu@email.com"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
+                                    autoComplete="email"
                                 />
                             </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] uppercase tracking-widest text-muted-foreground ml-4 font-bold">
+                                Contraseña
+                            </label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-5 flex items-center text-muted-foreground">
+                                    <Lock size={18} />
+                                </div>
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    required
+                                    className="w-full bg-muted/30 border border-border rounded-2xl py-4 pl-14 pr-12 text-sm focus:outline-none focus:border-primary/50 focus:bg-muted/50 transition-all font-medium"
+                                    placeholder="Tu contraseña"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    autoComplete="current-password"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute inset-y-0 right-5 flex items-center text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                    {showPassword ? (
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                    ) : (
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end">
+                            <Link
+                                href="/forgot-password"
+                                className="text-xs text-primary hover:underline"
+                            >
+                                ¿Olvidaste tu contraseña?
+                            </Link>
                         </div>
 
                         <button
@@ -237,19 +219,13 @@ function LoginForm() {
                             ) : (
                                 <>
                                     <span className="uppercase tracking-widest text-xs">
-                                        Enviar Enlace de Acceso
+                                        Iniciar Sesión
                                     </span>
                                     <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                                 </>
                             )}
                         </button>
                     </form>
-
-                    <div className="mt-8 pt-8 border-t border-border/50 text-center">
-                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60 leading-relaxed max-w-[200px] mx-auto font-medium">
-                            ¿No tienes cuenta? Contacta con un administrador.
-                        </p>
-                    </div>
                 </div>
 
                 <div className="mt-12 flex items-center justify-center space-x-3 text-muted-foreground/40">

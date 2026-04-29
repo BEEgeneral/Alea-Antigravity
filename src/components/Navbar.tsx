@@ -110,7 +110,7 @@ export default function Navbar() {
                         ) : (!user?.id || !userRole) ? (
                             <>
                                 <Link
-                                    href="/praetorium"
+                                    href="/login"
                                     className="group relative text-[9px] font-black tracking-[0.2em] uppercase bg-primary text-white border border-primary px-6 py-2.5 rounded-full overflow-hidden transition-all duration-500 hover:opacity-90 hover:shadow-lg hover:shadow-primary/20"
                                 >
                                     <span className="relative z-10 flex items-center">
@@ -187,7 +187,7 @@ export default function Navbar() {
                                     </div>
                                 ) : (!user?.id || !userRole) ? (
                                     <>
-                                        <Link href="/praetorium" className="w-full text-center py-4 rounded-xl bg-primary/10 text-primary border border-primary/20 uppercase text-[10px] font-bold tracking-widest">Portal Agentes</Link>
+                                        <Link href="/login" className="w-full text-center py-4 rounded-xl bg-primary/10 text-primary border border-primary/20 uppercase text-[10px] font-bold tracking-widest">Portal Agentes</Link>
                                     </>
                                 ) : (
                                     <>

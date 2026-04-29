@@ -15,6 +15,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { insforge } from "@/lib/insforge-client";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
     Agent,
     Investor,
@@ -103,6 +104,15 @@ const MOCK_TEMPLATES = [
 export default function AdminDashboard() {
     const router = useRouter();
     const { fetchAll } = useAdminData();
+    const { data: session } = useSession();
+
+    // Redirect if not authorized
+    useEffect(() => {
+        const role = (session?.user as any)?.role;
+        if (session && role !== "admin" && role !== "agent") {
+            router.replace("/");
+        }
+    }, [session, router]);
     const {
         leads, setLeads,
         investors, setInvestors,

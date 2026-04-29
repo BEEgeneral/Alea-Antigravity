@@ -5,10 +5,17 @@ import bcrypt from "bcryptjs"
 import type { NextAuthConfig } from "next-auth"
 
 // Edge-compatible Neon driver (lazy — only connects at runtime)
-// Initialized once on first use
+// Uses NEON_* vars that are already configured in Vercel
 let _sql: ReturnType<typeof neon> | null = null
 function getSql() {
-  if (!_sql) _sql = neon(process.env.DATABASE_URL!)
+  if (!_sql) {
+    const host = process.env.NEON_HOST!
+    const port = process.env.NEON_PORT!
+    const user = process.env.NEON_USER!
+    const password = process.env.NEON_PASSWORD!
+    const database = process.env.NEON_DATABASE!
+    _sql = neon(`postgresql://${user}:${password}@${host}:${port}/${database}?sslmode=require`)
+  }
   return _sql
 }
 

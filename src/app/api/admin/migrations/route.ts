@@ -1,31 +1,33 @@
 import { NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 
-export async function GET() {
-  const DATABASE_URL = process.env.DATABASE_URL;
-  if (!DATABASE_URL) {
-    return NextResponse.json(
-      { error: "DATABASE_URL not set" },
-      { status: 500 }
-    );
+function getDatabaseUrl(): string {
+  const host = process.env.NEON_HOST;
+  const port = process.env.NEON_PORT;
+  const user = process.env.NEON_USER;
+  const password = process.env.NEON_PASSWORD;
+  const database = process.env.NEON_DATABASE;
+  if (!host || !user || !password || !database) {
+    throw new Error("Missing NEON_* environment variables");
   }
+  return `postgresql://${user}:${password}@${host}:${port}/${database}?sslmode=require`;
+}
 
+export async function GET() {
   try {
+    const DATABASE_URL = getDatabaseUrl();
     const sql = neon(DATABASE_URL);
 
-    // 1. Add password_hash column if not exists
     await sql`
       ALTER TABLE users
       ADD COLUMN IF NOT EXISTS password_hash TEXT
     `;
 
-    // 2. Add name column if not exists
     await sql`
       ALTER TABLE users
       ADD COLUMN IF NOT EXISTS name TEXT
     `;
 
-    // 3. Create password_reset_tokens table
     await sql`
       CREATE TABLE IF NOT EXISTS password_reset_tokens (
         token TEXT PRIMARY KEY,
@@ -37,7 +39,7 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      message: "Migrations applied: password_hash, name columns added to users; password_reset_tokens table created"
+      message: "Migrations applied"
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

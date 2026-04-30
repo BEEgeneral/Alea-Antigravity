@@ -400,3 +400,6 @@ export function getAleaAIClient(options?: AleaAIOptions): AleaAIClient {
 export function isAleaAIConfigured(): boolean {
   return !!process.env.MINIMAX_API_KEY;
 }
+
+/** @deprecated alias — use isAleaAIConfigured */
+export const isMiniMaxConfigured = isAleaAIConfigured;

@@ -1,11 +1,11 @@
 import { Pool } from 'pg';
 
 const pool = new Pool({
-  host: process.env.NEON_HOST || 'ep-plain-fog-al6rviiz-pooler.c-3.eu-central-1.aws.neon.tech',
+  host: process.env.NEON_HOST,
   port: parseInt(process.env.NEON_PORT || '5432', 10),
-  user: process.env.NEON_USER || 'neondb_owner',
+  user: process.env.NEON_USER,
   password: process.env.NEON_PASSWORD,
-  database: process.env.NEON_DATABASE || 'neondb',
+  database: process.env.NEON_DATABASE,
   ssl: { rejectUnauthorized: false },
 });
 

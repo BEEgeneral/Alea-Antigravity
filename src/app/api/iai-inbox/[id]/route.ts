@@ -1,6 +1,6 @@
 import pool from "@/lib/vps-pg";
 import { NextResponse } from "next/server";
-import { createAuthenticatedClient } from "@/lib/insforge";
+import { createAuthenticatedClient, createClientWithToken } from "@/lib/insforge-server";
 
 export async function POST(
   req: Request,
@@ -13,7 +13,7 @@ export async function POST(
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
 
-    const client = createAuthenticatedClient(token);
+    const client = createClientWithToken(token);
     const { data: authData, error: authError } = await client.auth.getCurrentUser();
 
     if (authError || !authData?.user) {

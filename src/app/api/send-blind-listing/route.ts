@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { env } from '@/lib/env';
-import { insforgeAdmin } from '@/lib/insforge-admin';
+import { insforgeAdmin } from '@/lib/insforge-server';
 
 const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 

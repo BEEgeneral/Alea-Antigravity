@@ -1,12 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless'
+import { neon } from '@neondatabase/serverless';
+import { auth } from '@/lib/auth';
 
 function getSql() {
   return neon(process.env.DATABASE_URL!)
 }
 
+async function requireAdmin(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user) return { error: "No autenticado", status: 401 };
+  const role = (session.user as any)?.role;
+  const email = (session.user as any)?.email?.toLowerCase();
+  const isGodMode = email === "beenocode@gmail.com" || email === "albertogala@beenocode.com";
+  if (role !== "admin" && !isGodMode) return { error: "Solo administradores", status: 403 };
+  return null;
+}
+
 export async function POST(request: NextRequest) {
   try {
+    const authErr = await requireAdmin(request);
+    if (authErr) return NextResponse.json({ error: authErr.error }, { status: authErr.status });
+
     const { userId } = await request.json();
 
     if (!userId) {

@@ -4,7 +4,7 @@
 
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
-import { createAuthenticatedClient } from '@/lib/insforge';
+import { createAuthenticatedClient, createClientWithToken } from '@/lib/insforge-server';
 import { getMemoryContext, searchMemory, formatMemoryContextForAI } from '@/lib/memory';
 
 export async function GET(req: NextRequest) {
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    const client = createAuthenticatedClient(token);
+    const client = createClientWithToken(token);
     const { data: authData } = await client.auth.getCurrentUser();
 
     if (!authData?.user) {
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    const client = createAuthenticatedClient(token);
+    const client = createClientWithToken(token);
     const { data: authData } = await client.auth.getCurrentUser();
 
     if (!authData?.user) {
@@ -190,7 +190,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    const client = createAuthenticatedClient(token);
+    const client = createClientWithToken(token);
     const { data: authData } = await client.auth.getCurrentUser();
 
     if (!authData?.user) {

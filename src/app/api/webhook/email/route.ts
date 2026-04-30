@@ -1,6 +1,6 @@
 // GEMINI ONLY - NO GROQ - Updated 2026-03-27
 import { NextResponse } from 'next/server';
-import { insforgeAdmin } from '@/lib/insforge-admin';
+import { insforgeAdmin } from '@/lib/insforge-server';
 import { env } from '@/lib/env';
 import { analyzeWithMinimax } from '@/lib/minimax';
 import { INSFORGE_API_KEY } from '@/lib/insforge-constants';

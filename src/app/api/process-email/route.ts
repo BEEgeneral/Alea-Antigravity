@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { insforgeAdmin } from '@/lib/insforge-admin';
+import { insforgeAdmin } from '@/lib/insforge-server';
 import { analyzeWithMinimax, generateText } from '@/lib/minimax';
 
 export async function POST(req: Request) {

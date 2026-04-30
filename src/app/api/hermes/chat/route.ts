@@ -8,7 +8,7 @@
 
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
-import { createAuthenticatedClient } from '@/lib/insforge';
+import { createAuthenticatedClient, createClientWithToken } from '@/lib/insforge-server';
 import OpenAI from 'openai';
 import { HermesTools } from '@/lib/hermes-tools';
 import { executeToolCall, type ToolExecutorContext } from '@/lib/hermes-tool-executor';
@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    const client = createAuthenticatedClient(token);
+    const client = createClientWithToken(token);
     const { data: authData, error: authError } = await client.auth.getCurrentUser();
 
     if (authError || !authData?.user) {
@@ -453,7 +453,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    const client = createAuthenticatedClient(token);
+    const client = createClientWithToken(token);
     const { data: authData } = await client.auth.getCurrentUser();
 
     if (!authData?.user) {

@@ -50,8 +50,14 @@ export default function DossiersPage() {
   const [profiles, setProfiles] = useState<InvestorProfile[]>([]);
   const [classifications, setClassifications] = useState<Classification[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<InvestorProfile | null>(null);
-  const [activeTab, setActiveTab] = useState<"osint" | "classifications">("osint");
+  const [activeTab, setActiveTab] = useState<"osint" | "classifications" | "dossiers">("osint");
   const [loading, setLoading] = useState(true);
+
+  // Dossiers (OpenViking) state
+  const [dossierQuery, setDossierQuery] = useState("");
+  const [dossierResults, setDossierResults] = useState<any[]>([]);
+  const [dossierLoading, setDossierLoading] = useState(false);
+  const [dossierSearched, setDossierSearched] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -193,6 +199,22 @@ export default function DossiersPage() {
     RUBI: 'bg-red-500/10 text-red-500 border-red-500/20'
   };
 
+  const handleDossierSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dossierQuery.trim()) return;
+    setDossierLoading(true);
+    setDossierSearched(true);
+    try {
+      const res = await fetch(`/api/openviking/search?q=${encodeURIComponent(dossierQuery)}&limit=20`);
+      const data = await res.json();
+      setDossierResults(data.dossiers || []);
+    } catch {
+      setDossierResults([]);
+    } finally {
+      setDossierLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -226,6 +248,17 @@ export default function DossiersPage() {
             Búsqueda OSINT
           </button>
           <button
+            onClick={() => setActiveTab("dossiers")}
+            className={`px-6 py-3 rounded-xl font-medium transition-all ${
+              activeTab === "dossiers"
+                ? "bg-primary text-white"
+                : "bg-card border border-border hover:border-primary/50"
+            }`}
+          >
+            <FileText className="inline mr-2 w-4 h-4" />
+            Dossiers
+          </button>
+          <button
             onClick={() => {
               setActiveTab("classifications");
               loadClassifications();
@@ -240,6 +273,98 @@ export default function DossiersPage() {
             Clasificaciones Guardadas
           </button>
         </div>
+
+        {/* Dossiers Tab */}
+        {activeTab === "dossiers" && (
+          <div className="space-y-6">
+            <div className="bg-card border border-border rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-xl font-serif font-medium">Búsqueda de Dossiers</h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Buscar en {44}+ dossiers de propiedades subeidos a OpenViking
+                  </p>
+                </div>
+              </div>
+              <form onSubmit={handleDossierSearch} className="flex gap-3">
+                <div className="flex-1 relative">
+                  <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={dossierQuery}
+                    onChange={(e) => setDossierQuery(e.target.value)}
+                    placeholder="Ej: hotel madrid, local commercial, suelo barcelona..."
+                    className="w-full pl-10 pr-4 py-3 bg-muted/30 border border-border rounded-xl text-sm focus:outline-none focus:border-primary/50"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={dossierLoading}
+                  className="px-6 py-3 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 transition-all disabled:opacity-50"
+                >
+                  {dossierLoading ? "Buscando..." : "Buscar"}
+                </button>
+              </form>
+            </div>
+
+            {/* Results */}
+            {dossierLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : dossierSearched && dossierResults.length === 0 ? (
+              <div className="text-center py-16 border border-dashed border-border rounded-3xl">
+                <FileText size={40} className="mx-auto text-muted-foreground/20 mb-4" />
+                <p className="text-muted-foreground uppercase tracking-widest text-sm font-bold">
+                  Sin resultados
+                </p>
+                <p className="text-muted-foreground/50 text-xs mt-2">
+                  Prueba con otros términos de búsqueda
+                </p>
+              </div>
+            ) : dossierResults.length > 0 ? (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">{dossierResults.length} dossiers encontrados</p>
+                {dossierResults.map((dossier) => (
+                  <div key={dossier.id} className="bg-card/50 border border-border/50 rounded-2xl p-5 hover:border-border transition-all">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest">
+                            Dossier
+                          </span>
+                          <span className="text-xs text-muted-foreground font-mono">{dossier.id.slice(0, 12)}...</span>
+                        </div>
+                        {dossier.sample && (
+                          <p className="text-sm text-muted-foreground/80 line-clamp-2 mb-3">
+                            "{dossier.sample.slice(0, 200)}..."
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          {dossier.files?.map((f: string) => (
+                            <span key={f} className="px-2 py-0.5 bg-muted/50 rounded text-[10px] text-muted-foreground font-mono">
+                              {f}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16 border border-dashed border-border rounded-3xl">
+                <FileText size={40} className="mx-auto text-muted-foreground/20 mb-4" />
+                <p className="text-muted-foreground uppercase tracking-widest text-sm font-bold">
+                  Sin búsqueda
+                </p>
+                <p className="text-muted-foreground/50 text-xs mt-2">
+                  Escribe un término y pulsa Buscar para encontrar dossiers
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {activeTab === "osint" ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

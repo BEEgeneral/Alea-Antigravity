@@ -12,7 +12,7 @@
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
 import pool from '@/lib/vps-pg';
-import { generateText, analyzeWithAI, isMiniMaxConfigured } from '@/lib/ai-minimax';
+import { getAleaAIClient, isMiniMaxConfigured } from '@/lib/alea-ai';
 
 async function getCRMData() {
   const [leads, properties, investors, mandatarios, collaborators] = await Promise.all([
@@ -120,7 +120,8 @@ Usuario: ${message}
 ${summary}`;
 
     // Generate response
-    const response = await generateText(
+    const client = getAleaAIClient();
+    const response = await client.generateText(
       `${summary}\n\nPregunta del usuario: ${message}`,
       {
         systemPrompt,

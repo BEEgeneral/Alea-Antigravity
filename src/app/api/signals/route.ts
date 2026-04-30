@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAuthenticatedClient } from '@/lib/insforge-server';
+import { classifyAleaScore } from '@/lib/alea-score';
 
 export async function GET(req: Request) {
   try {
@@ -83,11 +84,7 @@ export async function POST(req: Request) {
     if (meters && meters > 1000) alea_score += 10;
     alea_score = Math.min(100, alea_score);
 
-    let score_classification = 'medium';
-    if (alea_score >= 80) score_classification = 'exceptional';
-    else if (alea_score >= 65) score_classification = 'high';
-    else if (alea_score >= 45) score_classification = 'medium';
-    else score_classification = 'low';
+    const score_classification = classifyAleaScore(alea_score);
 
     const { data, error } = await client
       .database

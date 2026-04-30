@@ -7,7 +7,7 @@
  * - Agenda Actions
  */
 
-import { createAuthenticatedClient } from './insforge';
+import { createAuthenticatedClient } from './insforge-server';
 import type { ToolCall, ToolResult } from './hermes-types';
 
 export interface ToolExecutorContext {

@@ -1,4 +1,4 @@
-import { insforge } from "@/lib/insforge-client";
+import { insforge } from "@/lib/insforge-server";
 import { AdobeTokens, refreshAccessToken, isTokenExpired } from "./adobeOAuth";
 
 const ADOBE_CLIENT_ID = process.env.ADOBE_SIGN_CLIENT_ID!;

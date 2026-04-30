@@ -31,19 +31,25 @@ export function createServerClient(): InsForgeClient {
   });
 }
 
-export async function createAuthenticatedClient(request?: NextRequest): Promise<InsForgeClient> {
+export async function createAuthenticatedClient(tokenOrRequest?: string | NextRequest): Promise<InsForgeClient> {
   let token: string | undefined;
 
-  if (request) {
+  if (!tokenOrRequest) {
+    const cookieStore = await cookies();
+    token = cookieStore.get('insforge_token')?.value;
+  } else if (typeof tokenOrRequest === 'string') {
+    token = tokenOrRequest;
+  } else {
+    // It's a NextRequest
+    const request = tokenOrRequest;
     token = request.cookies.get('insforge_token')?.value;
     if (!token && request.headers.get('authorization')) {
       token = request.headers.get('authorization')?.replace('Bearer ', '');
     }
-  }
-
-  if (!token) {
-    const cookieStore = await cookies();
-    token = cookieStore.get('insforge_token')?.value;
+    if (!token) {
+      const cookieStore = await cookies();
+      token = cookieStore.get('insforge_token')?.value;
+    }
   }
 
   return createClient({

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { 
     Shield, Users, Database, Settings, FileText, Activity, Bell, Webhook, 
     AlertTriangle, ArrowLeft,    Crown, Home, ArrowRight, Brain, Zap, Calendar, Video,
-    UserCheck, Search, BarChart3, Radar
+    UserCheck, Search, BarChart3, Radar, Bot
 } from "lucide-react";
 
 interface NavItem {
@@ -72,6 +72,7 @@ const navItems: NavItem[] = [
         { name: "Pelayo Chat Logs", href: "/centrion/pelayo", icon: <AlertTriangle size={20} /> },
         { name: "Paperclip", href: "/centrion/paperclip", icon: <Zap size={20} /> },
         { name: "Memory Palace", href: "/centrion/memory", icon: <Brain size={20} /> },
+        { name: "Hermes Chat", href: "/centrion/chat", icon: <Bot size={20} /> },
         { name: "Agenda", href: "/centrion/agenda", icon: <Calendar size={20} /> },
         { name: "Pirámide Activos", href: "/centrion/pyramid", icon: <BarChart3 size={20} /> },
         { name: "Video Llamadas", href: "/centrion/video", icon: <Video size={20} /> },

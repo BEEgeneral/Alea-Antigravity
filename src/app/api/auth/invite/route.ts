@@ -3,6 +3,22 @@ import { neon } from '@neondatabase/serverless'
 import { Resend } from 'resend'
 import bcrypt from 'bcryptjs'
 import { randomBytes } from 'crypto'
+import { auth } from '@/lib/auth'
+
+// Auth guard — only admin can invite
+async function requireAdmin(req: NextRequest) {
+  const session = await auth()
+  if (!session?.user) {
+    return { error: 'No autenticado', status: 401 }
+  }
+  const role = (session.user as any)?.role
+  const email = (session.user as any)?.email?.toLowerCase()
+  const isGodMode = email === 'beenocode@gmail.com' || email === 'albertogala@beenocode.com'
+  if (role !== 'admin' && !isGodMode) {
+    return { error: 'Solo administradores pueden invitar usuarios', status: 403 }
+  }
+  return null
+}
 
 function getSql() {
   return neon(process.env.DATABASE_URL!)
@@ -14,6 +30,9 @@ function getResend() {
 
 export async function POST(request: NextRequest) {
   try {
+    const authError = await requireAdmin(request)
+    if (authError) return NextResponse.json({ error: authError.error }, { status: authError.status })
+
     // Support both admin token auth and simple email+role for now
     const body = await request.json()
     const { email, role, name } = body
@@ -86,6 +105,9 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const authError = await requireAdmin(request)
+    if (authError) return NextResponse.json({ error: authError.error }, { status: authError.status })
+
     const { searchParams } = new URL(request.url)
     const token = searchParams.get('token')
 

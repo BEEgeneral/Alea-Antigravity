@@ -77,7 +77,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, message: 'If an account exists, a reset email has been sent.' })
   } catch (error: any) {
-    console.error('Forgot password error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

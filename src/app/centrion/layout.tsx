@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { 
     Shield, Users, Database, Settings, FileText, Activity, Bell, Webhook, 
     AlertTriangle, ArrowLeft,    Crown, Home, ArrowRight, Brain, Zap, Calendar, Video,
-    UserCheck, Search, BarChart3
+    UserCheck, Search, BarChart3, Radar
 } from "lucide-react";
 
 interface NavItem {
@@ -58,6 +58,7 @@ export default function CenturionLayout({ children }: { children: React.ReactNod
 
 const navItems: NavItem[] = [
         { name: "Overview", href: "/centrion", icon: <Home size={20} /> },
+        { name: "RADAR", href: "/centrion/radar", icon: <Radar size={20} />, badge: "Intel" },
         { name: "Clasificación Inversores", href: "/centrion/investors", icon: <UserCheck size={20} /> },
         { name: "OSINT", href: "/centrion/osint", icon: <Search size={20} /> },
         { name: "Patrones", href: "/centrion/patterns", icon: <Brain size={20} /> },

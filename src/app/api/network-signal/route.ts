@@ -10,7 +10,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { createAuthenticatedClient, createServerClient } from '@/lib/insforge-server';
+import { createServerClient, createClientWithToken } from '@/lib/insforge-server';
 
 export async function POST(req: Request) {
   try {
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       } else {
         // Try user auth
         try {
-          const client = await createAuthenticatedClient(req as any);
+          const client = createClientWithToken(token);
           const { data: { user } } = await client.auth.getCurrentUser();
           if (user) {
             isAuthorized = true;

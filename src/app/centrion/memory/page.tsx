@@ -58,27 +58,56 @@ export default function MemoryPage() {
     const [activeTab, setActiveTab] = useState<'wings' | 'graph' | 'search'>('wings');
 
     useEffect(() => {
-        setWings([
-            { id: '1', name: 'Investor Knowledge', wing_type: 'investors', keywords: ['inversores', 'hoteles', 'madrid'], created_at: new Date().toISOString() },
-            { id: '2', name: 'Property Intelligence', wing_type: 'properties', keywords: ['propiedades', 'edificios', 'suelos'], created_at: new Date().toISOString() },
-            { id: '3', name: 'Market Insights', wing_type: 'market', keywords: ['mercado', 'rentabilidad', 'tendencias'], created_at: new Date().toISOString() },
-        ]);
-        setRooms([
-            { id: '1', wing_id: '1', name: 'Madrid Investors', hall_type: 'facts', description: 'Datos de inversores en Madrid' },
-            { id: '2', wing_id: '1', name: 'Hotel Preferences', hall_type: 'conversations', description: 'Preferencias de hoteles' },
-            { id: '3', wing_id: '2', name: 'Chueca Properties', hall_type: 'insights', description: 'Insights de propiedades Chueca' },
-        ]);
-        setDrawers([
-            { id: '1', room_id: '1', content: 'Carlos Ruiz - Inversor hotelero - Budget 5M€', content_type: 'investor', importance_score: 0.9 },
-            { id: '2', room_id: '1', content: 'María García - Busca edificios Madrid centro', content_type: 'investor', importance_score: 0.8 },
-            { id: '3', room_id: '2', content: 'Prefiere hoteles con licencia vacacional', content_type: 'preference', importance_score: 0.7 },
-        ]);
-        setTriples([
-            { id: '1', entity_subject: 'Carlos Ruiz', relationship: 'invierte en', entity_object: 'Hoteles Madrid', confidence_score: 0.95 },
-            { id: '2', entity_subject: 'Palacio Gran Via', relationship: 'tiene rentabilidad', entity_object: '8.5%', confidence_score: 0.88 },
-            { id: '3', entity_subject: 'Chueca', relationship: 'es zona de', entity_object: 'Inversión hotelera', confidence_score: 0.75 },
-        ]);
-        setLoading(false);
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                // Fetch wings
+                const wingsRes = await fetch('/api/memory?action=list_wings');
+                const wingsData = await wingsRes.json();
+                setWings(wingsData.wings || []);
+
+                // Fetch rooms for all wings in parallel
+                const roomPromises = (wingsData.wings || []).map(async (wing: MemoryWing) => {
+                    const res = await fetch(`/api/memory?action=get_rooms&wingId=${wing.id}`);
+                    const data = await res.json();
+                    return { wingId: wing.id, rooms: data.rooms || [] };
+                });
+                const roomResults = await Promise.all(roomPromises);
+                const allRooms: MemoryRoom[] = [];
+                for (const result of roomResults) {
+                    allRooms.push(...result.rooms);
+                }
+                setRooms(allRooms);
+
+                // Fetch drawers for all rooms in parallel (first 10 rooms to avoid too many requests)
+                const roomIds = allRooms.slice(0, 10).map((r: MemoryRoom) => r.id);
+                const drawerPromises = roomIds.map(async (roomId: string) => {
+                    const res = await fetch(`/api/memory?action=get_drawers&roomId=${roomId}`);
+                    const data = await res.json();
+                    return { roomId, drawers: data.drawers || [] };
+                });
+                const drawerResults = await Promise.all(drawerPromises);
+                const allDrawers: MemoryDrawer[] = [];
+                for (const result of drawerResults) {
+                    allDrawers.push(...result.drawers);
+                }
+                setDrawers(allDrawers);
+
+                // Fetch knowledge graph triples
+                try {
+                    const graphRes = await fetch('/api/memory?action=query_graph');
+                    const graphData = await graphRes.json();
+                    setTriples(graphData.triples || []);
+                } catch {
+                    setTriples([]);
+                }
+            } catch (error) {
+                console.error('Error fetching memory data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
     }, []);
 
     const toggleWing = (wingId: string) => {
@@ -251,22 +280,51 @@ export default function MemoryPage() {
                 <div className="bg-card border border-border rounded-2xl p-6">
                     <h3 className="font-medium mb-4">Resultados de búsqueda</h3>
                     {searchTerm ? (
-                        <div className="space-y-4">
-                            {drawers.filter(d => d.content.toLowerCase().includes(searchTerm.toLowerCase())).map(drawer => (
-                                <div key={drawer.id} className="p-4 border border-border rounded-xl">
-                                    <p className="text-sm">{drawer.content}</p>
-                                    <div className="flex items-center space-x-2 mt-2">
-                                        <span className="px-2 py-0.5 bg-muted text-muted-foreground text-xs rounded">{drawer.content_type}</span>
-                                        <span className="text-xs text-muted-foreground">Importancia: {drawer.importance_score}</span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                        <SearchResults searchTerm={searchTerm} />
                     ) : (
                         <p className="text-muted-foreground text-center py-8">Ingresa un término de búsqueda</p>
                     )}
                 </div>
             )}
+        </div>
+    );
+}
+
+function SearchResults({ searchTerm }: { searchTerm: string }) {
+    const [results, setResults] = useState<MemoryDrawer[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (!searchTerm.trim()) return;
+        const fetchSearch = async () => {
+            setLoading(true);
+            try {
+                const res = await fetch(`/api/memory?action=search&q=${encodeURIComponent(searchTerm)}`);
+                const data = await res.json();
+                setResults(data.results || []);
+            } catch {
+                setResults([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchSearch();
+    }, [searchTerm]);
+
+    if (loading) return <Loader2 className="w-6 h-6 animate-spin mx-auto" />;
+    if (!results.length) return <p className="text-muted-foreground text-center py-4">Sin resultados</p>;
+
+    return (
+        <div className="space-y-4">
+            {results.map(drawer => (
+                <div key={drawer.id} className="p-4 border border-border rounded-xl">
+                    <p className="text-sm">{drawer.content}</p>
+                    <div className="flex items-center space-x-2 mt-2">
+                        <span className="px-2 py-0.5 bg-muted text-muted-foreground text-xs rounded">{drawer.content_type}</span>
+                        <span className="text-xs text-muted-foreground">Importancia: {drawer.importance_score}</span>
+                    </div>
+                </div>
+            ))}
         </div>
     );
 }

@@ -98,7 +98,6 @@ export async function POST(request: NextRequest) {
       email: normalizedEmail,
     })
   } catch (error: any) {
-    console.error('Invite error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

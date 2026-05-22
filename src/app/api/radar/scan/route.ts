@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { runRadarScan, getSignals, type SignalSource } from '@/lib/radar/scanner';
 import { auth } from '@/lib/auth';
 
-const CRON_SECRET = process.env.CRON_SECRET || 'radar-cron-secret';
+const CRON_SECRET = process.env.CRON_SECRET;
+if (!CRON_SECRET) throw new Error('CRON_SECRET environment variable is required');
 
 /**
  * POST /api/radar/scan

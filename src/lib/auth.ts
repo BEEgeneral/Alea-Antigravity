@@ -140,7 +140,8 @@ export const authConfig: NextAuthConfig = {
         const role = (auth.user as any)?.role
         if (role !== "admin" && role !== "agent") {
           const email = (auth.user as any)?.email?.toLowerCase()
-          const isGodMode = email === "beenocode@gmail.com" || email === "albertogala@beenocode.com"
+          const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase());
+          const isGodMode = adminEmails.includes(email);
           if (!isGodMode) return Response.redirect(new URL("/login", nextUrl))
         }
         return true

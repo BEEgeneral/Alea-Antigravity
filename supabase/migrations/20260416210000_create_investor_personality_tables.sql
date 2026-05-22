@@ -107,24 +107,24 @@ ALTER TABLE investors ADD COLUMN IF NOT EXISTS latest_classification_id UUID REF
 ALTER TABLE investor_classifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE centurion_scrape_jobs ENABLE ROW LEVEL SECURITY;
 
--- Policy: investors can see all classifications (they are admin users)
-CREATE POLICY "Admin users can view all classifications"
+-- Policy: investors can only see/modify their own classifications
+CREATE POLICY "Users can view own classifications"
     ON investor_classifications FOR SELECT
     TO authenticated
-    USING (true);
+    USING (auth.uid() = created_by OR created_by IS NULL);
 
-CREATE POLICY "Admin users can insert classifications"
+CREATE POLICY "Users can insert own classifications"
     ON investor_classifications FOR INSERT
     TO authenticated
-    WITH CHECK (true);
+    WITH CHECK (auth.uid() = created_by);
 
-CREATE POLICY "Admin users can update classifications"
+CREATE POLICY "Users can update own classifications"
     ON investor_classifications FOR UPDATE
     TO authenticated
-    USING (true);
+    USING (auth.uid() = created_by);
 
--- Policy for scrape jobs
-CREATE POLICY "Admin users can manage scrape jobs"
+-- Policy for scrape jobs (admin only - created_by check)
+CREATE POLICY "Users can manage own scrape jobs"
     ON centurion_scrape_jobs FOR ALL
     TO authenticated
-    USING (true);
+    USING (auth.uid() = created_by);

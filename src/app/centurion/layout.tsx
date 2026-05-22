@@ -59,7 +59,6 @@ export default function CenturionLayout({ children }: { children: React.ReactNod
         { name: "AI Control Center", href: "/centurion/ai", icon: <Activity size={20} /> },
         { name: "Email Intelligence", href: "/centurion/emails", icon: <Bell size={20} /> },
         { name: "Webhooks & Integrations", href: "/centurion/webhooks", icon: <Webhook size={20} /> },
-        { name: "Pelayo Chat Logs", href: "/centurion/pelayo", icon: <AlertTriangle size={20} /> },
     ];
 
     if (loading) {

@@ -19,8 +19,8 @@ interface AdminState {
     setProperties: (properties: Property[] | ((prev: Property[]) => Property[])) => void;
     agents: Agent[];
     setAgents: (agents: Agent[] | ((prev: Agent[]) => Agent[])) => void;
-    currentUser: any;
-    setCurrentUser: (user: any) => void;
+    currentUser: import('./index').User | null;
+    setCurrentUser: (user: import('./index').User | null) => void;
     selectedLead: Lead | null;
     setSelectedLead: (lead: Lead | null) => void;
     selectedProperty: Property | null;
@@ -101,7 +101,7 @@ export function AdminProvider({ children }: AdminProviderProps) {
     const [investors, setInvestors] = useState<Investor[]>([]);
     const [properties, setProperties] = useState<Property[]>([]);
     const [agents, setAgents] = useState<Agent[]>([]);
-    const [currentUser, setCurrentUser] = useState<any>(null);
+    const [currentUser, setCurrentUser] = useState<import('./index').User | null>(null);
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
     const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
     const [selectedInvestor, setSelectedInvestor] = useState<Investor | null>(null);

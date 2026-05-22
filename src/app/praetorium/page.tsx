@@ -26,13 +26,13 @@ import {
     IAISuggestion,
     Interaction,
 } from "@/types/admin";
-import AIChat from "@/components/admin/AIChat";
-import PelayoChat, { ChatButton } from "@/components/admin/PelayoChat";
+
+import dynamic from 'next/dynamic';
 import ValuationAgent from "@/components/admin/ValuationAgent";
 import AgendaPanel from "@/components/admin/AgendaPanel";
 import AIDashboard from "@/components/admin/AIDashboard";
 import VideoCallPanel from "@/components/admin/video/VideoCallPanel";
-import FinancialReportModal from "@/components/admin/FinancialReportModal";
+const FinancialReportModal = dynamic(() => import("@/components/admin/FinancialReportModal"), { ssr: false });
 import {
     EditAgentModal,
     AddAgentModal,
@@ -168,7 +168,6 @@ export default function AdminDashboard() {
     const [isSelectingInvestorForLead, setIsSelectingInvestorForLead] = useState(false);
     const [targetPropertyForLead, setTargetPropertyForLead] = useState<any>(null);
     const [agentForm, setAgentForm] = useState({ full_name: "", email: "", role: "agent" });
-    const [showAIChat, setShowAIChat] = useState(false);
     const [investorForm, setInvestorForm] = useState<any>({
         full_name: "",
         company_name: "",
@@ -3019,13 +3018,6 @@ useEffect(() => {
                     onClose={() => setIsTrackingModalOpen(false)}
                 />
             </main>
-            
-            {/* Chat Button */}
-            <ChatButton onClick={() => setShowAIChat(true)} />
-            
-            {/* Pelayo Chat */}
-            <PelayoChat isOpen={showAIChat} onClose={() => setShowAIChat(false)} />
-            
             </div>
     );
 }

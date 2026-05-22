@@ -1,7 +1,7 @@
 "use client";
 
 import { Lock } from "lucide-react";
-import { useState } from "react";
+import { useState, memo } from "react";
 import { motion } from "framer-motion";
 import { Skeleton } from "./Skeleton";
 
@@ -23,7 +23,7 @@ interface PropertyCardProps {
     userStatus: "public" | "registered" | "premium";
 }
 
-export function PropertyCard({ property, userStatus }: PropertyCardProps) {
+const PropertyCardComponent = ({ property, userStatus }: PropertyCardProps) => {
     const [isHovered, setIsHovered] = useState(false);
 
     // If public and it's off-market, blur it strictly to drive curiosity/registration
@@ -95,6 +95,8 @@ export function PropertyCard({ property, userStatus }: PropertyCardProps) {
         </motion.div>
     );
 }
+
+export const PropertyCard = memo(PropertyCardComponent);
 
 export function PropertyCardSkeleton() {
     return (

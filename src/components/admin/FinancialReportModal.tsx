@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, TrendingUp, Loader2, Download, BarChart3,
@@ -69,35 +69,75 @@ export default function FinancialReportModal({ property, onClose }: Props) {
   const [metrics, setMetrics] = useState<ExtendedMetrics>({});
   const [reportData, setReportData] = useState<any>(null);
 
-  // Computed financial metrics
+  // Memoized financial metrics to avoid recalculation on every render
+  const {
+    pricePerSqm,
+    totalAnnualCosts,
+    grossYield,
+    netYield,
+    annualNOI,
+    capRate,
+    equity,
+    financing,
+    monthlyMortgage,
+    annualDebtService,
+    annualCashFlow,
+    cashOnCash,
+  } = useMemo(() => {
+    const price = property.price || 0;
+    const meters = property.meters || 0;
+    const monthlyRent = property.monthly_rent || 0;
+    const pricePerSqmVal = price && meters ? Math.round(price / meters) : 0;
+
+    const costsVal = {
+      community: property.community_fee || 0,
+      insurance: property.insurance || 0,
+      maintenance: property.maintenance || 0,
+      ibi: property.ibi_tax || 0,
+    };
+    const totalAnnualCostsVal = Object.values(costsVal).reduce((s, v) => s + v, 0);
+    const grossYieldVal = price > 0 ? ((monthlyRent * 12) / price) * 100 : 0;
+    const netYieldVal = price > 0 ? ((monthlyRent * 12 - totalAnnualCostsVal) / price) * 100 : 0;
+    const annualNOIVal = monthlyRent * 12 - totalAnnualCostsVal;
+    const capRateVal = price > 0 ? (annualNOIVal / price) * 100 : 0;
+
+    const equityVal = Math.round(price * 0.4);
+    const financingVal = Math.round(price * 0.6);
+    const financingRateVal = 3.5;
+    const monthlyMortgageVal = financingVal > 0
+      ? (financingVal * (financingRateVal / 100 / 12) * Math.pow(1 + financingRateVal / 100 / 12, 240)) /
+        (Math.pow(1 + financingRateVal / 100 / 12, 240) - 1)
+      : 0;
+    const annualDebtServiceVal = monthlyMortgageVal * 12;
+    const annualCashFlowVal = annualNOIVal - annualDebtServiceVal;
+    const cashOnCashVal = equityVal > 0 ? (annualCashFlowVal / equityVal) * 100 : 0;
+
+    return {
+      pricePerSqm: pricePerSqmVal,
+      totalAnnualCosts: totalAnnualCostsVal,
+      grossYield: grossYieldVal,
+      netYield: netYieldVal,
+      annualNOI: annualNOIVal,
+      capRate: capRateVal,
+      equity: equityVal,
+      financing: financingVal,
+      monthlyMortgage: monthlyMortgageVal,
+      annualDebtService: annualDebtServiceVal,
+      annualCashFlow: annualCashFlowVal,
+      cashOnCash: cashOnCashVal,
+    };
+  }, [property]);
+
   const price = property.price || 0;
   const meters = property.meters || 0;
   const monthlyRent = property.monthly_rent || 0;
-  const pricePerSqm = price && meters ? Math.round(price / meters) : 0;
 
-  const costs = {
+  const costs = useMemo(() => ({
     community: property.community_fee || 0,
     insurance: property.insurance || 0,
     maintenance: property.maintenance || 0,
     ibi: property.ibi_tax || 0,
-  };
-  const totalAnnualCosts = Object.values(costs).reduce((s, v) => s + v, 0);
-  const grossYield = price > 0 ? ((monthlyRent * 12) / price) * 100 : 0;
-  const netYield = price > 0 ? ((monthlyRent * 12 - totalAnnualCosts) / price) * 100 : 0;
-  const annualNOI = monthlyRent * 12 - totalAnnualCosts;
-  const capRate = price > 0 ? (annualNOI / price) * 100 : 0;
-
-  // Equity / financing
-  const equity = Math.round(price * 0.4);
-  const financing = Math.round(price * 0.6);
-  const financingRate = 3.5;
-  const monthlyMortgage = financing > 0
-    ? (financing * (financingRate / 100 / 12) * Math.pow(1 + financingRate / 100 / 12, 240)) /
-      (Math.pow(1 + financingRate / 100 / 12, 240) - 1)
-    : 0;
-  const annualDebtService = monthlyMortgage * 12;
-  const annualCashFlow = annualNOI - annualDebtService;
-  const cashOnCash = equity > 0 ? (annualCashFlow / equity) * 100 : 0;
+  }), [property.community_fee, property.insurance, property.maintenance, property.ibi_tax]);
 
   const recommendation = metrics.recommendation || (netYield >= 6 ? 'BUY' : netYield >= 4 ? 'HOLD' : 'SELL');
   const recColor = { BUY: 'text-emerald-400', HOLD: 'text-amber-400', SELL: 'text-red-400' }[recommendation];
@@ -471,7 +511,7 @@ export default function FinancialReportModal({ property, onClose }: Props) {
                     <div className="border-t border-[#c5a059]/10 pt-3 mt-3 space-y-2">
                       <div className="flex justify-between text-xs">
                         <span className="text-white/40">Tipo interés</span>
-                        <span className="text-white">{financingRate}%</span>
+                        <span className="text-white">3.5%</span>
                       </div>
                       <div className="flex justify-between text-xs">
                         <span className="text-white/40">Plazo</span>

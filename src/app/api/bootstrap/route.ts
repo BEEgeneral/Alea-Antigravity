@@ -3,37 +3,26 @@ import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { Resend } from 'resend';
-import { auth } from '@/lib/auth';
 
 function getSql() {
   return neon(process.env.DATABASE_URL!);
 }
 
-async function requireAdmin(req: NextRequest) {
-  // Bootstrap secret — solo para crear el primer admin
-  const bootstrapSecret = req.headers.get('x-bootstrap-secret');
-  if (bootstrapSecret && bootstrapSecret === process.env.BOOTSTRAP_SECRET) {
-    return null;
-  }
-
-  const session = await auth();
-  if (!session?.user) return { error: 'No autenticado', status: 401 };
-  const role = (session.user as any)?.role;
-  const email = (session.user as any)?.email?.toLowerCase();
-  const isGodMode = email === 'beenocode@gmail.com' || email === 'albertogala@beenocode.com';
-  if (role !== 'admin' && !isGodMode) return { error: 'Solo administradores', status: 403 };
-  return null;
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const authError = await requireAdmin(request);
-    if (authError) return NextResponse.json({ error: authError.error }, { status: authError.status });
+    const secret = request.headers.get('x-bootstrap-secret');
+    if (secret !== process.env.BOOTSTRAP_SECRET) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     const { full_name, email, role } = await request.json();
 
     if (!email || !role) {
       return NextResponse.json({ error: 'Email y rol son obligatorios' }, { status: 400 });
+    }
+
+    if (role !== 'admin' && role !== 'agent') {
+      return NextResponse.json({ error: 'Rol debe ser admin o agent' }, { status: 400 });
     }
 
     const normalizedEmail = email.toLowerCase().trim();
@@ -46,17 +35,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Ya existe un usuario con este email.' }, { status: 400 });
     }
 
-    // 1. Create user in Neon (users table — for NextAuth login)
+    // Create user in Neon (users table — for NextAuth login)
     const userId = crypto.randomUUID();
     await getSql()`
       INSERT INTO users (id, email, name, password_hash, role, is_active, is_approved, created_at, updated_at)
       VALUES (${userId}, ${normalizedEmail}, ${full_name || normalizedEmail.split('@')[0]}, ${hashedPassword}, ${role}, true, true, NOW(), NOW())
     `;
 
-    // 2. Create agent record in InsForge via REST
-    let insforgeAgentId: string | null = null;
+    // Create agent record in InsForge
     try {
-      const insforgeRes = await fetch(`${process.env.NEXT_PUBLIC_INSFORGE_URL}/collections/agents/records`, {
+      await fetch(`${process.env.NEXT_PUBLIC_INSFORGE_URL}/collections/agents/records`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${process.env.INSFORGE_API_KEY}`,
@@ -72,14 +60,11 @@ export async function POST(request: NextRequest) {
           created_at: new Date().toISOString(),
         }),
       });
-      if (!insforgeRes.ok) {
-        console.error('[agent-invite] InsForge agent insert failed:', await insforgeRes.text());
-      }
     } catch (insErr) {
-      console.error('[agent-invite] InsForge insert error:', insErr);
+      console.error('[bootstrap] InsForge insert error:', insErr);
     }
 
-    // 3. Send credentials email
+    // Send credentials email
     const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://aleasignature.com'}/login`;
     try {
       const resend = new Resend(process.env.RESEND_API_KEY);
@@ -114,16 +99,18 @@ export async function POST(request: NextRequest) {
         `,
       });
     } catch (emailErr) {
-      console.error('[agent-invite] Email send error:', emailErr);
+      console.error('[bootstrap] Email send error:', emailErr);
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Agente creado. Credenciales enviadas al email.',
+      message: 'Usuario creado. Credenciales enviadas.',
       userId,
+      email: normalizedEmail,
+      role,
     });
   } catch (error: any) {
-    console.error('[agent-invite] Error:', error);
+    console.error('[bootstrap] Error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

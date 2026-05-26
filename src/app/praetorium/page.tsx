@@ -27,12 +27,8 @@ import {
     Interaction,
 } from "@/types/admin";
 
-import dynamic from 'next/dynamic';
-import ValuationAgent from "@/components/admin/ValuationAgent";
 import AgendaPanel from "@/components/admin/AgendaPanel";
-import AIDashboard from "@/components/admin/AIDashboard";
 import VideoCallPanel from "@/components/admin/video/VideoCallPanel";
-const FinancialReportModal = dynamic(() => import("@/components/admin/FinancialReportModal"), { ssr: false });
 import {
     EditAgentModal,
     AddAgentModal,
@@ -1344,20 +1340,7 @@ useEffect(() => {
                             <span>Generar PDF</span>
                         </button>
                         <button
-                            onClick={async () => {
-                                // Check if user is admin first
-                                const token = localStorage.getItem('insforge_token');
-                                if (!token) return;
-                                try {
-                                    const meRes = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } });
-                                    const meData = await meRes.json();
-                                    if (meData.profile?.is_admin || meData.profile?.role === 'admin') {
-                                        setFinancialReportProperty(property);
-                                    } else {
-                                        alert('Solo los agentes Admin pueden acceder al informe financiero.');
-                                    }
-                                } catch { alert('No se pudo verificar el acceso.'); }
-                            }}
+                            onClick={() => alert('Informe Financiero disponible próximamente.')}
                             className="flex items-center space-x-2 px-6 py-3 bg-amber-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-amber-700 transition-all shadow-lg shadow-amber-600/20"
                         >
                             <TrendingUp size={16} />
@@ -2346,6 +2329,14 @@ useEffect(() => {
                     </button>
 
                     <button
+                        onClick={() => { setActiveTab("agents"); setSelectedInvestor(null); setSelectedLead(null); }}
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "agents" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
+                    >
+                        <ShieldAlert size={18} />
+                        <span>Control de Agentes</span>
+                    </button>
+
+                    <button
                         onClick={() => { setActiveTab("investors"); setSelectedInvestor(null); setSelectedLead(null); }}
                         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === "investors" ? 'bg-primary/10 text-primary font-medium shadow-sm' : 'text-foreground/70 hover:bg-muted'}`}
                     >
@@ -2594,6 +2585,47 @@ useEffect(() => {
                                         onSelectLead={setSelectedLead}
                                         columnRefs={columnRefs}
                                     />
+                                )}
+
+                                {activeTab === "agents" && currentUser?.role === "admin" && (
+                                    <div className="flex flex-col space-y-6 animate-in fade-in duration-700 p-8">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <h2 className="text-2xl font-serif font-bold">Control de Agentes</h2>
+                                                <p className="text-muted-foreground text-sm">Gestión y alta de agentes</p>
+                                            </div>
+                                            <button
+                                                onClick={() => setIsAddingAgent(true)}
+                                                className="flex items-center space-x-2 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-primary/90 transition-all"
+                                            >
+                                                <Plus size={14} />
+                                                <span>Nuevo Agente</span>
+                                            </button>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {agents.map((agent: any) => (
+                                                <div key={agent.id} className="bg-card border border-border rounded-2xl p-5 hover:shadow-lg transition-all">
+                                                    <div className="flex items-start justify-between mb-3">
+                                                        <div>
+                                                            <p className="font-semibold text-sm">{agent.full_name || agent.email}</p>
+                                                            <p className="text-xs text-muted-foreground">{agent.email}</p>
+                                                        </div>
+                                                        <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full ${agent.role === 'admin' ? 'bg-red-500/10 text-red-500' : 'bg-blue-500/10 text-blue-500'}`}>
+                                                            {agent.role || 'agent'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center space-x-2">
+                                                        <button
+                                                            onClick={() => setSelectedAgentToEdit(agent)}
+                                                            className="flex-1 text-xs py-1.5 bg-muted hover:bg-muted/80 rounded-lg transition-all"
+                                                        >
+                                                            Editar
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 )}
 
                                 {activeTab === "iai_inbox" && (
@@ -2852,13 +2884,7 @@ useEffect(() => {
                         </div>
                     )}
 
-                    {/* Financial Report Modal (Admin Only) */}
-                    {financialReportProperty && (
-                        <FinancialReportModal
-                            property={financialReportProperty}
-                            onClose={() => setFinancialReportProperty(null)}
-                        />
-                    )}
+
 
                     {/* Edit Agent Modal */}
                     {selectedAgentToEdit && (

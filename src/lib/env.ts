@@ -24,6 +24,10 @@ export const env = {
   /** Git Provider (github, gitlab, bitbucket) */
   VERCEL_GIT_PROVIDER: process.env.VERCEL_GIT_PROVIDER || process.env.NEXT_PUBLIC_VERCEL_GIT_PROVIDER,
 
+  // --- InsForge Configuration ---
+  INSFORGE_API_KEY: process.env.INSFORGE_API_KEY || 'ik_dbb952a6fd01508d4ae7f53b36e23eaf',
+  INSFORGE_APP_URL: process.env.INSFORGE_APP_URL || 'https://if8rkq6j.eu-central.insforge.app',
+
   // --- Project Specific Variables (Custom) ---
 
   /** Gemini API Key (Server side only) */

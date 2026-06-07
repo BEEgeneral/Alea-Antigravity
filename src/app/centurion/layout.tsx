@@ -20,40 +20,29 @@ export default function CenturionLayout({ children }: { children: React.ReactNod
     useEffect(() => {
         const checkAuth = async () => {
             try {
-                const sessionRes = await fetch('/api/auth/session');
-                const session = await sessionRes.json();
-
-                if (session?.user?.email === CENTURION_ALLOWED_EMAIL) {
-                    setUserEmail(session.user.email);
-                    setAuthorized(true);
-                    setLoading(false);
-                    return;
-                }
-
+                // Check NextAuth session via /api/auth/me (server-side auth())
                 const token = localStorage.getItem('insforge_token');
-                if (!token) {
-                    window.location.href = '/login';
-                    return;
-                }
 
                 const res = await fetch('/api/auth/me', {
-                    headers: { Authorization: `Bearer ${token}` }
+                    headers: token ? { Authorization: `Bearer ${token}` } : {}
                 });
 
                 if (!res.ok) {
+                    // Not authenticated at all → go to login
                     window.location.href = '/login';
                     return;
                 }
 
                 const data = await res.json();
-                const email = data.user?.email || data.profile?.email || "";
+                const email = (data.user?.email || data.profile?.email || "").toLowerCase();
 
-                if (email.toLowerCase() !== CENTURION_ALLOWED_EMAIL) {
+                if (email !== CENTURION_ALLOWED_EMAIL) {
+                    // Authenticated but not the allowed email → go to praetorium
                     window.location.href = '/praetorium';
                     return;
                 }
 
-                setUserEmail(email);
+                setUserEmail(data.user?.email || data.profile?.email || "");
                 setAuthorized(true);
             } catch {
                 window.location.href = '/login';

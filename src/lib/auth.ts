@@ -147,6 +147,9 @@ export const authConfig: NextAuthConfig = {
         return true
       }
 
+      // /centurion: public route — layout does its own auth check (insforge_token + email whitelist)
+      if (pathname.startsWith("/centurion")) return true
+
       // All other routes require auth
       if (!auth?.user) return Response.redirect(new URL("/", nextUrl))
       return true

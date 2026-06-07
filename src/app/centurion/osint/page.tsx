@@ -30,7 +30,6 @@ import {
     CheckCircle2,
     XCircle
 } from "lucide-react";
-import Navbar from "@/components/Navbar";
 
 type Profile = {
     id: string;
@@ -203,7 +202,7 @@ export default function CenturionOSINTPage() {
 
     return (
         <div className="min-h-screen bg-background">
-            <Navbar />
+
             <div className="max-w-7xl mx-auto px-6 py-8">
                 {/* Header */}
                 <div className="mb-8">

@@ -20,7 +20,6 @@ import {
     ArrowRight,
     Sparkles
 } from "lucide-react";
-import Navbar from "@/components/Navbar";
 
 type SuggestionType = 'property' | 'investor' | 'lead' | 'mandatario' | 'collaborator';
 type SuggestionStatus = 'pending' | 'approved' | 'rejected';
@@ -190,7 +189,7 @@ export default function IAIMboxPage() {
 
     return (
         <div className="min-h-screen bg-background">
-            <Navbar />
+
             <div className="max-w-7xl mx-auto px-6 py-8">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">

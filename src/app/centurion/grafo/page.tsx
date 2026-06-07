@@ -195,7 +195,7 @@ export default function GrafoPage() {
                 <p className="text-xs text-muted-foreground">
                   Las flechas representan relaciones entre perfiles y activos. Cada perfil puede operar en uno o más activos simultáneamente.
                   <br />
-                  Para añadir nuevos perfiles al grafo, usa el <a href="/centrion/investors" className="text-primary hover:underline">directorio de inversores</a>.
+                  Para añadir nuevos perfiles al grafo, usa el <a href="/centurion/investors" className="text-primary hover:underline">directorio de inversores</a>.
                 </p>
               </div>
             </motion.div>

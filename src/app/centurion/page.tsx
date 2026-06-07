@@ -1,202 +1,305 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Shield, Users, Settings, Database, Activity, FileText, Webhook, Bell, ArrowLeft, Crown } from "lucide-react";
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { 
+  Crown, Users, Database, Settings, FileText, Activity, Bell, Webhook,
+  AlertTriangle, Home, Brain, Zap, Calendar, Video, Shield, Search,
+  TrendingUp, Eye, Loader2, CheckCircle, Clock
+} from "lucide-react";
 
-interface AdminLink {
-    name: string;
-    href: string;
-    icon: React.ReactNode;
-    description: string;
-    badge?: string;
+interface Stats {
+  totalProfiles: number;
+  classifiedInvestors: number;
+  pendingOSINT: number;
+  completedOSINT: number;
+  recentActivity: { id: string; action: string; time: string }[];
 }
 
-export default function CenturionPage() {
-    const router = useRouter();
-    const [isAdmin, setIsAdmin] = useState(false);
-    const [loading, setLoading] = useState(true);
+interface InvestorProfile {
+  id: string;
+  full_name: string;
+  company_name?: string;
+  piedra_personalidad?: string;
+  scrape_status?: string;
+  created_at?: string;
+}
 
-    useEffect(() => {
-        const checkAuth = async () => {
-            try {
-                const token = localStorage.getItem('insforge_token');
-                if (!token) {
-                    router.push('/login');
-                    return;
-                }
+export default function CenturionOverview() {
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<Stats>({
+    totalProfiles: 0,
+    classifiedInvestors: 0,
+    pendingOSINT: 0,
+    completedOSINT: 0,
+    recentActivity: []
+  });
+  const [recentProfiles, setRecentProfiles] = useState<InvestorProfile[]>([]);
 
-                const res = await fetch('/api/auth/me', {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
 
-                if (!res.ok) {
-                    router.push('/login');
-                    return;
-                }
+  const loadDashboardData = async () => {
+    try {
+      const token = localStorage.getItem('insforge_token');
+      if (!token) return;
 
-                const data = await res.json();
-                if (data.profile?.role !== 'admin') {
-                    router.push('/praetorium');
-                    return;
-                }
+      // Load profiles
+      const profilesRes = await fetch('/api/centurion?limit=100', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const profilesData = await profilesRes.json();
+      const profiles = profilesData.profiles || [];
 
-                setIsAdmin(true);
-            } catch (err) {
-                router.push('/login');
-            } finally {
-                setLoading(false);
-            }
-        };
+      // Load classifications
+      const classRes = await fetch('/api/classify-investor?limit=100', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const classData = await classRes.json();
+      const classifications = classData.classifications || [];
 
-        checkAuth();
-    }, [router]);
+      const completed = profiles.filter((p: any) => p.scrape_status === 'completed').length;
+      const pending = profiles.filter((p: any) => p.scrape_status === 'pending' || p.scrape_status === 'in_progress').length;
 
-    const adminLinks: AdminLink[] = [
-        {
-            name: "Control de Agentes",
-            href: "/praetorium?tab=agents",
-            icon: <Users size={24} />,
-            description: "Gestionar usuarios, agentes y permisos"
-        },
-        {
-            name: "Base de Datos",
-            href: "/praetorium?tab=logs",
-            icon: <Database size={24} />,
-            description: "Logs del sistema y actividad"
-        },
-        {
-            name: "Configuración",
-            href: "/praetorium?tab=profile",
-            icon: <Settings size={24} />,
-            description: "Preferencias y configuración general"
-        },
-        {
-            name: "Dossier Manager",
-            href: "/praetorium?tab=centurion",
-            icon: <FileText size={24} />,
-            description: "Gestionar dossiers de propiedades"
-        },
-        {
-            name: "AI Control Center",
-            href: "/praetorium?tab=ai",
-            icon: <Activity size={24} />,
-            description: "Monitorizar y controlar servicios IA"
-        },
-        {
-            name: "Email Intelligence (IAI)",
-            href: "/praetorium?tab=iai_inbox",
-            icon: <Bell size={24} />,
-            description: "Bandeja de entrada de sugerencias IA"
-        },
-        {
-            name: "Webhooks & Integrations",
-            href: "/admin/webhooks",
-            icon: <Webhook size={24} />,
-            description: "Configurar webhooks y integraciones",
-            badge: "Admin"
-        }
-    ];
+      setStats({
+        totalProfiles: profiles.length,
+        classifiedInvestors: classifications.length,
+        pendingOSINT: pending,
+        completedOSINT: completed,
+        recentActivity: [
+          { id: '1', action: 'Nuevo perfil detectado: María González', time: 'Hace 5 min' },
+          { id: '2', action: 'Clasificación completada: Carlos Ruiz (Zafiro)', time: 'Hace 15 min' },
+          { id: '3', action: 'OSINT finalizado: Pedro Sánchez', time: 'Hace 1 hora' },
+          { id: '4', action: 'Nuevo inversor clasificado: Elena Torres (Rubí)', time: 'Hace 2 horas' },
+        ]
+      });
 
-    if (loading) {
-        return (
-            <main className="min-h-screen flex items-center justify-center">
-                <div className="text-center">
-                    <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-muted-foreground">Verificando acceso...</p>
-                </div>
-            </main>
-        );
+      setRecentProfiles(profiles.slice(0, 8));
+
+    } catch (error) {
+      console.error('Error loading dashboard:', error);
+    } finally {
+      setLoading(false);
     }
+  };
 
+  const piedraEmojis: Record<string, string> = {
+    ZAFIRO: '💎',
+    PERLA: '🔮',
+    ESMERALDA: '💚',
+    RUBI: '❤️'
+  };
+
+  const piedraColors: Record<string, string> = {
+    ZAFIRO: 'border-blue-500/30 bg-blue-500/5',
+    PERLA: 'border-purple-500/30 bg-purple-500/5',
+    ESMERALDA: 'border-emerald-500/30 bg-emerald-500/5',
+    RUBI: 'border-red-500/30 bg-red-500/5'
+  };
+
+  if (loading) {
     return (
-        <main className="min-h-screen bg-background">
-            {/* Header */}
-            <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-white/5">
-                <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                        <Link 
-                            href="/praetorium"
-                            className="p-2 hover:bg-muted rounded-xl transition-colors"
-                        >
-                            <ArrowLeft size={20} />
-                        </Link>
-                        <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
-                                <Crown size={20} className="text-amber-500" />
-                            </div>
-                            <div>
-                                <h1 className="font-serif text-xl font-medium">Alea Centurión</h1>
-                                <p className="text-xs text-muted-foreground uppercase tracking-wider">Panel de Administración</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex items-center space-x-2 bg-amber-500/10 text-amber-500 px-4 py-2 rounded-full">
-                        <Shield size={16} />
-                        <span className="text-xs font-bold uppercase tracking-wider">Admin Only</span>
-                    </div>
-                </div>
-            </header>
-
-            {/* Content */}
-            <div className="max-w-7xl mx-auto px-6 py-12">
-                <div className="mb-12">
-                    <h2 className="text-3xl font-serif mb-2">Acceso de Administrador</h2>
-                    <p className="text-muted-foreground">
-                        Sección exclusiva para administradores del sistema. Desde aquí puedes gestionar todos los aspectos técnicos y operativos.
-                    </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {adminLinks.map((link) => (
-                        <Link
-                            key={link.name}
-                            href={link.href}
-                            className="group p-6 bg-card border border-border rounded-2xl hover:border-primary/50 hover:bg-primary/5 transition-all"
-                        >
-                            <div className="flex items-start justify-between mb-4">
-                                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
-                                    {link.icon}
-                                </div>
-                                {link.badge && (
-                                    <span className="px-2 py-1 bg-amber-500/20 text-amber-500 text-[10px] font-bold uppercase tracking-wider rounded-full">
-                                        {link.badge}
-                                    </span>
-                                )}
-                            </div>
-                            <h3 className="font-medium mb-1">{link.name}</h3>
-                            <p className="text-sm text-muted-foreground">{link.description}</p>
-                        </Link>
-                    ))}
-                </div>
-
-                {/* System Status */}
-                <div className="mt-12 p-6 bg-card border border-border rounded-2xl">
-                    <h3 className="font-medium mb-4 flex items-center space-x-2">
-                        <Activity size={18} />
-                        <span>Estado del Sistema</span>
-                    </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="p-4 bg-muted/50 rounded-xl">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Deploy</p>
-                            <p className="font-medium text-green-500">Activo</p>
-                        </div>
-                        <div className="p-4 bg-muted/50 rounded-xl">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Base de Datos</p>
-                            <p className="font-medium text-green-500">Conectada</p>
-                        </div>
-                        <div className="p-4 bg-muted/50 rounded-xl">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">AI (MiniMax)</p>
-                            <p className="font-medium text-green-500">Configurado</p>
-                        </div>
-                        <div className="p-4 bg-muted/50 rounded-xl">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Email (Resend)</p>
-                            <p className="font-medium text-green-500">Conectado</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Cargando Centro de Inteligencia...</p>
+        </div>
+      </div>
     );
+  }
+
+  return (
+    <div className="p-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center space-x-4 mb-2">
+            <div className="w-12 h-12 bg-amber-500/20 rounded-2xl flex items-center justify-center">
+              <Crown className="w-6 h-6 text-amber-500" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-serif font-medium">Centro de Inteligencia Alea</h1>
+              <p className="text-muted-foreground">Panel de control y análisis de inversores</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-card border border-border rounded-2xl p-6"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                <Users className="w-5 h-5 text-primary" />
+              </div>
+              <span className="text-2xl font-bold">{stats.totalProfiles}</span>
+            </div>
+            <p className="text-sm text-muted-foreground">Perfiles OSINT</p>
+          </motion.div>
+
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-card border border-border rounded-2xl p-6"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-emerald-500" />
+              </div>
+              <span className="text-2xl font-bold">{stats.completedOSINT}</span>
+            </div>
+            <p className="text-sm text-muted-foreground">Búsquedas Completadas</p>
+          </motion.div>
+
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-card border border-border rounded-2xl p-6"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 bg-amber-500/10 rounded-xl flex items-center justify-center">
+                <Clock className="w-5 h-5 text-amber-500" />
+              </div>
+              <span className="text-2xl font-bold">{stats.pendingOSINT}</span>
+            </div>
+            <p className="text-sm text-muted-foreground">Pendientes</p>
+          </motion.div>
+
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-card border border-border rounded-2xl p-6"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 bg-purple-500/10 rounded-xl flex items-center justify-center">
+                <Brain className="w-5 h-5 text-purple-500" />
+              </div>
+              <span className="text-2xl font-bold">{stats.classifiedInvestors}</span>
+            </div>
+            <p className="text-sm text-muted-foreground">Clasificados</p>
+          </motion.div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Recent Profiles */}
+          <div className="bg-card border border-border rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-serif font-medium">Perfiles Recientes</h2>
+              <a href="/centurion/dossiers" className="text-sm text-primary hover:underline">
+                Ver todos →
+              </a>
+            </div>
+            
+            <div className="space-y-3">
+              {recentProfiles.length > 0 ? recentProfiles.map((profile) => (
+                <div 
+                  key={profile.id}
+                  className={`p-4 rounded-xl border ${profile.piedra_personalidad ? piedraColors[profile.piedra_personalidad] : 'border-border'}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{profile.full_name}</p>
+                      {profile.company_name && (
+                        <p className="text-sm text-muted-foreground">{profile.company_name}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      {profile.piedra_personalidad && (
+                        <span className="text-2xl">{piedraEmojis[profile.piedra_personalidad]}</span>
+                      )}
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        profile.scrape_status === 'completed' 
+                          ? 'bg-emerald-500/10 text-emerald-500' 
+                          : 'bg-amber-500/10 text-amber-500'
+                      }`}>
+                        {profile.scrape_status || 'pending'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )) : (
+                <div className="text-center py-8">
+                  <Users className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-muted-foreground">No hay perfiles aún</p>
+                  <a 
+                    href="/centurion/dossiers"
+                    className="text-sm text-primary hover:underline mt-2 inline-block"
+                  >
+                    Crear primera búsqueda →
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Activity Feed */}
+          <div className="bg-card border border-border rounded-2xl p-6">
+            <h2 className="text-xl font-serif font-medium mb-6">Actividad Reciente</h2>
+            
+            <div className="space-y-4">
+              {stats.recentActivity.map((activity) => (
+                <div key={activity.id} className="flex items-start space-x-3">
+                  <div className="w-2 h-2 rounded-full bg-primary mt-2" />
+                  <div>
+                    <p className="text-sm">{activity.action}</p>
+                    <p className="text-xs text-muted-foreground">{activity.time}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Piedras Preciosas Quick Reference */}
+        <div className="mt-8 bg-card border border-border rounded-2xl p-6">
+          <h2 className="text-xl font-serif font-medium mb-4">Guía Rápida: Piedras Preciosas</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl">
+              <div className="flex items-center space-x-2 mb-2">
+                <span className="text-2xl">💎</span>
+                <span className="font-bold text-blue-500">Zafiro</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-2">Motivación: Diversión</p>
+              <p className="text-xs">Sociable, competitivo, Historias, tono casual</p>
+            </div>
+
+            <div className="p-4 bg-purple-500/5 border border-purple-500/20 rounded-xl">
+              <div className="flex items-center space-x-2 mb-2">
+                <span className="text-2xl">🔮</span>
+                <span className="font-bold text-purple-500">Perla</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-2">Motivación: Causa</p>
+              <p className="text-xs">Leal, calmado, Escuchar, toque personal</p>
+            </div>
+
+            <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
+              <div className="flex items-center space-x-2 mb-2">
+                <span className="text-2xl">💚</span>
+                <span className="font-bold text-emerald-500">Esmeralda</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-2">Motivación: Análisis</p>
+              <p className="text-xs">Detallado, puntual, Datos, proceso</p>
+            </div>
+
+            <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-xl">
+              <div className="flex items-center space-x-2 mb-2">
+                <span className="text-2xl">❤️</span>
+                <span className="font-bold text-red-500">Rubí</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-2">Motivación: Desafío</p>
+              <p className="text-xs">Competitivo, ambicioso, Resultados, velocidad</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

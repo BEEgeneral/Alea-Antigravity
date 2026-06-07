@@ -23,7 +23,6 @@ import {
     Zap,
     Brain
 } from "lucide-react";
-import Navbar from "@/components/Navbar";
 import { PIEDRAS_PRECIOSAS, INVESTOR_TYPES, type InvestorClassification } from "@/lib/investor-personality";
 
 type InvestorWithClassification = {
@@ -211,7 +210,7 @@ export default function InvestorClassificationPage() {
 
     return (
         <div className="min-h-screen bg-background">
-            <Navbar />
+
             <div className="max-w-7xl mx-auto px-6 py-8">
                 {/* Header */}
                 <div className="mb-8">

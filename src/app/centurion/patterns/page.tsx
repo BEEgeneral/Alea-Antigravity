@@ -498,7 +498,7 @@ function InvestorPatternDetail({ investor, pattern, onRefresh, onDerive, deriveL
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-medium text-gray-400">Oportunidades que Matchean</h3>
             <Link 
-              href={`/centrion/investors?investor=${investor.id}`}
+              href={`/centurion/investors?investor=${investor.id}`}
               className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1"
             >
               Ver en CRM <ArrowRight className="w-3 h-3" />

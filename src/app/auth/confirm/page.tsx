@@ -107,7 +107,7 @@ function ConfirmContent() {
                             </p>
                             <div className="space-y-4">
                                 <Link 
-                                    href="/register"
+                                    href="/auth/register"
                                     className="inline-flex items-center justify-center space-x-2 bg-foreground text-background font-bold py-4 px-8 rounded-2xl transition-all hover:-translate-y-1"
                                 >
                                     <Mail size={18} />

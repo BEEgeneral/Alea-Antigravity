@@ -202,7 +202,7 @@ function LoginForm() {
 
                         <div className="flex justify-end">
                             <Link
-                                href="/forgot-password"
+                                href="/auth/forgot-password"
                                 className="text-xs text-primary hover:underline"
                             >
                                 ¿Olvidaste tu contraseña?

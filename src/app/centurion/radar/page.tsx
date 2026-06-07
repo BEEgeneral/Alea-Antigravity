@@ -92,7 +92,7 @@ const CLASSIFICATION_COLORS: Record<string, string> = {
   low: "bg-muted/10 text-muted-foreground border border-border",
 };
 
-export default function CentrionRadarPage() {
+export default function CenturionRadarPage() {
   const [signals, setSignals] = useState<ScannedSignal[]>([]);
   const [stats, setStats] = useState<ScannerStatus | null>(null);
   const [loading, setLoading] = useState(true);

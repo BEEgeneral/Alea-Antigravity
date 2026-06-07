@@ -91,7 +91,7 @@ async function scanBOE(limit = 30) {
             const hasKeyword = realEstateKeywords.some(k => combined.includes(k));
             if (!hasKeyword) continue;
 
-            const locationHints = ['Madrid', 'Barcelona', 'Valencia', 'Sevilla', 'Málaga', 'Bilbao', 'Zaragoza', 'Palma', 'Las Palmas', 'Córdoba', 'Alicante'];
+            const locationHints = ['Madrid', 'Barcelona', 'Valencia', 'Sevilla', 'Málaga', 'Bilbao', 'Zaragoza', 'Palma', 'Las Palmas', 'Córdoba', 'Alicante', 'Murcia', 'Cartagena', 'Lleida', 'Girona', 'Tarragona', 'Almería', 'Cádiz', 'Huelva', 'Badajoz', 'Cáceres', 'Salamanca', 'Valladolid', 'León', 'Burgos', 'Albacete', 'Cuenca', 'Guadalajara', 'Toledo', 'Jaén'];
             let location_hint = 'España';
             for (const loc of locationHints) {
               if (combined.includes(loc.toLowerCase())) { location_hint = loc; break; }

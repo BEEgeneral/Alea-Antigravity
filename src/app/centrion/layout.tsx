@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-    Shield, Users, Database, Settings, FileText, Activity, Bell, Webhook, 
+import {
+    Shield, Users, Database, Settings, FileText, Activity, Bell, Webhook,
     ArrowLeft,    Crown, Home, ArrowRight, Brain, Zap, Calendar, Video,
-    UserCheck, Search, BarChart3, Radar
+    UserCheck, Search, BarChart3, Radar, GitBranch
 } from "lucide-react";
 
 interface NavItem {
@@ -69,6 +69,7 @@ const navItems: NavItem[] = [
         { name: "Agenda", href: "/centrion/agenda", icon: <Calendar size={20} /> },
         { name: "Pirámide Activos", href: "/centrion/pyramid", icon: <BarChart3 size={20} /> },
         { name: "Video Llamadas", href: "/centrion/video", icon: <Video size={20} /> },
+        { name: "Grafo", href: "/centrion/grafo", icon: <GitBranch size={20} /> },
     ];
 
     if (loading) {
